@@ -42,6 +42,11 @@ AGENTS_COMFYUI_HOST=http://127.0.0.1:8188
 
 If these are omitted, the app keeps its existing defaults. Endpoint values saved in the Settings UI take precedence over `.env` endpoint values.
 
+In development, the backend API and Vite UI are separate processes:
+
+- `AGENTS_BACKEND_PORT` controls the API server. Default: `3000`.
+- `AGENTS_FRONTEND_PORT` controls the Vite dev server. Default: `5174`.
+
 ## Docker
 
 Run with Docker Compose:
@@ -50,16 +55,18 @@ Run with Docker Compose:
 docker compose up
 ```
 
-The production Docker container serves the built UI from the backend process.
+The production Docker container is different from development: it serves the
+built UI and API from the same backend process, so there is only one app port.
 On Linux, Docker Compose runs it with host networking so host-local services
 like Ollama and ComfyUI are reachable at `127.0.0.1` and `localhost`.
-`AGENTS_FRONTEND_PORT` is the web UI port used by the production container.
+`AGENTS_BACKEND_PORT` is the web UI/API port used by the production container.
 
-With defaults, the UI is available at `http://localhost:5174`. For example,
-this serves the UI on `http://localhost:5175`:
+With defaults, the UI is available at `http://localhost:3000`. For example,
+this serves the UI on `http://localhost:5174`:
 
 ```bash
-AGENTS_FRONTEND_PORT=5175
+AGENTS_BACKEND_PORT=5174
+docker compose up
 ```
 
 App data is persisted in the `agents-data` Docker volume.
