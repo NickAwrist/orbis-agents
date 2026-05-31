@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type { OllamaModelOption } from "../types";
 
 const selectClass =
@@ -17,7 +18,9 @@ export function ModelSelectBar({
   disabled: boolean;
 }) {
   const modelNames = new Set(ollamaModels.map((m) => m.name));
-  const showSelectedNotListed = Boolean(selectedModel && ollamaModels.length > 0 && !modelNames.has(selectedModel));
+  const showSelectedNotListed = Boolean(
+    selectedModel && ollamaModels.length > 0 && !modelNames.has(selectedModel),
+  );
 
   return (
     <div className="relative min-w-0">
@@ -51,9 +54,7 @@ export function ModelSelectBar({
         className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
         aria-hidden
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronDown size={12} strokeWidth={1.75} />
       </span>
     </div>
   );

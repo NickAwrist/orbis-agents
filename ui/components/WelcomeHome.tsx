@@ -1,6 +1,6 @@
 import { EyeOff, MessageSquarePlus, Sparkles } from "lucide-react";
-import type { SessionSummary } from "../types";
 import { cx, primaryButton } from "../styles";
+import type { SessionSummary } from "../types";
 
 type WelcomeHomeProps = {
   sessions: SessionSummary[];
@@ -10,7 +10,13 @@ type WelcomeHomeProps = {
   onOpenSession: (id: string) => void;
 };
 
-export function WelcomeHome({ sessions, isLoading, onNewChat, onNewEphemeralChat, onOpenSession }: WelcomeHomeProps) {
+export function WelcomeHome({
+  sessions,
+  isLoading,
+  onNewChat,
+  onNewEphemeralChat,
+  onOpenSession,
+}: WelcomeHomeProps) {
   return (
     <div className="ui-animate-fade-in mx-auto flex h-full w-full max-w-[28rem] flex-col items-center justify-center gap-8 px-6 pb-12 pt-8">
       <div className="flex flex-col items-center text-center">
@@ -24,10 +30,16 @@ export function WelcomeHome({ sessions, isLoading, onNewChat, onNewEphemeralChat
           Pick a chat or start fresh
         </h2>
         <p className="m-0 max-w-[34ch] text-[0.9375rem] leading-[1.65] text-muted-foreground">
-          Your conversations live in the sidebar. Open one to continue, or create a new thread for a clean run.
+          Your conversations live in the sidebar. Open one to continue, or
+          create a new thread for a clean run.
         </p>
         <div className="mt-[22px] flex items-center gap-2.5">
-          <button type="button" onClick={onNewChat} disabled={isLoading} className={cx(primaryButton)}>
+          <button
+            type="button"
+            onClick={onNewChat}
+            disabled={isLoading}
+            className={cx(primaryButton)}
+          >
             <MessageSquarePlus size={16} />
             New chat
           </button>

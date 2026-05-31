@@ -1,5 +1,5 @@
-import type { Tool } from "ollama";
 import { parse as parseHtml } from "node-html-parser";
+import type { Tool } from "ollama";
 import { BaseTool } from "./BaseTool";
 
 const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
@@ -41,7 +41,9 @@ export class WebSearchTool extends BaseTool {
     }
 
     const maxResults =
-      typeof args.max_results === "number" ? Math.min(Math.max(1, args.max_results), 10) : 5;
+      typeof args.max_results === "number"
+        ? Math.min(Math.max(1, args.max_results), 10)
+        : 5;
 
     try {
       const res = await fetch(DUCKDUCKGO_URL, {
@@ -80,7 +82,10 @@ export class WebSearchTool extends BaseTool {
 
 type SearchResult = { title: string; url: string; snippet: string };
 
-function parseDuckDuckGoResults(html: string, maxResults: number): SearchResult[] {
+function parseDuckDuckGoResults(
+  html: string,
+  maxResults: number,
+): SearchResult[] {
   const root = parseHtml(html);
   const nodes = root.querySelectorAll(".result");
   const out: SearchResult[] = [];
@@ -88,7 +93,8 @@ function parseDuckDuckGoResults(html: string, maxResults: number): SearchResult[
   for (const node of nodes) {
     if (out.length >= maxResults) break;
 
-    const titleAnchor = node.querySelector(".result__title a") ?? node.querySelector("h2 a");
+    const titleAnchor =
+      node.querySelector(".result__title a") ?? node.querySelector("h2 a");
     if (!titleAnchor) continue;
 
     const title = titleAnchor.text.trim();

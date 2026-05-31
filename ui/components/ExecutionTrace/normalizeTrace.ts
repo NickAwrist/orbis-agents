@@ -6,7 +6,8 @@ function normalizeMessageStep(step: MessageStep): MessageStep {
   if (!child?.steps?.length) return step;
   const fallbackAgent = child.agentName;
   const steps = child.steps.map((s) => {
-    const next = s.agentName || !fallbackAgent ? s : { ...s, agentName: fallbackAgent };
+    const next =
+      s.agentName || !fallbackAgent ? s : { ...s, agentName: fallbackAgent };
     return normalizeMessageStep(next);
   });
   return { ...step, childRun: { ...child, steps } };

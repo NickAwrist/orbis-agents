@@ -24,13 +24,10 @@ export type ComfyUITestBody = z.infer<typeof ComfyUITestBodySchema>;
 
 export const ComfyUIViewQuerySchema = z.object({
   subfolder: queryString,
-  type: z.preprocess(
-    (v) => {
-      const x = Array.isArray(v) ? v[0] : v;
-      return x === undefined || x === "" ? "output" : x;
-    },
-    z.string(),
-  ),
+  type: z.preprocess((v) => {
+    const x = Array.isArray(v) ? v[0] : v;
+    return x === undefined || x === "" ? "output" : x;
+  }, z.string()),
 });
 
 export type ComfyUIViewQuery = z.infer<typeof ComfyUIViewQuerySchema>;

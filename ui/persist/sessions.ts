@@ -28,7 +28,9 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
   const data = (await res.json()) as { sessions?: unknown };
   const raw = Array.isArray(data.sessions) ? data.sessions : [];
   return raw
-    .filter((s): s is Record<string, unknown> => s != null && typeof s === "object")
+    .filter(
+      (s): s is Record<string, unknown> => s != null && typeof s === "object",
+    )
     .map((s) => ({
       id: String(s.id ?? ""),
       createdAt: Number(s.createdAt) || 0,
@@ -39,7 +41,9 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export async function fetchSession(id: string): Promise<StoredChatSession | null> {
+export async function fetchSession(
+  id: string,
+): Promise<StoredChatSession | null> {
   const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(await readError(res));

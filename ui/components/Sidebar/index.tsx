@@ -1,5 +1,13 @@
+import {
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  Loader2,
+  Plus,
+  Settings,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Bot, ChevronLeft, ChevronRight, EyeOff, Loader2, Plus, Settings } from "lucide-react";
 import { cx, eyebrowText, iconButton } from "../../styles";
 import { SessionListItem } from "./SessionListItem";
 import type { SidebarProps } from "./types";
@@ -41,7 +49,9 @@ export function Sidebar({
           {!collapsed && (
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className={eyebrowText}>Chats</span>
-              <span className="text-[0.9375rem] font-semibold text-foreground">Recent</span>
+              <span className="text-[0.9375rem] font-semibold text-foreground">
+                Recent
+              </span>
             </div>
           )}
         </div>
@@ -66,7 +76,11 @@ export function Sidebar({
               collapsed ? "w-full" : "flex-1",
             )}
           >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            {isLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Plus size={16} />
+            )}
             {!collapsed && <span>New chat</span>}
           </button>
           <button
@@ -116,7 +130,9 @@ export function Sidebar({
 
             {sessions.length === 0 && (
               <div className="mt-1 border-t border-border-subtle px-2.5 py-3 text-[0.8125rem] leading-[1.5] text-muted-foreground">
-                {!collapsed ? "No chats yet. Start one from the button above." : "Empty"}
+                {!collapsed
+                  ? "No chats yet. Start one from the button above."
+                  : "Empty"}
               </div>
             )}
           </div>

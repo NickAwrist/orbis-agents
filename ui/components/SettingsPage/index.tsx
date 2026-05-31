@@ -1,9 +1,9 @@
 import { ArrowLeft, Save } from "lucide-react";
 import { cx, primaryButton } from "../../styles";
-import type { SettingsPageProps } from "./types";
-import type { SettingsTab } from "./types";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
+import type { SettingsPageProps } from "./types";
+import type { SettingsTab } from "./types";
 import { useSettingsPageState } from "./useSettingsPageState";
 
 export function SettingsPage(props: SettingsPageProps) {
@@ -29,11 +29,17 @@ export function SettingsPage(props: SettingsPageProps) {
           Back to chat
         </button>
         <div className="h-4 w-px bg-border-subtle" />
-        <h1 className="text-[0.9375rem] font-semibold text-foreground">Settings</h1>
+        <h1 className="text-[0.9375rem] font-semibold text-foreground">
+          Settings
+        </h1>
       </header>
 
       <div className="flex shrink-0 gap-1 border-b border-border-subtle px-5">
-        <button type="button" className={tabButtonClass("general")} onClick={() => p.setTab("general")}>
+        <button
+          type="button"
+          className={tabButtonClass("general")}
+          onClick={() => p.setTab("general")}
+        >
           General
         </button>
         <button
@@ -48,7 +54,9 @@ export function SettingsPage(props: SettingsPageProps) {
       <main className="flex-1 overflow-y-auto p-6">
         <form onSubmit={p.handleSubmit} className="mx-auto max-w-2xl space-y-6">
           {p.error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">{p.error}</div>
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+              {p.error}
+            </div>
           )}
 
           {p.tab === "general" && (
@@ -86,7 +94,10 @@ export function SettingsPage(props: SettingsPageProps) {
               type="submit"
               disabled={!p.isDirty || p.isSaving}
               aria-busy={p.isSaving}
-              className={cx(primaryButton, (!p.isDirty || p.isSaving) && "opacity-60")}
+              className={cx(
+                primaryButton,
+                (!p.isDirty || p.isSaving) && "opacity-60",
+              )}
             >
               <Save size={15} />
               Save settings

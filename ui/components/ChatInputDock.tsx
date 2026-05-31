@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
 import { ArrowUp, Square } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep } from "../types";
 
@@ -26,7 +26,8 @@ export function ChatInputDock({
 }) {
   const footerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const isBusy = chatPending || streamingStep !== null || streamingSteps.length > 0;
+  const isBusy =
+    chatPending || streamingStep !== null || streamingSteps.length > 0;
   const canSend = ollamaSendReady && !isBusy;
 
   const syncInputHeight = useCallback(() => {
@@ -103,7 +104,10 @@ export function ChatInputDock({
           <button
             type="submit"
             disabled={!input.trim() || !canSend}
-            className={cx(primaryButton, "size-9 shrink-0 justify-center rounded-lg p-0")}
+            className={cx(
+              primaryButton,
+              "size-9 shrink-0 justify-center rounded-lg p-0",
+            )}
             aria-label="Send message"
           >
             <ArrowUp size={18} />

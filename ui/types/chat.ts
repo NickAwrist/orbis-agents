@@ -10,7 +10,7 @@ export interface MessageStep {
   status?: string;
   toolName?: string;
   agentName?: string;
-  args?: any;
+  args?: unknown;
   thinking?: string;
   result?: string;
   error?: string;

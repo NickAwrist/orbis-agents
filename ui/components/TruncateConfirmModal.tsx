@@ -1,6 +1,15 @@
-import { useId } from "react";
 import { X } from "lucide-react";
-import { cx, eyebrowText, modalCloseButton, modalHeader, modalShell, primaryButton, secondaryButton } from "../styles";
+import type { KeyboardEvent, MouseEvent } from "react";
+import { useId } from "react";
+import {
+  cx,
+  eyebrowText,
+  modalCloseButton,
+  modalHeader,
+  modalShell,
+  primaryButton,
+  secondaryButton,
+} from "../styles";
 
 export function TruncateConfirmModal({
   title,
@@ -26,14 +35,31 @@ export function TruncateConfirmModal({
     onClose();
   };
 
+  const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target === event.currentTarget) handleClose();
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") handleClose();
+  };
+
   return (
-    <div className={modalShell} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={handleClose}>
-      <div className="max-h-none w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
+    <dialog
+      className={modalShell}
+      aria-labelledby={titleId}
+      open
+      onClick={handleDialogClick}
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div className="max-h-none w-full max-w-[400px]">
         <div className="ui-animate-modal-panel grid rounded-xl border border-border-subtle bg-surface">
           <div className={modalHeader}>
             <div>
               <div className={eyebrowText}>Warning</div>
-              <h2 id={titleId} className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]">
+              <h2
+                id={titleId}
+                className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]"
+              >
                 {title}
               </h2>
             </div>
@@ -41,23 +67,37 @@ export function TruncateConfirmModal({
               type="button"
               onClick={handleClose}
               disabled={busy}
-              className={cx(modalCloseButton, busy && "pointer-events-none opacity-40")}
+              className={cx(
+                modalCloseButton,
+                busy && "pointer-events-none opacity-40",
+              )}
               aria-label="Close"
             >
               <X size={18} />
             </button>
           </div>
           <div className="px-[18px] py-4 sm:px-3.5">
-            <p className="m-0 text-[0.875rem] leading-[1.6] text-muted-foreground">{description}</p>
+            <p className="m-0 text-[0.875rem] leading-[1.6] text-muted-foreground">
+              {description}
+            </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={handleClose} disabled={busy} className={secondaryButton}>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={busy}
+                className={secondaryButton}
+              >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => void Promise.resolve(onConfirm())}
                 disabled={busy}
-                className={cx(primaryButton, "!bg-[#991b1b] hover:!bg-[#b91c1c] !text-white", busy && "opacity-80")}
+                className={cx(
+                  primaryButton,
+                  "!bg-[#991b1b] hover:!bg-[#b91c1c] !text-white",
+                  busy && "opacity-80",
+                )}
               >
                 {busy ? busyConfirmLabel : confirmLabel}
               </button>
@@ -65,6 +105,6 @@ export function TruncateConfirmModal({
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

@@ -1,9 +1,10 @@
 import { Check, Copy, Pencil, RotateCcw, Send, X } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { CSSProperties } from "react";
+import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { MarkdownMessage } from "../MarkdownMessage";
-import { cx } from "../../styles";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
@@ -41,6 +42,14 @@ export function UserMessageBubble({
   beginEdit,
   copyContent,
 }: Props) {
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isEditingUser) {
+      editRef.current?.focus();
+    }
+  }, [isEditingUser]);
+
   return (
     <div className="ui-animate-slide-up flex justify-end" style={enterStyle}>
       <div className="group/msg flex w-full min-w-0 flex-col items-end">
@@ -54,11 +63,11 @@ export function UserMessageBubble({
         >
           {isEditingUser ? (
             <textarea
+              ref={editRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.min(12, Math.max(3, draft.split("\n").length))}
               className="box-border min-h-[4.5rem] w-full max-w-full bg-transparent text-[0.9375rem] leading-[1.5] text-foreground outline-none"
-              autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.preventDefault();
@@ -67,7 +76,9 @@ export function UserMessageBubble({
               }}
             />
           ) : (
-            <MarkdownMessage className="text-foreground">{message.content}</MarkdownMessage>
+            <MarkdownMessage className="text-foreground">
+              {message.content}
+            </MarkdownMessage>
           )}
         </div>
         {!isEditingUser ? (

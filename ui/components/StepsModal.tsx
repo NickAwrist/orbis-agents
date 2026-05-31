@@ -1,11 +1,27 @@
-import { useState } from "react";
 import { Check, Copy, Search, X } from "lucide-react";
-import type { MessageStep } from "../types";
+import type { KeyboardEvent, MouseEvent } from "react";
+import { useState } from "react";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
-import { ExecutionTraceList, formatTraceResultsForCopy, traceStepsForDisplay } from "./ExecutionTrace";
-import { cx, iconButton, modalCloseButton, modalHeader, modalShell, modalSurface, eyebrowText } from "../styles";
+import {
+  cx,
+  eyebrowText,
+  iconButton,
+  modalCloseButton,
+  modalHeader,
+  modalShell,
+  modalSurface,
+} from "../styles";
+import type { MessageStep } from "../types";
+import {
+  ExecutionTraceList,
+  formatTraceResultsForCopy,
+  traceStepsForDisplay,
+} from "./ExecutionTrace";
 
-export { traceStepsForDisplay, formatTraceResultsForCopy } from "./ExecutionTrace";
+export {
+  traceStepsForDisplay,
+  formatTraceResultsForCopy,
+} from "./ExecutionTrace";
 
 export function StepsModal({
   steps,
@@ -31,10 +47,24 @@ export function StepsModal({
 
   if (traceStepsForDisplay(steps ?? []).length === 0) return null;
 
+  const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target === event.currentTarget) onClose();
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") onClose();
+  };
+
   return (
-    <div className={modalShell} role="dialog" aria-modal="true" onClick={onClose}>
+    <dialog
+      className={modalShell}
+      aria-label="Agent steps"
+      open
+      onClick={handleDialogClick}
+      onKeyDown={handleDialogKeyDown}
+    >
       <div className="relative max-h-[calc(100vh-32px)] w-full max-w-[42rem]">
-        <div className={modalSurface} onClick={(e) => e.stopPropagation()}>
+        <div className={modalSurface}>
           <div className={modalHeader}>
             <div>
               <div className={eyebrowText}>Execution trace</div>
@@ -48,23 +78,34 @@ export function StepsModal({
                 type="button"
                 disabled={!canCopyResults}
                 onClick={() => void copyResults()}
-                className={cx(iconButton, "disabled:pointer-events-none disabled:opacity-40")}
+                className={cx(
+                  iconButton,
+                  "disabled:pointer-events-none disabled:opacity-40",
+                )}
                 title={resultsCopied ? "Copied" : "Copy trace results"}
                 aria-label={resultsCopied ? "Copied" : "Copy trace results"}
               >
                 {resultsCopied ? <Check size={18} /> : <Copy size={18} />}
               </button>
-              <button onClick={onClose} className={modalCloseButton} aria-label="Close steps viewer">
+              <button
+                type="button"
+                onClick={onClose}
+                className={modalCloseButton}
+                aria-label="Close steps viewer"
+              >
                 <X size={18} />
               </button>
             </div>
           </div>
 
           <div className="flex min-h-0 flex-col overflow-y-auto px-[18px] pb-5 pt-4 sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
-            <ExecutionTraceList steps={steps} streamingThinking={streamingThinking} />
+            <ExecutionTraceList
+              steps={steps}
+              streamingThinking={streamingThinking}
+            />
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

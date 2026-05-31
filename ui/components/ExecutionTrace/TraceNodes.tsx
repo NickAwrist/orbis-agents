@@ -1,13 +1,31 @@
 import { Bot, Wrench } from "lucide-react";
-import type { MessageStep, SubagentRun } from "../../types";
 import { cx, debugBlock, eyebrowText } from "../../styles";
+import type { MessageStep, SubagentRun } from "../../types";
 import { traceStepsForDisplay } from "./normalizeTrace";
+
+function traceStepKey(step: MessageStep): string {
+  return [
+    step.kind,
+    step.status,
+    step.toolName,
+    step.agentName,
+    step.result,
+    step.error,
+  ]
+    .filter((part) => typeof part === "string" && part.length > 0)
+    .join(":");
+}
 
 function TraceStepsInner({ steps }: { steps: MessageStep[] }) {
   return (
     <div className="border-l border-border-subtle/80 pl-3">
       {steps.map((step, index) => (
-        <div key={index} className={index > 0 ? "mt-3 border-t border-border-subtle/60 pt-3" : ""}>
+        <div
+          key={traceStepKey(step)}
+          className={
+            index > 0 ? "mt-3 border-t border-border-subtle/60 pt-3" : ""
+          }
+        >
           <TraceStepBody step={step} showIndex={false} />
         </div>
       ))}
@@ -30,9 +48,16 @@ function TraceSubagentPanel({ run }: { run: SubagentRun }) {
         </span>
         <span className="min-w-0 flex-1">
           Subagent trace
-          {run.agentName ? <span className="font-normal text-muted-foreground"> · {run.agentName}</span> : null}
+          {run.agentName ? (
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              · {run.agentName}
+            </span>
+          ) : null}
         </span>
-        <span className="shrink-0 text-[0.6875rem] font-normal text-muted-foreground">{steps.length} steps</span>
+        <span className="shrink-0 text-[0.6875rem] font-normal text-muted-foreground">
+          {steps.length} steps
+        </span>
       </summary>
       <div className="border-t border-border-subtle px-2 pb-3 pt-1">
         {run.prompt ? (
@@ -65,10 +90,15 @@ export function TraceStepBody({
   stepNumber?: number;
   streamingThinking?: string;
 }) {
-  const thinkingText = step.thinking || (step.status === "running" ? streamingThinking : "") || "";
+  const thinkingText =
+    step.thinking || (step.status === "running" ? streamingThinking : "") || "";
 
   return (
-    <div className={cx(showIndex && "border-b border-border-subtle py-[14px] last:border-b-0")}>
+    <div
+      className={cx(
+        showIndex && "border-b border-border-subtle py-[14px] last:border-b-0",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2">
         {showIndex && stepNumber != null ? (
           <span className="flex size-[26px] items-center justify-center rounded-md bg-muted text-[0.6875rem] font-semibold text-muted-foreground">
@@ -110,19 +140,29 @@ export function TraceStepBody({
         </div>
       ) : null}
 
-      {step.args && (
+      {step.args != null ? (
         <div className="mt-2.5">
           <div className={eyebrowText}>Arguments</div>
-          <pre className={cx(debugBlock, "mt-1.5 text-[0.8125rem] leading-[1.5] text-muted-foreground")}>
+          <pre
+            className={cx(
+              debugBlock,
+              "mt-1.5 text-[0.8125rem] leading-[1.5] text-muted-foreground",
+            )}
+          >
             {JSON.stringify(step.args, null, 2)}
           </pre>
         </div>
-      )}
+      ) : null}
 
       {step.result ? (
         <div className="mt-2.5">
           <div className={eyebrowText}>Result</div>
-          <pre className={cx(debugBlock, "mt-1.5 text-[0.8125rem] leading-[1.5] text-muted-foreground")}>
+          <pre
+            className={cx(
+              debugBlock,
+              "mt-1.5 text-[0.8125rem] leading-[1.5] text-muted-foreground",
+            )}
+          >
             {step.result}
           </pre>
         </div>

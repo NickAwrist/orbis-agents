@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { copyTextToClipboard } from "../../lib/copyTextToClipboard";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 import { UserMessageBubble } from "./UserMessageBubble";
@@ -19,9 +19,12 @@ export function MessageItem({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(message.content);
   const [copied, setCopied] = useState(false);
-  const [editBubbleWidthPx, setEditBubbleWidthPx] = useState<number | null>(null);
+  const [editBubbleWidthPx, setEditBubbleWidthPx] = useState<number | null>(
+    null,
+  );
 
-  const isEditingUser = message.role === "user" && editingUserIndex === messageIndex;
+  const isEditingUser =
+    message.role === "user" && editingUserIndex === messageIndex;
 
   useEffect(() => {
     if (isEditingUser) setDraft(message.content);
@@ -53,7 +56,11 @@ export function MessageItem({
 
   const bubbleEditStyle: CSSProperties | undefined =
     isEditingUser && editBubbleWidthPx != null
-      ? { width: editBubbleWidthPx, minWidth: editBubbleWidthPx, boxSizing: "border-box" }
+      ? {
+          width: editBubbleWidthPx,
+          minWidth: editBubbleWidthPx,
+          boxSizing: "border-box",
+        }
       : undefined;
 
   if (message.role === "user") {

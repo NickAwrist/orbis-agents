@@ -1,8 +1,8 @@
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { type RefObject, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLayoutEffect, useState, type RefObject } from "react";
-import type { SessionSummary } from "../../types";
 import { cx } from "../../styles";
+import type { SessionSummary } from "../../types";
 
 const MENU_VIEW_MARGIN = 8;
 const MENU_GAP = 4;
@@ -18,7 +18,11 @@ function SessionOptionsMenuPortal({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const [pos, setPos] = useState<{ top: number; left: number; flipped: boolean } | null>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    flipped: boolean;
+  } | null>(null);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -28,7 +32,8 @@ function SessionOptionsMenuPortal({
       const wrapRect = wrap.getBoundingClientRect();
       const panelHeight = panel?.offsetHeight ?? 88;
       const panelWidth = panel?.offsetWidth ?? 140;
-      const spaceBelow = window.innerHeight - wrapRect.bottom - MENU_VIEW_MARGIN;
+      const spaceBelow =
+        window.innerHeight - wrapRect.bottom - MENU_VIEW_MARGIN;
       const spaceAbove = wrapRect.top - MENU_VIEW_MARGIN;
       const flipped =
         spaceBelow < panelHeight &&

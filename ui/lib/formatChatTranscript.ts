@@ -20,6 +20,6 @@ export function formatChatTranscript(
     parts.push(block(label, m.content));
   }
   const stream = options?.streamingAssistant;
-  if (stream != null && stream.trim()) parts.push(block("MODEL", stream));
+  if (stream?.trim()) parts.push(block("MODEL", stream));
   return parts.join(SEP);
 }

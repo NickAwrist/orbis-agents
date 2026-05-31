@@ -17,7 +17,9 @@ export function readSseBlocks(
         const dataLine = block.split("\n").find((l) => l.startsWith("data: "));
         if (!dataLine) continue;
         try {
-          await Promise.resolve(onData(JSON.parse(dataLine.slice(6)) as Record<string, unknown>));
+          await Promise.resolve(
+            onData(JSON.parse(dataLine.slice(6)) as Record<string, unknown>),
+          );
         } catch {
           /* ignore */
         }

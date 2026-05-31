@@ -14,7 +14,11 @@ export function StreamingStatusRow({
   streamingContent,
   onViewSteps,
 }: Props) {
-  const liveMeta = getLiveStepMeta(streamingStep, streamingSteps.length, streamingContent);
+  const liveMeta = getLiveStepMeta(
+    streamingStep,
+    streamingSteps.length,
+    streamingContent,
+  );
 
   return (
     <div className="ui-animate-slide-up mt-0 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border-subtle bg-transparent py-[10px] pb-3 text-[0.8125rem] text-muted-foreground">
@@ -25,7 +29,10 @@ export function StreamingStatusRow({
           onClick={() => onViewSteps("live")}
           aria-label="View execution trace"
         >
-          <div className="ui-live-status-dot size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+          <div
+            className="ui-live-status-dot size-1.5 shrink-0 rounded-full bg-accent"
+            aria-hidden
+          />
           <span className="font-medium text-foreground">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
@@ -35,7 +42,10 @@ export function StreamingStatusRow({
         </button>
       ) : (
         <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-          <div className="ui-live-status-dot size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+          <div
+            className="ui-live-status-dot size-1.5 shrink-0 rounded-full bg-accent"
+            aria-hidden
+          />
           <span className="font-medium">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">

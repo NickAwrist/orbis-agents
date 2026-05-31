@@ -1,23 +1,23 @@
-import { useState, type CSSProperties } from "react";
-import { TruncateConfirmModal } from "./components/TruncateConfirmModal";
-import { Sidebar } from "./components/Sidebar";
+import { type CSSProperties, useState } from "react";
+import { AgentsPage } from "./components/AgentsPage";
+import { ChatAppHeader } from "./components/ChatAppHeader";
 import { ChatArea } from "./components/ChatArea";
 import { ChatInputDock } from "./components/ChatInputDock";
-import { StepsModal } from "./components/StepsModal";
-import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { DebugModal } from "./components/DebugModal";
-import { RenameSessionModal } from "./components/RenameSessionModal";
+import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { OllamaDisconnectedBanner } from "./components/OllamaDisconnectedBanner";
-import { SidebarBackdrop } from "./components/SidebarBackdrop";
-import { ChatAppHeader } from "./components/ChatAppHeader";
-import { WelcomeHome } from "./components/WelcomeHome";
-import { AgentsPage } from "./components/AgentsPage";
+import { RenameSessionModal } from "./components/RenameSessionModal";
 import { SettingsPage } from "./components/SettingsPage";
-import { cx } from "./styles";
+import { Sidebar } from "./components/Sidebar";
+import { SidebarBackdrop } from "./components/SidebarBackdrop";
+import { StepsModal } from "./components/StepsModal";
+import { TruncateConfirmModal } from "./components/TruncateConfirmModal";
+import { WelcomeHome } from "./components/WelcomeHome";
+import { useAppKeybinds } from "./hooks/useAppKeybinds";
+import { useChatApp } from "./hooks/useChatApp";
 import { copyTextToClipboard } from "./lib/copyTextToClipboard";
 import { formatChatTranscript } from "./lib/formatChatTranscript";
-import { useChatApp } from "./hooks/useChatApp";
-import { useAppKeybinds } from "./hooks/useAppKeybinds";
+import { cx } from "./styles";
 import type { AppView } from "./types";
 
 export default function App() {
@@ -51,10 +51,19 @@ export default function App() {
   return (
     <>
       {app.ollamaDisconnected && <OllamaDisconnectedBanner />}
-      <div className={cx("h-screen overflow-hidden", app.ollamaDisconnected && "pt-9")}>
+      <div
+        className={cx(
+          "h-screen overflow-hidden",
+          app.ollamaDisconnected && "pt-9",
+        )}
+      >
         <div
           className="grid h-full max-[900px]:grid-cols-1 min-[901px]:overflow-hidden min-[901px]:transition-[grid-template-columns] min-[901px]:duration-300 min-[901px]:ease-[cubic-bezier(0.22,1,0.36,1)] min-[901px]:[grid-template-columns:var(--app-sidebar-cols)]"
-          style={{ ["--app-sidebar-cols" as string]: app.sidebarCols } as CSSProperties}
+          style={
+            {
+              ["--app-sidebar-cols" as string]: app.sidebarCols,
+            } as CSSProperties
+          }
         >
           <aside
             id="app-sidebar"
@@ -62,7 +71,9 @@ export default function App() {
               "min-h-0 min-w-0 border-r border-border-subtle bg-background min-[901px]:w-full",
               "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)]",
               "max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-              app.sidebarOpen ? "max-[900px]:translate-x-0" : "max-[900px]:-translate-x-full",
+              app.sidebarOpen
+                ? "max-[900px]:translate-x-0"
+                : "max-[900px]:-translate-x-full",
             )}
           >
             <Sidebar
@@ -73,19 +84,36 @@ export default function App() {
                 setCurrentView("chat");
                 app.switchToSession(id);
               }}
-              onNewSession={() => { setCurrentView("chat"); app.createSession(); }}
-              onNewEphemeralSession={() => { setCurrentView("chat"); app.createEphemeralSession(); }}
+              onNewSession={() => {
+                setCurrentView("chat");
+                app.createSession();
+              }}
+              onNewEphemeralSession={() => {
+                setCurrentView("chat");
+                app.createEphemeralSession();
+              }}
               onRenameSession={(id) => app.setRenameSessionId(id)}
               onDeleteSession={app.requestDeleteSession}
               isLoading={app.isLoading}
               collapsed={app.sidebarCollapsed}
-              onToggleCollapsed={() => app.setSidebarCollapsed((value) => !value)}
-              onManageAgents={() => { app.setSidebarOpen(false); setCurrentView("agents"); }}
-              onSettings={() => { app.setSidebarOpen(false); setCurrentView("settings"); }}
+              onToggleCollapsed={() =>
+                app.setSidebarCollapsed((value) => !value)
+              }
+              onManageAgents={() => {
+                app.setSidebarOpen(false);
+                setCurrentView("agents");
+              }}
+              onSettings={() => {
+                app.setSidebarOpen(false);
+                setCurrentView("settings");
+              }}
             />
           </aside>
 
-          <SidebarBackdrop open={app.sidebarOpen} onClose={() => app.setSidebarOpen(false)} />
+          <SidebarBackdrop
+            open={app.sidebarOpen}
+            onClose={() => app.setSidebarOpen(false)}
+          />
 
           <main className="relative min-h-0 min-w-0 bg-background">
             {currentView === "agents" ? (
@@ -144,7 +172,12 @@ export default function App() {
                   onSessionDirectoryPersist={app.persistSessionDirectory}
                 />
 
-                <section className={cx("flex h-full min-h-0 overflow-x-hidden", !app.activeSessionId && "pt-0")}>
+                <section
+                  className={cx(
+                    "flex h-full min-h-0 overflow-x-hidden",
+                    !app.activeSessionId && "pt-0",
+                  )}
+                >
                   {app.activeSessionId ? (
                     <div
                       key={app.activeSessionId}
@@ -162,9 +195,15 @@ export default function App() {
                         onStartEditUser={app.setEditingUserIndex}
                         onCancelEditUser={() => app.setEditingUserIndex(null)}
                         onRequestEditConfirm={(userIndex, text) =>
-                          app.setTruncateConfirm({ kind: "edit", userIndex, text })
+                          app.setTruncateConfirm({
+                            kind: "edit",
+                            userIndex,
+                            text,
+                          })
                         }
-                        onRequestRetryConfirm={(userIndex) => app.setTruncateConfirm({ kind: "retry", userIndex })}
+                        onRequestRetryConfirm={(userIndex) =>
+                          app.setTruncateConfirm({ kind: "retry", userIndex })
+                        }
                       />
                     </div>
                   ) : (
@@ -208,7 +247,9 @@ export default function App() {
         {stepsModalOpen && (
           <StepsModal
             steps={app.modalSteps ?? []}
-            streamingThinking={app.stepsModalData === "live" ? app.streamingThinking : undefined}
+            streamingThinking={
+              app.stepsModalData === "live" ? app.streamingThinking : undefined
+            }
             onClose={() => app.setStepsModalData(null)}
           />
         )}

@@ -1,6 +1,16 @@
 import { cx, eyebrowText } from "../../styles";
-import { SIZE_PRESETS, hintClass, inputClass, labelClass, selectClass, sizeKey } from "./constants";
-import { comfyConnectionFeedback, ConnectionTestFeedback } from "./ConnectionTestFeedback";
+import {
+  ConnectionTestFeedback,
+  comfyConnectionFeedback,
+} from "./ConnectionTestFeedback";
+import {
+  SIZE_PRESETS,
+  hintClass,
+  inputClass,
+  labelClass,
+  selectClass,
+  sizeKey,
+} from "./constants";
 import type { ComfyUITestState } from "./types";
 
 type Props = {
@@ -56,11 +66,18 @@ export function ImageGenerationTab({
             disabled={comfyTestState.status === "loading"}
             className="shrink-0 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-[0.875rem] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
           >
-            {comfyTestState.status === "loading" ? "Testing…" : "Test connection"}
+            {comfyTestState.status === "loading"
+              ? "Testing…"
+              : "Test connection"}
           </button>
         </div>
-        <p className={hintClass}>Leave empty to use the default local ComfyUI address (http://127.0.0.1:8188).</p>
-        <ConnectionTestFeedback {...comfyConnectionFeedback(comfyTestState, comfyuiConnected)} />
+        <p className={hintClass}>
+          Leave empty to use the default local ComfyUI address
+          (http://127.0.0.1:8188).
+        </p>
+        <ConnectionTestFeedback
+          {...comfyConnectionFeedback(comfyTestState, comfyuiConnected)}
+        />
       </div>
 
       <hr className="border-border-subtle" />
@@ -69,7 +86,12 @@ export function ImageGenerationTab({
         <label htmlFor="comfyModel" className={labelClass}>
           Default Checkpoint Model
         </label>
-        <select id="comfyModel" value={comfyModel} onChange={(e) => setComfyModel(e.target.value)} className={selectClass}>
+        <select
+          id="comfyModel"
+          value={comfyModel}
+          onChange={(e) => setComfyModel(e.target.value)}
+          className={selectClass}
+        >
           <option value="">Auto (first available)</option>
           {comfyModels.map((m) => (
             <option key={m} value={m}>
@@ -78,7 +100,8 @@ export function ImageGenerationTab({
           ))}
         </select>
         <p className={hintClass}>
-          The checkpoint model used for image generation. Leave empty to use the first available model.
+          The checkpoint model used for image generation. Leave empty to use the
+          first available model.
         </p>
       </div>
 
@@ -88,7 +111,12 @@ export function ImageGenerationTab({
         <label htmlFor="comfySize" className={labelClass}>
           Default Image Size
         </label>
-        <select id="comfySize" value={comfySize} onChange={(e) => setComfySize(e.target.value)} className={selectClass}>
+        <select
+          id="comfySize"
+          value={comfySize}
+          onChange={(e) => setComfySize(e.target.value)}
+          className={selectClass}
+        >
           {SIZE_PRESETS.map((preset) => {
             const key = sizeKey(preset.width, preset.height);
             return (
@@ -116,7 +144,8 @@ export function ImageGenerationTab({
           className="min-h-[100px] w-full resize-y rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none"
         />
         <p className={hintClass}>
-          Applied to every generated image. Clear the field and save to use no negative prompt.
+          Applied to every generated image. Clear the field and save to use no
+          negative prompt.
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import type { ComfyUIConfigPayload, OllamaModelOption } from "../../types";
 import type { UserSettings } from "../../persist/userSettings";
+import type { ComfyUIConfigPayload, OllamaModelOption } from "../../types";
 
 export type SettingsTab = "general" | "image-generation";
 
@@ -11,7 +11,11 @@ export type ComfyUITestState =
 
 export type OllamaTestState =
   | { status: "idle" }
-  | { status: "loading"; previousVersion?: string; holdSavedConnected?: boolean }
+  | {
+      status: "loading";
+      previousVersion?: string;
+      holdSavedConnected?: boolean;
+    }
   | { status: "ok"; version: string }
   | { status: "err"; message: string };
 
@@ -26,6 +30,10 @@ export type SettingsPageProps = {
   comfyuiDefaultWidth: number;
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
-  onSave: (settings: UserSettings, ollamaHost: string, comfyui?: ComfyUIConfigPayload) => Promise<void>;
+  onSave: (
+    settings: UserSettings,
+    ollamaHost: string,
+    comfyui?: ComfyUIConfigPayload,
+  ) => Promise<void>;
   onBack: () => void;
 };

@@ -35,7 +35,8 @@ export function traceStepsForModal(
   streamingSteps: MessageStep[],
   streamingStep: MessageStep | null,
 ): MessageStep[] {
-  if (stepsModalData === "live") return coalesceLiveTraceSteps(streamingSteps, streamingStep);
+  if (stepsModalData === "live")
+    return coalesceLiveTraceSteps(streamingSteps, streamingStep);
   if (stepsModalData == null) return [];
   return stepsModalData;
 }
@@ -46,5 +47,9 @@ export function shouldShowStepsModal(
   streamingStep: MessageStep | null,
 ): boolean {
   if (stepsModalData == null) return false;
-  return traceStepsForDisplay(traceStepsForModal(stepsModalData, streamingSteps, streamingStep)).length > 0;
+  return (
+    traceStepsForDisplay(
+      traceStepsForModal(stepsModalData, streamingSteps, streamingStep),
+    ).length > 0
+  );
 }

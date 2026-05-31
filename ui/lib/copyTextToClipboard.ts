@@ -27,7 +27,9 @@ function fallbackCopyText(text: string): boolean {
   let ok = false;
   try {
     // Intentional legacy path for non-secure origins
-    const execCommand = (document as unknown as { execCommand: (commandId: string) => boolean }).execCommand;
+    const execCommand = (
+      document as unknown as { execCommand: (commandId: string) => boolean }
+    ).execCommand;
     ok = execCommand.call(document, "copy");
   } finally {
     document.body.removeChild(ta);

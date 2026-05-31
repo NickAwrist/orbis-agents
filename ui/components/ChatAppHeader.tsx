@@ -1,9 +1,18 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Bug, Check, Copy, EyeOff, Folder, FolderOpen, PanelLeft, X } from "lucide-react";
-import { ModelSelectBar } from "./ModelSelectBar";
-import { AgentSelectBar } from "./AgentSelectBar";
+import {
+  Bug,
+  Check,
+  Copy,
+  EyeOff,
+  Folder,
+  FolderOpen,
+  PanelLeft,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cx, iconButton } from "../styles";
 import type { OllamaModelOption } from "../types";
+import { AgentSelectBar } from "./AgentSelectBar";
+import { ModelSelectBar } from "./ModelSelectBar";
 
 type ChatAppHeaderProps = {
   activeSessionId: string | null;
@@ -58,20 +67,39 @@ function FolderPickerButton({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) close();
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      )
+        close();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, close]);
 
   const pickFolder = async () => {
     setPickingFolder(true);
     try {
-      const res = await fetch("/api/sessions/pick-directory", { method: "POST" });
-      const data = (await res.json().catch(() => ({}))) as { path?: string | null; error?: string };
-      if (!res.ok) { window.alert(typeof data.error === "string" ? data.error : res.statusText); return; }
+      const res = await fetch("/api/sessions/pick-directory", {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        path?: string | null;
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(
+          typeof data.error === "string" ? data.error : res.statusText,
+        );
+        return;
+      }
       if (typeof data.path === "string" && data.path.trim().length > 0) {
         onSessionDirectoryDraft(data.path.trim());
         await onSessionDirectoryPersist();
@@ -94,9 +122,13 @@ function FolderPickerButton({
       <button
         type="button"
         disabled={disabled || pickingFolder}
-        onClick={() => hasDir ? setOpen((v) => !v) : void pickFolder()}
+        onClick={() => (hasDir ? setOpen((v) => !v) : void pickFolder())}
         title={hasDir ? folderBasename : "Set working directory"}
-        aria-label={hasDir ? `Working directory: ${folderBasename}` : "Set working directory"}
+        aria-label={
+          hasDir
+            ? `Working directory: ${folderBasename}`
+            : "Set working directory"
+        }
         className={cx(
           "relative inline-flex items-center gap-1.5 rounded-lg border bg-transparent px-2 py-1.5 text-[0.75rem] font-medium transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-[0.97]",
           hasDir
@@ -118,7 +150,10 @@ function FolderPickerButton({
           <p className="mb-0.5 text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground/70">
             Working directory
           </p>
-          <p className="break-all text-[0.8rem] leading-snug text-foreground/90" title={dirTrimmed}>
+          <p
+            className="break-all text-[0.8rem] leading-snug text-foreground/90"
+            title={dirTrimmed}
+          >
             {dirTrimmed}
           </p>
           <div className="mt-3 flex gap-2">
@@ -224,14 +259,16 @@ export function ChatAppHeader({
         )}
       </div>
       <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-        {activeSessionId && onSessionDirectoryDraft && onSessionDirectoryPersist && (
-          <FolderPickerButton
-            sessionDirectory={sessionDirectory}
-            onSessionDirectoryDraft={onSessionDirectoryDraft}
-            onSessionDirectoryPersist={onSessionDirectoryPersist}
-            disabled={headerChatBusy}
-          />
-        )}
+        {activeSessionId &&
+          onSessionDirectoryDraft &&
+          onSessionDirectoryPersist && (
+            <FolderPickerButton
+              sessionDirectory={sessionDirectory}
+              onSessionDirectoryDraft={onSessionDirectoryDraft}
+              onSessionDirectoryPersist={onSessionDirectoryPersist}
+              disabled={headerChatBusy}
+            />
+          )}
         {activeSessionId && onCopyEntireChat && (
           <button
             type="button"

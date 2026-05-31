@@ -31,7 +31,8 @@ export function getLiveStepMeta(
 
   const toolName = step.toolName ? startCase(step.toolName) : null;
   const agentName = formatAgentName(step.agentName);
-  const isSubagentTool = step.kind === "tool_call" && step.toolName?.endsWith("_agent");
+  const isSubagentTool =
+    step.kind === "tool_call" && step.toolName?.endsWith("_agent");
 
   if (isSubagentTool) {
     return {
@@ -47,7 +48,11 @@ export function getLiveStepMeta(
     };
   }
 
-  if (step.kind === "llm_call" && agentName && step.agentName !== "general_agent") {
+  if (
+    step.kind === "llm_call" &&
+    agentName &&
+    step.agentName !== "general_agent"
+  ) {
     return {
       label: "Agent",
       detail: agentName,

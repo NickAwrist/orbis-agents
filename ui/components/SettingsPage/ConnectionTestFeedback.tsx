@@ -26,7 +26,10 @@ export function ollamaConnectionFeedback(
             : undefined,
       };
     case "ok":
-      return { variant: "ok", okLabel: `Connected — Ollama version ${state.version}` };
+      return {
+        variant: "ok",
+        okLabel: `Connected — Ollama version ${state.version}`,
+      };
     case "idle":
       if (ollamaConnected === true) {
         return { variant: "ok", okLabel: "Connected" };
@@ -61,29 +64,38 @@ export function ConnectionTestFeedback(model: ConnectionTestFeedbackModel) {
   switch (model.variant) {
     case "err":
       return (
-        <p className={cx(lineClass, "text-red-400")} role="status">
+        <output className={cx(lineClass, "block text-red-400")}>
           {model.message}
-        </p>
+        </output>
       );
     case "loading":
       if (model.verifyingLabel) {
         return (
-          <p className={cx(lineClass, "text-emerald-500/90")} role="status" aria-live="polite">
+          <output
+            className={cx(lineClass, "block text-emerald-500/90")}
+            aria-live="polite"
+          >
             <span className="opacity-65">{model.verifyingLabel}</span>
             <span className="text-muted-foreground"> · Verifying…</span>
-          </p>
+          </output>
         );
       }
       return (
-        <p className={cx(lineClass, "text-muted-foreground")} role="status" aria-live="polite">
+        <output
+          className={cx(lineClass, "block text-muted-foreground")}
+          aria-live="polite"
+        >
           Checking connection…
-        </p>
+        </output>
       );
     case "ok":
       return (
-        <p className={cx(lineClass, "text-emerald-500/90")} role="status" aria-live="polite">
+        <output
+          className={cx(lineClass, "block text-emerald-500/90")}
+          aria-live="polite"
+        >
           {model.okLabel}
-        </p>
+        </output>
       );
     default:
       return null;

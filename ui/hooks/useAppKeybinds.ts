@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
 import type { SessionSummary } from "../types";
 
 type UseAppKeybindsOptions = {
@@ -41,7 +41,9 @@ export function useAppKeybinds(opts: UseAppKeybindsOptions) {
 
         if (o.activeSessionId == null) {
           o.switchToSession(
-            k === "[" ? o.sessions[o.sessions.length - 1]!.id : o.sessions[0]!.id,
+            k === "["
+              ? o.sessions[o.sessions.length - 1]!.id
+              : o.sessions[0]!.id,
           );
           return;
         }
@@ -79,7 +81,9 @@ export function useAppKeybinds(opts: UseAppKeybindsOptions) {
         if (o.headerChatBusy || !o.activeSessionId) return;
         suppress(e);
         queueMicrotask(() => {
-          const el = document.getElementById("chat-model") as HTMLSelectElement | null;
+          const el = document.getElementById(
+            "chat-model",
+          ) as HTMLSelectElement | null;
           if (!el || el.disabled) return;
           el.focus();
           try {

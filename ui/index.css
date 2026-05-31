@@ -149,7 +149,8 @@
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 40%, transparent);
   }
   55% {
-    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent) 0%, transparent);
+    box-shadow: 0 0 0 7px
+      color-mix(in srgb, var(--color-accent) 0%, transparent);
   }
 }
 

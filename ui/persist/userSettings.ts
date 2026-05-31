@@ -18,7 +18,7 @@ export function loadUserSettings(): UserSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    
+
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
     return {
       name: parsed.name || "",
@@ -45,7 +45,9 @@ export function saveUserSettings(settings: UserSettings): void {
   }
 }
 
-export function updateUserSettings(updates: Partial<UserSettings>): UserSettings {
+export function updateUserSettings(
+  updates: Partial<UserSettings>,
+): UserSettings {
   const current = loadUserSettings();
   const updated = { ...current, ...updates };
   saveUserSettings(updated);

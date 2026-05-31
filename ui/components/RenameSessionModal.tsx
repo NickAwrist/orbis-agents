@@ -1,6 +1,14 @@
-import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { eyebrowText, modalCloseButton, modalHeader, modalShell, primaryButton, secondaryButton } from "../styles";
+import type { KeyboardEvent, MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  eyebrowText,
+  modalCloseButton,
+  modalHeader,
+  modalShell,
+  primaryButton,
+  secondaryButton,
+} from "../styles";
 
 export function RenameSessionModal({
   initialTitle,
@@ -23,18 +31,40 @@ export function RenameSessionModal({
     inputRef.current?.select();
   }, []);
 
+  const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target === event.currentTarget) onClose();
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") onClose();
+  };
+
   return (
-    <div className={modalShell} role="dialog" aria-modal="true" aria-labelledby="rename-session-title" onClick={onClose}>
-      <div className="max-h-none w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
+    <dialog
+      className={modalShell}
+      aria-labelledby="rename-session-title"
+      open
+      onClick={handleDialogClick}
+      onKeyDown={handleDialogKeyDown}
+    >
+      <div className="max-h-none w-full max-w-[400px]">
         <div className="ui-animate-modal-panel grid rounded-xl border border-border-subtle bg-surface">
           <div className={modalHeader}>
             <div>
               <div className={eyebrowText}>Chat</div>
-              <h2 id="rename-session-title" className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]">
+              <h2
+                id="rename-session-title"
+                className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]"
+              >
                 Rename
               </h2>
             </div>
-            <button type="button" onClick={onClose} className={modalCloseButton} aria-label="Close">
+            <button
+              type="button"
+              onClick={onClose}
+              className={modalCloseButton}
+              aria-label="Close"
+            >
               <X size={18} />
             </button>
           </div>
@@ -45,7 +75,10 @@ export function RenameSessionModal({
               onSave(value.trim());
             }}
           >
-            <label className="text-[0.8125rem] font-medium text-muted-foreground" htmlFor="rename-session-input">
+            <label
+              className="text-[0.8125rem] font-medium text-muted-foreground"
+              htmlFor="rename-session-input"
+            >
               Display name
             </label>
             <input
@@ -61,7 +94,11 @@ export function RenameSessionModal({
               Leave empty to show the latest user message as the title.
             </p>
             <div className="mt-[14px] flex justify-end gap-2">
-              <button type="button" className={secondaryButton} onClick={onClose}>
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={onClose}
+              >
                 Cancel
               </button>
               <button type="submit" className={primaryButton}>
@@ -71,6 +108,6 @@ export function RenameSessionModal({
           </form>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

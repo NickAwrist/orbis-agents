@@ -1,7 +1,10 @@
 import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
+import {
+  ConnectionTestFeedback,
+  ollamaConnectionFeedback,
+} from "./ConnectionTestFeedback";
 import { hintClass, inputClass, labelClass, selectClass } from "./constants";
-import { ConnectionTestFeedback, ollamaConnectionFeedback } from "./ConnectionTestFeedback";
 import type { OllamaTestState } from "./types";
 
 type Props = {
@@ -41,7 +44,9 @@ export function GeneralSettingsTab({
             placeholder="Enter your name"
             className={inputClass}
           />
-          <p className={hintClass}>Your name will be used in conversations and messages.</p>
+          <p className={hintClass}>
+            Your name will be used in conversations and messages.
+          </p>
         </div>
         <div className="mt-4 space-y-2">
           <label htmlFor="location" className={labelClass}>
@@ -55,7 +60,9 @@ export function GeneralSettingsTab({
             placeholder="e.g., New York, USA"
             className={inputClass}
           />
-          <p className={hintClass}>Your location can help provide more relevant responses.</p>
+          <p className={hintClass}>
+            Your location can help provide more relevant responses.
+          </p>
         </div>
       </div>
 
@@ -65,7 +72,8 @@ export function GeneralSettingsTab({
         <h2 className={cx(eyebrowText, "mb-4")}>Preferences</h2>
         <div className="space-y-2">
           <label htmlFor="preferredFormats" className={labelClass}>
-            Preferred Response Formats <span className="text-muted-foreground">(optional)</span>
+            Preferred Response Formats{" "}
+            <span className="text-muted-foreground">(optional)</span>
           </label>
           <textarea
             id="preferredFormats"
@@ -75,7 +83,9 @@ export function GeneralSettingsTab({
             rows={3}
             className="min-h-[100px] w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none"
           />
-          <p className={hintClass}>Specify how you prefer responses to be formatted.</p>
+          <p className={hintClass}>
+            Specify how you prefer responses to be formatted.
+          </p>
         </div>
       </div>
 
@@ -107,8 +117,13 @@ export function GeneralSettingsTab({
               {testState.status === "loading" ? "Testing…" : "Test connection"}
             </button>
           </div>
-          <p className={hintClass}>Leave empty to use the default local Ollama address (http://127.0.0.1:11434).</p>
-          <ConnectionTestFeedback {...ollamaConnectionFeedback(testState, ollamaConnected)} />
+          <p className={hintClass}>
+            Leave empty to use the default local Ollama address
+            (http://127.0.0.1:11434).
+          </p>
+          <ConnectionTestFeedback
+            {...ollamaConnectionFeedback(testState, ollamaConnected)}
+          />
         </div>
         <div className="space-y-2">
           <label htmlFor="defaultModel" className={labelClass}>
@@ -127,7 +142,9 @@ export function GeneralSettingsTab({
               </option>
             ))}
           </select>
-          <p className={hintClass}>This model will be used for new conversations.</p>
+          <p className={hintClass}>
+            This model will be used for new conversations.
+          </p>
         </div>
       </div>
     </div>

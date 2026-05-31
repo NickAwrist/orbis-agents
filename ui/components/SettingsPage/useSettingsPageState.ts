@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { UserSettings } from "../../persist/userSettings";
 import type { ComfyUIConfigPayload, OllamaModelOption } from "../../types";
 import { parseSize, sizeKey } from "./constants";
@@ -15,7 +21,11 @@ type Args = {
   comfyuiDefaultWidth: number;
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
-  onSave: (settings: UserSettings, ollamaHost: string, comfyui?: ComfyUIConfigPayload) => Promise<void>;
+  onSave: (
+    settings: UserSettings,
+    ollamaHost: string,
+    comfyui?: ComfyUIConfigPayload,
+  ) => Promise<void>;
 };
 
 export function useSettingsPageState({
@@ -36,13 +46,19 @@ export function useSettingsPageState({
   const [ollamaUri, setOllamaUri] = useState(ollamaHost);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testState, setTestState] = useState<OllamaTestState>({ status: "idle" });
+  const [testState, setTestState] = useState<OllamaTestState>({
+    status: "idle",
+  });
 
   const [comfyUri, setComfyUri] = useState(comfyuiHost);
   const [comfyModel, setComfyModel] = useState(comfyuiDefaultModel);
-  const [comfySize, setComfySize] = useState(sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight));
+  const [comfySize, setComfySize] = useState(
+    sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight),
+  );
   const [comfyModels, setComfyModels] = useState<string[]>([]);
-  const [comfyTestState, setComfyTestState] = useState<ComfyUITestState>({ status: "idle" });
+  const [comfyTestState, setComfyTestState] = useState<ComfyUITestState>({
+    status: "idle",
+  });
   const [comfyNegative, setComfyNegative] = useState(comfyuiNegativePrompt);
 
   useEffect(() => {
@@ -78,9 +94,12 @@ export function useSettingsPageState({
     }
   }, [comfyuiConnected]);
 
-  const handleChange = useCallback((field: keyof UserSettings, value: string) => {
-    setSettings((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (field: keyof UserSettings, value: string) => {
+      setSettings((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
 
   const handleTestOllama = useCallback(async () => {
     setTestState((prev) => {
@@ -99,21 +118,33 @@ export function useSettingsPageState({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ host: ollamaUri }),
       });
-      const data = (await res.json()) as { ok?: boolean; version?: string; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        version?: string;
+        error?: string;
+      };
       if (data.ok && typeof data.version === "string") {
         setTestState({ status: "ok", version: data.version });
       } else {
-        setTestState({ status: "err", message: data.error || "Connection failed" });
+        setTestState({
+          status: "err",
+          message: data.error || "Connection failed",
+        });
       }
     } catch (e) {
-      setTestState({ status: "err", message: e instanceof Error ? e.message : String(e) });
+      setTestState({
+        status: "err",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }, [ollamaUri, ollamaConnected]);
 
   const handleTestComfyUI = useCallback(async () => {
     setComfyTestState((prev) => ({
       status: "loading",
-      holdConnected: prev.status === "ok" || (prev.status === "idle" && comfyuiConnected === true),
+      holdConnected:
+        prev.status === "ok" ||
+        (prev.status === "idle" && comfyuiConnected === true),
     }));
     try {
       const res = await fetch("/api/comfyui/test", {
@@ -132,10 +163,16 @@ export function useSettingsPageState({
           /* ignore */
         }
       } else {
-        setComfyTestState({ status: "err", message: data.error || "Connection failed" });
+        setComfyTestState({
+          status: "err",
+          message: data.error || "Connection failed",
+        });
       }
     } catch (e) {
-      setComfyTestState({ status: "err", message: e instanceof Error ? e.message : String(e) });
+      setComfyTestState({
+        status: "err",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }, [comfyUri, comfyuiConnected]);
 
@@ -192,12 +229,23 @@ export function useSettingsPageState({
         setTestState({ status: "idle" });
         setComfyTestState({ status: "idle" });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save settings");
+        setError(
+          err instanceof Error ? err.message : "Failed to save settings",
+        );
       } finally {
         setIsSaving(false);
       }
     },
-    [isDirty, settings, ollamaUri, comfyUri, comfyModel, comfySize, comfyNegative, onSave],
+    [
+      isDirty,
+      settings,
+      ollamaUri,
+      comfyUri,
+      comfyModel,
+      comfySize,
+      comfyNegative,
+      onSave,
+    ],
   );
 
   const availableModels = ollamaModels.map((m) => m.name);
