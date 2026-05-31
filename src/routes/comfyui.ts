@@ -16,10 +16,16 @@ import {
   setComfyUINegativePrompt,
 } from "../db/index";
 import { logger } from "../logger";
+import {
+  ComfyUIConfigPutSchema,
+  ComfyUITestBodySchema,
+  ComfyUIViewQuerySchema,
+} from "../schemas/comfyui";
 
 const router = Router();
 const log = logger.child({ route: "comfyui" });
 
+// Checking the health of the ComfyUI server.
 router.get("/health", async (_req, res) => {
   try {
     const client = getComfyUIClient();
@@ -34,6 +40,7 @@ router.get("/health", async (_req, res) => {
   }
 });
 
+// Getting the user's comfyUI configuration.
 router.get("/config", (_req, res) => {
   const { width, height } = getComfyUIImageSize();
   res.json({
@@ -45,28 +52,28 @@ router.get("/config", (_req, res) => {
   });
 });
 
+// Updating the user's comfyUI configuration.
 router.put("/config", (req, res) => {
-  const body = req.body as {
-    host?: unknown;
-    defaultModel?: unknown;
-    defaultWidth?: unknown;
-    defaultHeight?: unknown;
-    negativePrompt?: unknown;
-  };
-  if (typeof body.host === "string") {
+  const parsed = ComfyUIConfigPutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request body",
+      details: parsed.error.flatten(),
+    });
+    return;
+  }
+  const body = parsed.data;
+  if (body.host !== undefined) {
     setComfyUIHost(body.host);
     invalidateComfyUIClient();
   }
-  if (typeof body.defaultModel === "string") {
+  if (body.defaultModel !== undefined) {
     setComfyUIDefaultModel(body.defaultModel);
   }
-  if (
-    typeof body.defaultWidth === "number" &&
-    typeof body.defaultHeight === "number"
-  ) {
+  if (body.defaultWidth !== undefined && body.defaultHeight !== undefined) {
     setComfyUIImageSize(body.defaultWidth, body.defaultHeight);
   }
-  if (typeof body.negativePrompt === "string") {
+  if (body.negativePrompt !== undefined) {
     setComfyUINegativePrompt(body.negativePrompt);
   }
   const { width, height } = getComfyUIImageSize();
@@ -79,15 +86,24 @@ router.put("/config", (req, res) => {
   });
 });
 
+// Testing the connection to the ComfyUI server.
 router.post("/test", async (req, res) => {
-  const body = req.body as { host?: unknown };
-  const raw = typeof body.host === "string" ? body.host.trim() : "";
+  const parsed = ComfyUITestBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request body",
+      details: parsed.error.flatten(),
+    });
+    return;
+  }
+  const raw = parsed.data.host?.trim() ?? "";
   const url = raw || "http://127.0.0.1:8188";
   const client = new ComfyUIClient(url);
   const result = await client.healthCheck();
   res.json({ ok: result.ok, error: result.error });
 });
 
+// Getting the available models from the ComfyUI server.
 router.get("/models", async (_req, res) => {
   try {
     const client = getComfyUIClient();
@@ -99,11 +115,18 @@ router.get("/models", async (_req, res) => {
   }
 });
 
+// Viewing a generated image from the ComfyUI server.
 router.get("/view/:filename", async (req, res) => {
   const { filename } = req.params;
-  const subfolder =
-    typeof req.query.subfolder === "string" ? req.query.subfolder : undefined;
-  const type = typeof req.query.type === "string" ? req.query.type : "output";
+  const q = ComfyUIViewQuerySchema.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({
+      error: "Invalid query",
+      details: q.error.flatten(),
+    });
+    return;
+  }
+  const { subfolder, type } = q.data;
 
   try {
     const client = getComfyUIClient();
