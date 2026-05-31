@@ -15,6 +15,7 @@ import {
   setComfyUIImageSize,
   setComfyUINegativePrompt,
 } from "../db/index";
+import { DEFAULT_COMFYUI_HOST } from "../env";
 import { logger } from "../logger";
 import {
   ComfyUIConfigPutSchema,
@@ -97,7 +98,7 @@ router.post("/test", async (req, res) => {
     return;
   }
   const raw = parsed.data.host?.trim() ?? "";
-  const url = raw || "http://127.0.0.1:8188";
+  const url = raw || getComfyUIHost() || DEFAULT_COMFYUI_HOST;
   const client = new ComfyUIClient(url);
   const result = await client.healthCheck();
   res.json({ ok: result.ok, error: result.error });

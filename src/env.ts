@@ -1,0 +1,44 @@
+const DEFAULT_BACKEND_PORT = 3000;
+const DEFAULT_FRONTEND_PORT = 5174;
+const DEFAULT_BACKEND_HOST = "127.0.0.1";
+export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
+
+function getEnv(name: string): string {
+  return process.env[name]?.trim() ?? "";
+}
+
+function getFirstEnv(names: string[]): string {
+  for (const name of names) {
+    const value = getEnv(name);
+    if (value) return value;
+  }
+  return "";
+}
+
+function getPort(names: string[], fallback: number): number {
+  const raw = getFirstEnv(names);
+  if (!raw) return fallback;
+
+  const value = Number.parseInt(raw, 10);
+  if (Number.isInteger(value) && value > 0 && value <= 65535) {
+    return value;
+  }
+
+  return fallback;
+}
+
+export const envConfig = {
+  backendPort: getPort(
+    ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
+    DEFAULT_BACKEND_PORT,
+  ),
+  backendHost:
+    getFirstEnv(["AGENTS_BACKEND_HOST", "BACKEND_HOST"]) ||
+    DEFAULT_BACKEND_HOST,
+  frontendPort: getPort(
+    ["AGENTS_FRONTEND_PORT", "FRONTEND_PORT"],
+    DEFAULT_FRONTEND_PORT,
+  ),
+  ollamaHost: getFirstEnv(["AGENTS_OLLAMA_HOST", "OLLAMA_HOST"]),
+  comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
+};

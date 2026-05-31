@@ -1,6 +1,9 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import cors from "cors";
 import express from "express";
 import { getDb } from "./db/index";
+import { envConfig } from "./env";
 import { logger } from "./logger";
 import agentsRoutes from "./routes/agents";
 import chatRoutes from "./routes/chat";
@@ -13,15 +16,19 @@ import toolsRoutes from "./routes/tools";
 
 getDb();
 
+const DEFAULT_FRONTEND_PORTS = [5173, 5174];
+const allowedFrontendPorts = Array.from(
+  new Set([...DEFAULT_FRONTEND_PORTS, envConfig.frontendPort]),
+);
+const allowedOrigins = allowedFrontendPorts.flatMap((port) => [
+  `http://localhost:${port}`,
+  `http://127.0.0.1:${port}`,
+]);
+
 const app = express();
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5174",
-    ],
+    origin: allowedOrigins,
     credentials: false,
   }),
 );
@@ -35,7 +42,25 @@ app.use("/api/models", modelsRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/chat", chatRoutes);
 
-const PORT = 3000;
-app.listen(PORT, "127.0.0.1", () => {
-  logger.info({ port: PORT, host: "127.0.0.1" }, "API server listening");
+const distPath = join(process.cwd(), "dist");
+const indexPath = join(distPath, "index.html");
+
+if (existsSync(indexPath)) {
+  app.use(express.static(distPath));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+
+    res.sendFile(indexPath);
+  });
+}
+
+const PORT = envConfig.backendPort;
+app.listen(PORT, envConfig.backendHost, () => {
+  logger.info(
+    { port: PORT, host: envConfig.backendHost },
+    "API server listening",
+  );
 });

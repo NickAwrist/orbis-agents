@@ -1,3 +1,4 @@
+import { envConfig } from "../env";
 import { agentNameExistsInDb } from "./agents/helpers";
 import { getDb } from "./connection";
 import {
@@ -30,12 +31,12 @@ export function setDefaultChatAgent(name: string): boolean {
   return true;
 }
 
-/** Stored value only; empty means use the default local Ollama URL. */
+/** Stored setting, then optional .env setting; empty means use the ollama-js default local URL. */
 export function getOllamaHost(): string {
   const row = getDb()
     .query("SELECT value FROM app_settings WHERE key = ?")
     .get(OLLAMA_HOST_KEY) as { value: string } | null;
-  return row?.value?.trim() ?? "";
+  return row?.value?.trim() || envConfig.ollamaHost;
 }
 
 export function setOllamaHost(host: string): void {
@@ -60,7 +61,7 @@ function setAppSetting(key: string, value: string): void {
 }
 
 export function getComfyUIHost(): string {
-  return getAppSetting(COMFYUI_HOST_KEY);
+  return getAppSetting(COMFYUI_HOST_KEY) || envConfig.comfyuiHost;
 }
 
 export function setComfyUIHost(host: string): void {

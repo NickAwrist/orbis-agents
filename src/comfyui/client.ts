@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import { getComfyUIHost } from "../db/index";
+import { DEFAULT_COMFYUI_HOST } from "../env";
 import { logger } from "../logger";
 
 export type ComfyUIPromptResponse = {
@@ -282,7 +283,7 @@ let clientInstance: ComfyUIClient | null = null;
 let cachedHost: string | null = null;
 
 export function getComfyUIClient(): ComfyUIClient {
-  const host = getComfyUIHost() || "http://127.0.0.1:8188";
+  const host = getComfyUIHost() || DEFAULT_COMFYUI_HOST;
   if (!clientInstance || cachedHost !== host) {
     clientInstance?.disconnect();
     clientInstance = new ComfyUIClient(host);
