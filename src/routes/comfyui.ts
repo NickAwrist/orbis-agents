@@ -5,6 +5,7 @@ import {
   getComfyUIClient,
   invalidateComfyUIClient,
 } from "../comfyui/client";
+import { withContainerLoopbackHint } from "../containerNetworkHint";
 import {
   getComfyUIDefaultModel,
   getComfyUIHost,
@@ -101,7 +102,12 @@ router.post("/test", async (req, res) => {
   const url = raw || getComfyUIHost() || DEFAULT_COMFYUI_HOST;
   const client = new ComfyUIClient(url);
   const result = await client.healthCheck();
-  res.json({ ok: result.ok, error: result.error });
+  res.json({
+    ok: result.ok,
+    error: result.error
+      ? withContainerLoopbackHint(result.error, url)
+      : undefined,
+  });
 });
 
 // Getting the available models from the ComfyUI server.

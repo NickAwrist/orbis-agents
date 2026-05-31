@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { Ollama } from "ollama";
+import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { getOllamaHost, setOllamaHost } from "../db/index";
 import {
   getOllamaClient,
@@ -64,7 +65,10 @@ ollamaRoutes.post("/test", async (req, res) => {
   } catch (e) {
     res.json({
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: withContainerLoopbackHint(
+        e instanceof Error ? e.message : String(e),
+        raw || effectiveHost,
+      ),
       effectiveHost,
     });
   }

@@ -7,7 +7,7 @@ services:
         required: false
     command: sh -c "bun install --frozen-lockfile && bun run build && AGENTS_BACKEND_HOST=0.0.0.0 bun run start"
     ports:
-      - "${AGENTS_BACKEND_PORT:-3000}:${AGENTS_BACKEND_PORT:-3000}"
+      - "${AGENTS_FRONTEND_PORT:-5174}:${AGENTS_BACKEND_PORT:-3000}"
     volumes:
       - .:/app
       - agents-node-modules:/app/node_modules
