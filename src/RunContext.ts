@@ -3,6 +3,16 @@ import type { PromptContext } from "./prompts/render";
 
 export type StepStatus = "running" | "done" | "error";
 
+export type LlmMetrics = {
+  outputTokens?: number;
+  outputDurationMs?: number;
+  promptTokens?: number;
+  promptDurationMs?: number;
+  totalDurationMs?: number;
+  loadDurationMs?: number;
+  tokensPerSecond?: number;
+};
+
 export type Step = {
   kind: "llm_call" | "tool_call" | "complete" | "error";
   status: StepStatus;
@@ -11,6 +21,7 @@ export type Step = {
   args?: Record<string, unknown>;
   result?: string;
   thinking?: string;
+  metrics?: LlmMetrics;
   error?: string;
   startedAt: string;
   endedAt?: string;
@@ -82,11 +93,17 @@ export class RunContext {
   }
 
   /** End the given running step with a result. Fires onChange. */
-  endStep(step: Step, result: string, thinking?: string): void {
+  endStep(
+    step: Step,
+    result: string,
+    thinking?: string,
+    metrics?: LlmMetrics,
+  ): void {
     if (step.status !== "running" || !this._steps.includes(step)) return;
     step.status = "done";
     step.result = result;
     if (thinking) step.thinking = thinking;
+    if (metrics) step.metrics = metrics;
     step.endedAt = new Date().toISOString();
     this._onChange?.(this, step);
   }
@@ -170,6 +187,7 @@ export class RunContext {
     if (step.args) out.args = step.args;
     if (step.result !== undefined) out.result = step.result;
     if (step.thinking !== undefined) out.thinking = step.thinking;
+    if (step.metrics !== undefined) out.metrics = step.metrics;
     if (step.error !== undefined) out.error = step.error;
     return out;
   }

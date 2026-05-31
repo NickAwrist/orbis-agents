@@ -12,6 +12,15 @@ export interface MessageStep {
   agentName?: string;
   args?: unknown;
   thinking?: string;
+  metrics?: {
+    outputTokens?: number;
+    outputDurationMs?: number;
+    promptTokens?: number;
+    promptDurationMs?: number;
+    totalDurationMs?: number;
+    loadDurationMs?: number;
+    tokensPerSecond?: number;
+  };
   result?: string;
   error?: string;
   childRun?: SubagentRun;

@@ -1,6 +1,6 @@
-import type { ToolCall } from "ollama";
+import type { ChatResponse, ToolCall } from "ollama";
 import type { Plan } from "../Plan";
-import type { RunContext, Step } from "../RunContext";
+import type { LlmMetrics, RunContext, Step } from "../RunContext";
 import { DEFAULT_CHAT_MODEL } from "../constants";
 import { logger } from "../logger";
 import { getOllamaClient } from "../ollamaClient";
@@ -15,6 +15,49 @@ type AssistantHistoryMsg = {
   content: string;
   tool_calls?: ToolCall[];
 };
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function nsToMs(value: number): number {
+  return value / 1_000_000;
+}
+
+function metricsFromOllamaChunk(chunk: ChatResponse): LlmMetrics | undefined {
+  const outputTokens = finiteNumber(chunk.eval_count);
+  const outputDurationNs = finiteNumber(chunk.eval_duration);
+  const promptTokens = finiteNumber(chunk.prompt_eval_count);
+  const promptDurationNs = finiteNumber(chunk.prompt_eval_duration);
+  const totalDurationNs = finiteNumber(chunk.total_duration);
+  const loadDurationNs = finiteNumber(chunk.load_duration);
+
+  const metrics: LlmMetrics = {};
+  if (outputTokens !== undefined) metrics.outputTokens = outputTokens;
+  if (outputDurationNs !== undefined) {
+    metrics.outputDurationMs = nsToMs(outputDurationNs);
+  }
+  if (promptTokens !== undefined) metrics.promptTokens = promptTokens;
+  if (promptDurationNs !== undefined) {
+    metrics.promptDurationMs = nsToMs(promptDurationNs);
+  }
+  if (totalDurationNs !== undefined) {
+    metrics.totalDurationMs = nsToMs(totalDurationNs);
+  }
+  if (loadDurationNs !== undefined)
+    metrics.loadDurationMs = nsToMs(loadDurationNs);
+  if (
+    outputTokens !== undefined &&
+    outputDurationNs !== undefined &&
+    outputDurationNs > 0
+  ) {
+    metrics.tokensPerSecond = outputTokens / (outputDurationNs / 1_000_000_000);
+  }
+
+  return Object.keys(metrics).length > 0 ? metrics : undefined;
+}
 
 export class BaseAgent {
   model: string;
@@ -162,6 +205,7 @@ export class BaseAgent {
       fullContent = "";
       fullThinking = "";
       toolCalls = [];
+      let llmMetrics: LlmMetrics | undefined;
 
       const stream = await getOllamaClient().chat({
         model: this.model,
@@ -195,6 +239,10 @@ export class BaseAgent {
           if (chunk.message.tool_calls?.length) {
             toolCalls = chunk.message.tool_calls;
           }
+
+          if (chunk.done) {
+            llmMetrics = metricsFromOllamaChunk(chunk);
+          }
         }
       } catch (e) {
         if (!signal?.aborted) throw e;
@@ -207,6 +255,7 @@ export class BaseAgent {
           llmStep,
           fullContent || "[aborted]",
           fullThinking || undefined,
+          llmMetrics,
         );
         break;
       }
@@ -217,17 +266,24 @@ export class BaseAgent {
           llmStep,
           `${fullContent}\n\n${toolStr}`,
           fullThinking || undefined,
+          llmMetrics,
         );
       } else if (fullContent) {
-        ctx.endStep(llmStep, fullContent, fullThinking || undefined);
+        ctx.endStep(
+          llmStep,
+          fullContent,
+          fullThinking || undefined,
+          llmMetrics,
+        );
       } else if (toolCalls.length) {
         ctx.endStep(
           llmStep,
           `→ ${toolCalls.map((c) => c.function.name).join(", ")}`,
           fullThinking || undefined,
+          llmMetrics,
         );
       } else {
-        ctx.endStep(llmStep, "", fullThinking || undefined);
+        ctx.endStep(llmStep, "", fullThinking || undefined, llmMetrics);
       }
 
       if (userMessage) {
