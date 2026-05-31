@@ -51,32 +51,31 @@ docker compose up
 ```
 
 The production Docker container serves the built UI from the backend process.
-`AGENTS_FRONTEND_PORT` is the host-facing web UI port, and
-`AGENTS_BACKEND_PORT` is the port the backend listens on inside the container.
+On Linux, Docker Compose runs it with host networking so host-local services
+like Ollama and ComfyUI are reachable at `127.0.0.1` and `localhost`.
+`AGENTS_FRONTEND_PORT` is the web UI port used by the production container.
 
-With defaults, the UI is available at `http://localhost:3000`. For example,
-this publishes the UI on `http://localhost:5175` while the backend listens on
-port `3100` in the container:
+With defaults, the UI is available at `http://localhost:5174`. For example,
+this serves the UI on `http://localhost:5175`:
 
 ```bash
-AGENTS_BACKEND_PORT=3100
 AGENTS_FRONTEND_PORT=5175
 ```
 
 App data is persisted in the `agents-data` Docker volume.
 
-When Ollama or ComfyUI are running on the host machine, set their container-reachable URLs in `.env`:
+When Ollama or ComfyUI are running on the same Linux host, these local endpoint
+values work because the container shares the host network namespace:
 
 ```bash
-AGENTS_OLLAMA_HOST=http://host.docker.internal:11434
-AGENTS_COMFYUI_HOST=http://host.docker.internal:8188
+AGENTS_OLLAMA_HOST=http://127.0.0.1:11434
+AGENTS_COMFYUI_HOST=http://127.0.0.1:8188
 ```
 
-On Linux, `http://127.0.0.1:<port>` and `http://localhost:<port>` from inside
-the container refer to the container itself, not the host. The upstream services
-also need to listen on a non-loopback interface for Docker to reach them. For
-Ollama, set `OLLAMA_HOST=0.0.0.0:11434` for the Ollama service. For ComfyUI,
-start it with `--listen 0.0.0.0`.
+If you run this Compose file on Docker Desktop for macOS or Windows, host
+networking has different behavior. In that case, use the local Bun dev commands
+or switch the Compose file back to port publishing plus
+`host.docker.internal`.
 
 ## Project Structure
 

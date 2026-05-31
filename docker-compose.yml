@@ -5,15 +5,12 @@ services:
     env_file:
       - path: .env
         required: false
-    command: sh -c "bun install --frozen-lockfile && bun run build && AGENTS_BACKEND_HOST=0.0.0.0 bun run start"
-    ports:
-      - "${AGENTS_FRONTEND_PORT:-5174}:${AGENTS_BACKEND_PORT:-3000}"
+    command: sh -c "bun install --frozen-lockfile && bun run build && AGENTS_BACKEND_HOST=0.0.0.0 AGENTS_BACKEND_PORT=$${AGENTS_FRONTEND_PORT:-5174} bun run start"
+    network_mode: host
     volumes:
       - .:/app
       - agents-node-modules:/app/node_modules
       - agents-data:/app/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 volumes:
   agents-node-modules:
