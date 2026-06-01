@@ -9,6 +9,7 @@ import {
 } from "../prompts/render";
 import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
+import { isBuiltinToolEnabled } from "../tools/availability";
 import { BashTool } from "../tools/bash";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
@@ -124,7 +125,9 @@ export const agentManager = {
     );
 
     if (config.tools.length > 0) {
-      const tools = config.tools.map((t: string) => this.getToolInstance(t));
+      const tools = config.tools
+        .filter((t: string) => this.isToolEnabled(t))
+        .map((t: string) => this.getToolInstance(t));
       agent.addTools(tools);
     }
 
@@ -161,5 +164,10 @@ export const agentManager = {
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
+  },
+
+  isToolEnabled(toolName: string): boolean {
+    if (toolName.endsWith("_agent")) return true;
+    return isBuiltinToolEnabled(toolName);
   },
 };

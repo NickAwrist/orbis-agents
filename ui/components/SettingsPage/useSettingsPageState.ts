@@ -6,9 +6,18 @@ import {
   useState,
 } from "react";
 import type { UserSettings } from "../../persist/userSettings";
-import type { ComfyUIConfigPayload, OllamaModelOption } from "../../types";
+import type {
+  ComfyUIConfigPayload,
+  OllamaModelOption,
+  SearXNGConfigPayload,
+} from "../../types";
 import { parseSize, sizeKey } from "./constants";
-import type { ComfyUITestState, OllamaTestState, SettingsTab } from "./types";
+import type {
+  ComfyUITestState,
+  OllamaTestState,
+  SearXNGTestState,
+  SettingsTab,
+} from "./types";
 
 type Args = {
   ollamaModels: OllamaModelOption[];
@@ -21,10 +30,13 @@ type Args = {
   comfyuiDefaultWidth: number;
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
+  searxngHost: string;
+  searxngConnected: boolean | null;
   onSave: (
     settings: UserSettings,
     ollamaHost: string,
     comfyui?: ComfyUIConfigPayload,
+    searxng?: SearXNGConfigPayload,
   ) => Promise<void>;
 };
 
@@ -39,6 +51,8 @@ export function useSettingsPageState({
   comfyuiDefaultWidth,
   comfyuiDefaultHeight,
   comfyuiNegativePrompt,
+  searxngHost,
+  searxngConnected,
   onSave,
 }: Args) {
   const [tab, setTab] = useState<SettingsTab>("general");
@@ -60,6 +74,10 @@ export function useSettingsPageState({
     status: "idle",
   });
   const [comfyNegative, setComfyNegative] = useState(comfyuiNegativePrompt);
+  const [searxngUri, setSearxngUri] = useState(searxngHost);
+  const [searxngTestState, setSearxngTestState] = useState<SearXNGTestState>({
+    status: "idle",
+  });
 
   useEffect(() => {
     setSettings(currentSettings);
@@ -79,6 +97,9 @@ export function useSettingsPageState({
   useEffect(() => {
     setComfyNegative(comfyuiNegativePrompt);
   }, [comfyuiNegativePrompt]);
+  useEffect(() => {
+    setSearxngUri(searxngHost);
+  }, [searxngHost]);
 
   useEffect(() => {
     if (comfyuiConnected) {
@@ -176,6 +197,36 @@ export function useSettingsPageState({
     }
   }, [comfyUri, comfyuiConnected]);
 
+  const handleTestSearXNG = useCallback(async () => {
+    setSearxngTestState((prev) => ({
+      status: "loading",
+      holdConnected:
+        prev.status === "ok" ||
+        (prev.status === "idle" && searxngConnected === true),
+    }));
+    try {
+      const res = await fetch("/api/searxng/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host: searxngUri }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setSearxngTestState({ status: "ok" });
+      } else {
+        setSearxngTestState({
+          status: "err",
+          message: data.error || "Connection failed",
+        });
+      }
+    } catch (e) {
+      setSearxngTestState({
+        status: "err",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }, [searxngUri, searxngConnected]);
+
   const savedComfySize = useMemo(
     () => sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight),
     [comfyuiDefaultWidth, comfyuiDefaultHeight],
@@ -195,6 +246,7 @@ export function useSettingsPageState({
     if (comfyModel !== comfyuiDefaultModel) return true;
     if (comfySize !== savedComfySize) return true;
     if (comfyNegative !== comfyuiNegativePrompt) return true;
+    if (searxngUri !== searxngHost) return true;
     return false;
   }, [
     settings,
@@ -209,6 +261,8 @@ export function useSettingsPageState({
     savedComfySize,
     comfyNegative,
     comfyuiNegativePrompt,
+    searxngUri,
+    searxngHost,
   ]);
 
   const handleSubmit = useCallback(
@@ -219,15 +273,23 @@ export function useSettingsPageState({
       setError(null);
       try {
         const { width, height } = parseSize(comfySize);
-        await onSave(settings, ollamaUri, {
-          host: comfyUri,
-          defaultModel: comfyModel,
-          defaultWidth: width,
-          defaultHeight: height,
-          negativePrompt: comfyNegative,
-        });
+        await onSave(
+          settings,
+          ollamaUri,
+          {
+            host: comfyUri,
+            defaultModel: comfyModel,
+            defaultWidth: width,
+            defaultHeight: height,
+            negativePrompt: comfyNegative,
+          },
+          {
+            host: searxngUri,
+          },
+        );
         setTestState({ status: "idle" });
         setComfyTestState({ status: "idle" });
+        setSearxngTestState({ status: "idle" });
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to save settings",
@@ -244,6 +306,7 @@ export function useSettingsPageState({
       comfyModel,
       comfySize,
       comfyNegative,
+      searxngUri,
       onSave,
     ],
   );
@@ -258,6 +321,11 @@ export function useSettingsPageState({
   const onComfyUriInput = useCallback((v: string) => {
     setComfyUri(v);
     setComfyTestState({ status: "idle" });
+  }, []);
+
+  const onSearxngUriInput = useCallback((v: string) => {
+    setSearxngUri(v);
+    setSearxngTestState({ status: "idle" });
   }, []);
 
   return {
@@ -280,9 +348,13 @@ export function useSettingsPageState({
     comfyTestState,
     comfyNegative,
     setComfyNegative,
+    searxngUri,
+    onSearxngUriInput,
+    searxngTestState,
     handleChange,
     handleTestOllama,
     handleTestComfyUI,
+    handleTestSearXNG,
     handleSubmit,
     availableModels,
   };

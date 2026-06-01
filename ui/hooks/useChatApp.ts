@@ -11,12 +11,14 @@ import { useChatAgentsBootstrap } from "./chat/useChatAgentsBootstrap";
 import { useChatStreaming } from "./chat/useChatStreaming";
 import { useComfyUIConnection } from "./chat/useComfyUIConnection";
 import { useOllamaConnection } from "./chat/useOllamaConnection";
+import { useSearXNGConnection } from "./chat/useSearXNGConnection";
 import { useSessionsAndNavigation } from "./chat/useSessionsAndNavigation";
 import { useSettings } from "./chat/useSettings";
 
 export function useChatApp() {
   const ollama = useOllamaConnection();
   const comfy = useComfyUIConnection();
+  const searxng = useSearXNGConnection();
   const agents = useChatAgentsBootstrap();
 
   const activeSessionIdRef = useRef<string | null>(null);
@@ -39,6 +41,8 @@ export function useChatApp() {
     ollama.refreshOllamaModels,
     comfy.fetchComfyUIHealth,
     comfy.applyComfyConfigResponse,
+    searxng.fetchSearXNGHealth,
+    searxng.applySearXNGConfigResponse,
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -163,6 +167,8 @@ export function useChatApp() {
     comfyuiDefaultWidth: comfy.comfyuiDefaultWidth,
     comfyuiDefaultHeight: comfy.comfyuiDefaultHeight,
     comfyuiNegativePrompt: comfy.comfyuiNegativePrompt,
+    searxngHost: searxng.searxngHost,
+    searxngConnected: searxng.searxngConnected,
     saveUserSettings: settings.saveUserSettings,
     switchToSession: sessions.switchToSession,
     createSession: sessions.createSession,

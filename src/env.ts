@@ -2,6 +2,7 @@ const DEFAULT_BACKEND_PORT = 3000;
 const DEFAULT_FRONTEND_PORT = 5174;
 const DEFAULT_BACKEND_HOST = "127.0.0.1";
 export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
+export const DEFAULT_SEARXNG_HOST = "http://127.0.0.1:8080";
 
 function getEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
@@ -41,4 +42,5 @@ export const envConfig = {
   ),
   ollamaHost: getFirstEnv(["AGENTS_OLLAMA_HOST", "OLLAMA_HOST"]),
   comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
+  searxngHost: getFirstEnv(["AGENTS_SEARXNG_HOST", "SEARXNG_HOST"]),
 };

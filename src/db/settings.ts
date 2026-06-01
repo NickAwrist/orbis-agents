@@ -10,6 +10,7 @@ import {
   DEFAULT_CHAT_AGENT_KEY,
   DEFAULT_COMFYUI_NEGATIVE_PROMPT,
   OLLAMA_HOST_KEY,
+  SEARXNG_HOST_KEY,
 } from "./constants";
 
 export function getDefaultChatAgent(): string {
@@ -97,4 +98,12 @@ export function getComfyUINegativePrompt(): string {
 
 export function setComfyUINegativePrompt(value: string): void {
   setAppSetting(COMFYUI_NEGATIVE_PROMPT_KEY, value);
+}
+
+export function getSearXNGHost(): string {
+  return getAppSetting(SEARXNG_HOST_KEY) || envConfig.searxngHost;
+}
+
+export function setSearXNGHost(host: string): void {
+  setAppSetting(SEARXNG_HOST_KEY, host);
 }

@@ -6,3 +6,8 @@ export interface ComfyUIConfigPayload {
   defaultHeight: number;
   negativePrompt: string;
 }
+
+/** Payload for PUT /api/searxng/config (and Settings save callback). */
+export interface SearXNGConfigPayload {
+  host: string;
+}

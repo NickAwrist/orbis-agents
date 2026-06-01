@@ -9,6 +9,7 @@ import {
   type SessionStepEvent,
   type SessionStreamDeltaEvent,
 } from "../session/AgentSession";
+import { refreshToolAvailability } from "../tools/availability";
 import type { ChatPersistence } from "./chatPersistence";
 import type { ChatTurnContext } from "./chatRequestContext";
 import type { ChatStream } from "./chatStream";
@@ -26,6 +27,7 @@ export async function runChatTurn(
   stream: ChatStream,
   persistence: ChatPersistence,
 ): Promise<void> {
+  await refreshToolAvailability();
   const session = buildSession(ctx);
 
   const onStep = (p: SessionStepEvent) =>

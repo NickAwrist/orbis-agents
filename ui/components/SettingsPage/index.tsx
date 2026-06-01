@@ -2,6 +2,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { cx, primaryButton } from "../../styles";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
+import { WebSearchTab } from "./WebSearchTab";
 import type { SettingsPageProps } from "./types";
 import type { SettingsTab } from "./types";
 import { useSettingsPageState } from "./useSettingsPageState";
@@ -49,6 +50,13 @@ export function SettingsPage(props: SettingsPageProps) {
         >
           Image Generation
         </button>
+        <button
+          type="button"
+          className={tabButtonClass("web-search")}
+          onClick={() => p.setTab("web-search")}
+        >
+          Web Search
+        </button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-6">
@@ -86,6 +94,16 @@ export function SettingsPage(props: SettingsPageProps) {
               setComfySize={p.setComfySize}
               comfyNegative={p.comfyNegative}
               setComfyNegative={p.setComfyNegative}
+            />
+          )}
+
+          {p.tab === "web-search" && (
+            <WebSearchTab
+              searxngConnected={props.searxngConnected}
+              searxngUri={p.searxngUri}
+              onSearxngUriInput={p.onSearxngUriInput}
+              searxngTestState={p.searxngTestState}
+              onTestSearXNG={p.handleTestSearXNG}
             />
           )}
 

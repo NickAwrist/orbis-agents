@@ -23,6 +23,7 @@ import {
   ComfyUITestBodySchema,
   ComfyUIViewQuerySchema,
 } from "../schemas/comfyui";
+import { setToolServiceStatus } from "../tools/availability";
 
 const router = Router();
 const log = logger.child({ route: "comfyui" });
@@ -32,9 +33,11 @@ router.get("/health", async (_req, res) => {
   try {
     const client = getComfyUIClient();
     const result = await client.healthCheck();
+    setToolServiceStatus("comfyui", result.ok);
     res.json({ connected: result.ok, error: result.error });
   } catch (e) {
     log.error({ err: e }, "comfyui health");
+    setToolServiceStatus("comfyui", false);
     res.json({
       connected: false,
       error: e instanceof Error ? e.message : String(e),

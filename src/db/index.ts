@@ -32,10 +32,12 @@ export {
   getComfyUIImageSize,
   getComfyUINegativePrompt,
   getOllamaHost,
+  getSearXNGHost,
   setComfyUIDefaultModel,
   setComfyUIHost,
   setComfyUIImageSize,
   setComfyUINegativePrompt,
   setDefaultChatAgent,
   setOllamaHost,
+  setSearXNGHost,
 } from "./settings";

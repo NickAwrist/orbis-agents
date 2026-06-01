@@ -8,5 +8,5 @@ export type {
   TruncateConfirmState,
 } from "./chat";
 export type { OllamaModelOption } from "./models";
-export type { ComfyUIConfigPayload } from "./settingsApi";
+export type { ComfyUIConfigPayload, SearXNGConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";

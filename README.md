@@ -38,6 +38,7 @@ AGENTS_BACKEND_HOST=127.0.0.1
 AGENTS_FRONTEND_PORT=5174
 AGENTS_OLLAMA_HOST=http://127.0.0.1:11434
 AGENTS_COMFYUI_HOST=http://127.0.0.1:8188
+AGENTS_SEARXNG_HOST=http://127.0.0.1:8080
 ```
 
 If these are omitted, the app keeps its existing defaults. Endpoint values saved in the Settings UI take precedence over `.env` endpoint values.
