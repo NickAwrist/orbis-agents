@@ -1,5 +1,6 @@
 import { Ollama } from "ollama";
 import { getOllamaHost } from "./db/index";
+import { providerHostConfig } from "./providerHostConfig";
 
 let cached: { hostKey: string; client: Ollama } | null = null;
 
@@ -24,7 +25,22 @@ export function invalidateOllamaClientCache(): void {
 
 /** Normalized host string as used by the client (for display). */
 export function getResolvedOllamaHost(): string {
-  const stored = getOllamaHost();
-  const o = stored ? new Ollama({ host: stored }) : new Ollama();
-  return (o as unknown as { config: { host: string } }).config.host;
+  return getOllamaHostConfig().effectiveHost;
+}
+
+export function getOllamaHostConfig(): {
+  host: string;
+  effectiveHost: string;
+} {
+  return providerHostConfig({
+    host: getOllamaHost(),
+    fallbackHost: normalizedOllamaHost(),
+    normalize: (host) =>
+      (new Ollama({ host }) as unknown as { config: { host: string } }).config
+        .host,
+  });
+}
+
+function normalizedOllamaHost(): string {
+  return (new Ollama() as unknown as { config: { host: string } }).config.host;
 }

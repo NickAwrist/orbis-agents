@@ -118,6 +118,8 @@ export default function App() {
           <main className="relative min-h-0 min-w-0 bg-background">
             {currentView === "agents" ? (
               <AgentsPage
+                defaultChatAgent={app.serverDefaultChatAgent}
+                onDefaultChatAgentChange={app.setServerDefaultChatAgent}
                 onBack={() => {
                   void app.refreshAgentDefaults();
                   setCurrentView("chat");
@@ -147,6 +149,7 @@ export default function App() {
                   sidebarOpen={app.sidebarOpen}
                   onOpenSidebar={() => app.setSidebarOpen(true)}
                   ollamaModels={app.ollamaModels}
+                  ollamaConnected={app.ollamaConnected}
                   modelsLoadError={app.modelsLoadError}
                   selectedModel={app.selectedModel}
                   onModelChange={app.handleModelChange}

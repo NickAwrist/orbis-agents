@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import { getComfyUIHost } from "../db/index";
 import { DEFAULT_COMFYUI_HOST } from "../env";
 import { logger } from "../logger";
+import { providerHostConfig } from "../providerHostConfig";
 
 export type ComfyUIPromptResponse = {
   prompt_id: string;
@@ -283,7 +284,7 @@ let clientInstance: ComfyUIClient | null = null;
 let cachedHost: string | null = null;
 
 export function getComfyUIClient(): ComfyUIClient {
-  const host = getComfyUIHost() || DEFAULT_COMFYUI_HOST;
+  const host = getResolvedComfyUIHost();
   if (!clientInstance || cachedHost !== host) {
     clientInstance?.disconnect();
     clientInstance = new ComfyUIClient(host);
@@ -296,4 +297,19 @@ export function invalidateComfyUIClient(): void {
   clientInstance?.disconnect();
   clientInstance = null;
   cachedHost = null;
+}
+
+export function getResolvedComfyUIHost(): string {
+  return getComfyUIHostConfig().effectiveHost;
+}
+
+export function getComfyUIHostConfig(): {
+  host: string;
+  effectiveHost: string;
+} {
+  return providerHostConfig({
+    host: getComfyUIHost(),
+    fallbackHost: DEFAULT_COMFYUI_HOST,
+    normalize: (host) => host.replace(/\/+$/, ""),
+  });
 }

@@ -74,8 +74,15 @@ export function useOllamaConnection() {
   }, []);
 
   useEffect(() => {
-    void refreshOllamaModels();
-  }, [refreshOllamaModels]);
+    if (ollamaConnected === true) {
+      void refreshOllamaModels();
+      return;
+    }
+    if (ollamaConnected === false) {
+      setOllamaModels([]);
+      setModelsLoadError(null);
+    }
+  }, [ollamaConnected, refreshOllamaModels]);
 
   useEffect(() => {
     let cancelled = false;

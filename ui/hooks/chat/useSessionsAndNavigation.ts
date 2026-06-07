@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { fetchDefaultChatAgent } from "../../persist/agents";
 import {
   createSessionApi,
   deleteSessionApi,
@@ -61,7 +60,6 @@ type Args = {
   ollamaModels: OllamaModelOption[];
   serverDefaultModel: string;
   serverDefaultChatAgent: string;
-  setServerDefaultChatAgent: Dispatch<SetStateAction<string>>;
   userSettingsRef: MutableRefObject<UserSettings>;
   userSettingsDefaultModel: string;
   messages: Message[];
@@ -369,13 +367,7 @@ export function useSessionsAndNavigation(p: Args) {
         }
       }
       setIsEphemeral(false);
-      let agentForNewChat = p.serverDefaultChatAgent;
-      try {
-        agentForNewChat = await fetchDefaultChatAgent();
-        p.setServerDefaultChatAgent(agentForNewChat);
-      } catch {
-        /* use last known */
-      }
+      const agentForNewChat = p.serverDefaultChatAgent;
       const names = new Set(p.ollamaModels.map((m) => m.name));
       let modelForNew = effectiveDefaultChatModel(
         p.userSettingsRef.current,
@@ -407,7 +399,6 @@ export function useSessionsAndNavigation(p: Args) {
     p.ollamaModels,
     p.serverDefaultChatAgent,
     p.serverDefaultModel,
-    p.setServerDefaultChatAgent,
     p.userSettingsRef,
     refreshSessions,
   ]);

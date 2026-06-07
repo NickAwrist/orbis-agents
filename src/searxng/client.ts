@@ -1,6 +1,7 @@
 import { parse as parseHtml } from "node-html-parser";
 import { getSearXNGHost } from "../db/index";
 import { DEFAULT_SEARXNG_HOST } from "../env";
+import { providerHostConfig } from "../providerHostConfig";
 
 export type SearXNGResult = {
   title: string;
@@ -151,7 +152,19 @@ let clientInstance: SearXNGClient | null = null;
 let cachedHost: string | null = null;
 
 export function getResolvedSearXNGHost(): string {
-  return getSearXNGHost() || DEFAULT_SEARXNG_HOST;
+  return getSearXNGHostConfig().effectiveHost;
+}
+
+export function getSearXNGHostConfig(): {
+  host: string;
+  effectiveHost: string;
+} {
+  const configuredHost = getSearXNGHost();
+  return providerHostConfig({
+    host: configuredHost === DEFAULT_SEARXNG_HOST ? "" : configuredHost,
+    fallbackHost: DEFAULT_SEARXNG_HOST,
+    normalize: (host) => host.replace(/\/+$/, ""),
+  });
 }
 
 export function getSearXNGClient(): SearXNGClient {

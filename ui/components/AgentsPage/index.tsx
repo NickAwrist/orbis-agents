@@ -5,8 +5,16 @@ import { AgentList } from "./AgentList";
 import { PROTECTED_AGENT_NAME, emptyEditor } from "./agentsPageUtils";
 import { useAgentsPage } from "./useAgentsPage";
 
-export function AgentsPage({ onBack }: { onBack: () => void }) {
-  const p = useAgentsPage();
+export function AgentsPage({
+  defaultChatAgent,
+  onDefaultChatAgentChange,
+  onBack,
+}: {
+  defaultChatAgent: string;
+  onDefaultChatAgentChange: (name: string) => void;
+  onBack: () => void;
+}) {
+  const p = useAgentsPage({ defaultChatAgent, onDefaultChatAgentChange });
 
   return (
     <div className="flex h-full min-h-0 flex-col">

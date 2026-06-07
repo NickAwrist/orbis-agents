@@ -1,4 +1,4 @@
-import { envConfig } from "../env";
+import { DEFAULT_SEARXNG_HOST, envConfig } from "../env";
 import { agentNameExistsInDb } from "./agents/helpers";
 import { getDb } from "./connection";
 import {
@@ -105,5 +105,9 @@ export function getSearXNGHost(): string {
 }
 
 export function setSearXNGHost(host: string): void {
-  setAppSetting(SEARXNG_HOST_KEY, host);
+  const trimmed = host.trim();
+  setAppSetting(
+    SEARXNG_HOST_KEY,
+    trimmed === DEFAULT_SEARXNG_HOST ? "" : trimmed,
+  );
 }

@@ -6,12 +6,14 @@ const selectClass =
 
 export function ModelSelectBar({
   ollamaModels,
+  ollamaConnected,
   modelsLoadError,
   selectedModel,
   onModelChange,
   disabled,
 }: {
   ollamaModels: OllamaModelOption[];
+  ollamaConnected: boolean | null;
   modelsLoadError: string | null;
   selectedModel: string;
   onModelChange: (model: string) => void;
@@ -21,6 +23,16 @@ export function ModelSelectBar({
   const showSelectedNotListed = Boolean(
     selectedModel && ollamaModels.length > 0 && !modelNames.has(selectedModel),
   );
+  const hasModels = ollamaModels.length > 0;
+  const placeholderValue = "__model_status__";
+  const statusLabel =
+    ollamaConnected === null
+      ? "Checking Ollama..."
+      : ollamaConnected === false
+        ? "Model provider disconnected"
+        : modelsLoadError
+          ? "Models unavailable"
+          : "No models found";
 
   return (
     <div className="relative min-w-0">
@@ -29,14 +41,14 @@ export function ModelSelectBar({
       </label>
       <select
         id="chat-model"
-        value={selectedModel}
+        value={hasModels ? selectedModel : placeholderValue}
         onChange={(e) => onModelChange(e.target.value)}
-        disabled={disabled}
+        disabled={disabled || !hasModels}
         className={selectClass}
         title={modelsLoadError ? modelsLoadError : undefined}
       >
-        {ollamaModels.length === 0 ? (
-          <option value={selectedModel}>{selectedModel || "No models"}</option>
+        {!hasModels ? (
+          <option value={placeholderValue}>{statusLabel}</option>
         ) : (
           <>
             {showSelectedNotListed && (

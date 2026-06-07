@@ -19,6 +19,7 @@ type ChatAppHeaderProps = {
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
   ollamaModels: OllamaModelOption[];
+  ollamaConnected: boolean | null;
   modelsLoadError: string | null;
   selectedModel: string;
   onModelChange: (model: string) => void;
@@ -189,6 +190,7 @@ export function ChatAppHeader({
   sidebarOpen,
   onOpenSidebar,
   ollamaModels,
+  ollamaConnected,
   modelsLoadError,
   selectedModel,
   onModelChange,
@@ -244,6 +246,7 @@ export function ChatAppHeader({
             )}
             <ModelSelectBar
               ollamaModels={ollamaModels}
+              ollamaConnected={ollamaConnected}
               modelsLoadError={modelsLoadError}
               selectedModel={selectedModel}
               onModelChange={onModelChange}

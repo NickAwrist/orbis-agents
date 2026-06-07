@@ -9,7 +9,6 @@ import {
 } from "../prompts/render";
 import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
-import { isBuiltinToolEnabled } from "../tools/availability";
 import { BashTool } from "../tools/bash";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
@@ -167,7 +166,9 @@ export const agentManager = {
   },
 
   isToolEnabled(toolName: string): boolean {
-    if (toolName.endsWith("_agent")) return true;
-    return isBuiltinToolEnabled(toolName);
+    return (
+      toolName.endsWith("_agent") ||
+      (BUILTIN_TOOLS as readonly string[]).includes(toolName)
+    );
   },
 };

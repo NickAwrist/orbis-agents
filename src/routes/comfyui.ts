@@ -3,12 +3,13 @@ import { Router } from "express";
 import {
   ComfyUIClient,
   getComfyUIClient,
+  getComfyUIHostConfig,
+  getResolvedComfyUIHost,
   invalidateComfyUIClient,
 } from "../comfyui/client";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
 import {
   getComfyUIDefaultModel,
-  getComfyUIHost,
   getComfyUIImageSize,
   getComfyUINegativePrompt,
   setComfyUIDefaultModel,
@@ -16,14 +17,12 @@ import {
   setComfyUIImageSize,
   setComfyUINegativePrompt,
 } from "../db/index";
-import { DEFAULT_COMFYUI_HOST } from "../env";
 import { logger } from "../logger";
 import {
   ComfyUIConfigPutSchema,
   ComfyUITestBodySchema,
   ComfyUIViewQuerySchema,
 } from "../schemas/comfyui";
-import { setToolServiceStatus } from "../tools/availability";
 
 const router = Router();
 const log = logger.child({ route: "comfyui" });
@@ -33,11 +32,9 @@ router.get("/health", async (_req, res) => {
   try {
     const client = getComfyUIClient();
     const result = await client.healthCheck();
-    setToolServiceStatus("comfyui", result.ok);
     res.json({ connected: result.ok, error: result.error });
   } catch (e) {
     log.error({ err: e }, "comfyui health");
-    setToolServiceStatus("comfyui", false);
     res.json({
       connected: false,
       error: e instanceof Error ? e.message : String(e),
@@ -49,7 +46,7 @@ router.get("/health", async (_req, res) => {
 router.get("/config", (_req, res) => {
   const { width, height } = getComfyUIImageSize();
   res.json({
-    host: getComfyUIHost(),
+    ...getComfyUIHostConfig(),
     defaultModel: getComfyUIDefaultModel(),
     defaultWidth: width,
     defaultHeight: height,
@@ -83,7 +80,7 @@ router.put("/config", (req, res) => {
   }
   const { width, height } = getComfyUIImageSize();
   res.json({
-    host: getComfyUIHost(),
+    ...getComfyUIHostConfig(),
     defaultModel: getComfyUIDefaultModel(),
     defaultWidth: width,
     defaultHeight: height,
@@ -102,7 +99,7 @@ router.post("/test", async (req, res) => {
     return;
   }
   const raw = parsed.data.host?.trim() ?? "";
-  const url = raw || getComfyUIHost() || DEFAULT_COMFYUI_HOST;
+  const url = raw || getResolvedComfyUIHost();
   const client = new ComfyUIClient(url);
   const result = await client.healthCheck();
   res.json({

@@ -5,7 +5,6 @@ import {
   deleteAgentApi,
   fetchAgents,
   fetchBuiltinTools,
-  fetchDefaultChatAgent,
   putDefaultChatAgentApi,
   updateAgentApi,
 } from "../../persist/agents";
@@ -17,7 +16,13 @@ import {
 } from "./agentsPageUtils";
 import type { AgentEditorState } from "./types";
 
-export function useAgentsPage() {
+export function useAgentsPage({
+  defaultChatAgent,
+  onDefaultChatAgentChange,
+}: {
+  defaultChatAgent: string;
+  onDefaultChatAgentChange: (name: string) => void;
+}) {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [builtinTools, setBuiltinTools] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -28,7 +33,7 @@ export function useAgentsPage() {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [defaultDraft, setDefaultDraft] = useState("general_agent");
+  const [defaultDraft, setDefaultDraft] = useState(defaultChatAgent);
   const [defaultSaving, setDefaultSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{
     id: string;
@@ -39,19 +44,21 @@ export function useAgentsPage() {
   const menuWrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
-    const [agentList, tools, def] = await Promise.all([
+    const [agentList, tools] = await Promise.all([
       fetchAgents(),
       fetchBuiltinTools(),
-      fetchDefaultChatAgent(),
     ]);
     setAgents(agentList);
     setBuiltinTools(tools);
-    setDefaultDraft(def);
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setDefaultDraft(defaultChatAgent);
+  }, [defaultChatAgent]);
 
   useEffect(() => {
     if (!menuOpenId) return;
@@ -156,6 +163,7 @@ export function useAgentsPage() {
     try {
       const next = await putDefaultChatAgentApi(name);
       setDefaultDraft(next);
+      onDefaultChatAgentChange(next);
     } catch (err: unknown) {
       setDefaultDraft(previous);
       setError(err instanceof Error ? err.message : "Failed to save default");

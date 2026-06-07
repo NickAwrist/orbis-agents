@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { Ollama } from "ollama";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
-import { getOllamaHost, setOllamaHost } from "../db/index";
+import { setOllamaHost } from "../db/index";
 import {
   getOllamaClient,
-  getResolvedOllamaHost,
+  getOllamaHostConfig,
   invalidateOllamaClientCache,
 } from "../ollamaClient";
 
@@ -23,10 +23,7 @@ ollamaRoutes.get("/health", async (_req, res) => {
 });
 
 ollamaRoutes.get("/config", (_req, res) => {
-  res.json({
-    host: getOllamaHost(),
-    effectiveHost: getResolvedOllamaHost(),
-  });
+  res.json(getOllamaHostConfig());
 });
 
 ollamaRoutes.put("/config", (req, res) => {
@@ -34,10 +31,7 @@ ollamaRoutes.put("/config", (req, res) => {
   const host = typeof body.host === "string" ? body.host.trim() : "";
   setOllamaHost(host);
   invalidateOllamaClientCache();
-  res.json({
-    host: getOllamaHost(),
-    effectiveHost: getResolvedOllamaHost(),
-  });
+  res.json(getOllamaHostConfig());
 });
 
 ollamaRoutes.post("/test", async (req, res) => {

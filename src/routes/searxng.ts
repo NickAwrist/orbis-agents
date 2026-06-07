@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
-import { getSearXNGHost, setSearXNGHost } from "../db/index";
-import { DEFAULT_SEARXNG_HOST } from "../env";
+import { setSearXNGHost } from "../db/index";
 import {
   SearXNGConfigPutSchema,
   SearXNGTestBodySchema,
@@ -10,23 +9,19 @@ import {
   SearXNGClient,
   getResolvedSearXNGHost,
   getSearXNGClient,
+  getSearXNGHostConfig,
   invalidateSearXNGClient,
 } from "../searxng/client";
-import { setToolServiceStatus } from "../tools/availability";
 
 const router = Router();
 
 router.get("/health", async (_req, res) => {
   const result = await getSearXNGClient().healthCheck(3000);
-  setToolServiceStatus("searxng", result.ok);
   res.json({ connected: result.ok, error: result.error });
 });
 
 router.get("/config", (_req, res) => {
-  res.json({
-    host: getSearXNGHost() || DEFAULT_SEARXNG_HOST,
-    effectiveHost: getResolvedSearXNGHost(),
-  });
+  res.json(getSearXNGHostConfig());
 });
 
 router.put("/config", (req, res) => {
@@ -42,10 +37,7 @@ router.put("/config", (req, res) => {
     setSearXNGHost(parsed.data.host);
     invalidateSearXNGClient();
   }
-  res.json({
-    host: getSearXNGHost() || DEFAULT_SEARXNG_HOST,
-    effectiveHost: getResolvedSearXNGHost(),
-  });
+  res.json(getSearXNGHostConfig());
 });
 
 router.post("/test", async (req, res) => {
