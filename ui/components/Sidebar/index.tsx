@@ -7,7 +7,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { cx, eyebrowText, iconButton } from "../../styles";
 import { SessionListItem } from "./SessionListItem";
 import type { SidebarProps } from "./types";
@@ -26,21 +26,10 @@ export function Sidebar({
   onManageAgents,
   onSettings,
 }: SidebarProps) {
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const menuWrapRef = useRef<HTMLDivElement>(null);
-  const menuPortalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!(e.target instanceof Node)) return;
-      if (menuWrapRef.current?.contains(e.target)) return;
-      if (menuPortalRef.current?.contains(e.target)) return;
-      setMenuOpenId(null);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [menuOpenId]);
+  const [openMenu, setOpenMenu] = useState<{
+    id: string;
+    anchorRect: DOMRect;
+  } | null>(null);
 
   return (
     <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3 pt-3">
@@ -104,7 +93,7 @@ export function Sidebar({
 
         <div
           className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto border-t border-border-subtle pt-1"
-          onScroll={() => setMenuOpenId(null)}
+          onScroll={() => setOpenMenu(null)}
         >
           {/* Fixed width matches expanded column minus px-2.5 so titles don't reflow during width animation */}
           <div
@@ -118,10 +107,8 @@ export function Sidebar({
                 session={session}
                 active={session.id === activeSessionId}
                 collapsed={collapsed}
-                menuOpenId={menuOpenId}
-                setMenuOpenId={setMenuOpenId}
-                menuWrapRef={menuWrapRef}
-                menuPortalRef={menuPortalRef}
+                openMenu={openMenu}
+                setOpenMenu={setOpenMenu}
                 onSelectSession={onSelectSession}
                 onRenameSession={onRenameSession}
                 onDeleteSession={onDeleteSession}

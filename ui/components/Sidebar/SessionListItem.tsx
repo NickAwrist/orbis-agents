@@ -1,106 +1,14 @@
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { type RefObject, useLayoutEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
-
-const MENU_VIEW_MARGIN = 8;
-const MENU_GAP = 4;
-
-function SessionOptionsMenuPortal({
-  menuWrapRef,
-  menuPortalRef,
-  onRename,
-  onDelete,
-}: {
-  menuWrapRef: RefObject<HTMLDivElement | null>;
-  menuPortalRef: RefObject<HTMLDivElement | null>;
-  onRename: () => void;
-  onDelete: () => void;
-}) {
-  const [pos, setPos] = useState<{
-    top: number;
-    left: number;
-    flipped: boolean;
-  } | null>(null);
-
-  useLayoutEffect(() => {
-    const update = () => {
-      const wrap = menuWrapRef.current;
-      const panel = menuPortalRef.current;
-      if (!wrap) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const panelHeight = panel?.offsetHeight ?? 88;
-      const panelWidth = panel?.offsetWidth ?? 140;
-      const spaceBelow =
-        window.innerHeight - wrapRect.bottom - MENU_VIEW_MARGIN;
-      const spaceAbove = wrapRect.top - MENU_VIEW_MARGIN;
-      const flipped =
-        spaceBelow < panelHeight &&
-        (spaceAbove >= panelHeight || spaceAbove > spaceBelow);
-      let top = flipped
-        ? wrapRect.top - panelHeight - MENU_GAP
-        : wrapRect.bottom + MENU_GAP;
-      const maxTop = window.innerHeight - panelHeight - MENU_VIEW_MARGIN;
-      const minTop = MENU_VIEW_MARGIN;
-      top = Math.min(maxTop, Math.max(minTop, top));
-      const left = Math.min(
-        Math.max(MENU_VIEW_MARGIN, wrapRect.right - panelWidth),
-        window.innerWidth - panelWidth - MENU_VIEW_MARGIN,
-      );
-      setPos({ top, left, flipped });
-    };
-
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [menuWrapRef, menuPortalRef]);
-
-  return createPortal(
-    <div
-      ref={menuPortalRef}
-      className={cx(
-        "ui-animate-slide-up fixed z-[200] min-w-[140px] rounded-lg border border-border-subtle bg-surface p-1 shadow-[0_10px_28px_rgba(0,0,0,0.4)]",
-        pos?.flipped ? "origin-bottom-right" : "origin-top-right",
-      )}
-      style={
-        pos
-          ? { top: pos.top, left: pos.left }
-          : { visibility: "hidden", top: 0, left: 0 }
-      }
-      role="menu"
-    >
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.99] active:bg-muted/80"
-        role="menuitem"
-        onClick={onRename}
-      >
-        <Pencil size={14} />
-        Rename
-      </button>
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-red-400 transition-[color,background-color,transform] duration-150 ease-out hover:bg-red-400/10 hover:text-red-300 active:scale-[0.99] active:bg-red-400/15"
-        role="menuitem"
-        onClick={onDelete}
-      >
-        <Trash2 size={14} />
-        Delete
-      </button>
-    </div>,
-    document.body,
-  );
-}
+import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 
 type Props = {
   session: SessionSummary;
   active: boolean;
   collapsed: boolean;
-  menuOpenId: string | null;
-  setMenuOpenId: (id: string | null) => void;
-  menuWrapRef: RefObject<HTMLDivElement | null>;
-  menuPortalRef: RefObject<HTMLDivElement | null>;
+  openMenu: { id: string; anchorRect: DOMRect } | null;
+  setOpenMenu: (menu: { id: string; anchorRect: DOMRect } | null) => void;
   onSelectSession: (id: string) => void;
   onRenameSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
@@ -110,14 +18,14 @@ export function SessionListItem({
   session,
   active,
   collapsed,
-  menuOpenId,
-  setMenuOpenId,
-  menuWrapRef,
-  menuPortalRef,
+  openMenu,
+  setOpenMenu,
   onSelectSession,
   onRenameSession,
   onDeleteSession,
 }: Props) {
+  const menuOpen = openMenu?.id === session.id;
+
   if (collapsed) {
     return (
       <button
@@ -147,7 +55,7 @@ export function SessionListItem({
       <button
         type="button"
         onClick={() => {
-          setMenuOpenId(null);
+          setOpenMenu(null);
           onSelectSession(session.id);
         }}
         className={cx(
@@ -164,39 +72,60 @@ export function SessionListItem({
           </div>
         </div>
       </button>
-      <div
-        className="relative flex items-start justify-center pr-0.5 pt-2"
-        ref={menuOpenId === session.id ? menuWrapRef : undefined}
-      >
+      <div className="relative flex items-start justify-center pr-0.5 pt-2">
         <button
           type="button"
           className={cx(
             "inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted hover:text-foreground active:scale-[0.94] active:bg-muted/70",
-            menuOpenId === session.id && "bg-muted text-foreground",
+            menuOpen && "bg-muted text-foreground",
           )}
-          aria-expanded={menuOpenId === session.id}
+          aria-expanded={menuOpen}
           aria-haspopup="menu"
           aria-label="Chat options"
           onClick={(e) => {
             e.stopPropagation();
-            setMenuOpenId(menuOpenId === session.id ? null : session.id);
+            if (menuOpen) {
+              setOpenMenu(null);
+              return;
+            }
+            setOpenMenu({
+              id: session.id,
+              anchorRect: e.currentTarget.getBoundingClientRect(),
+            });
           }}
         >
           <MoreVertical size={16} />
         </button>
-        {menuOpenId === session.id && (
-          <SessionOptionsMenuPortal
-            menuWrapRef={menuWrapRef}
-            menuPortalRef={menuPortalRef}
-            onRename={() => {
-              setMenuOpenId(null);
-              onRenameSession(session.id);
-            }}
-            onDelete={() => {
-              setMenuOpenId(null);
-              onDeleteSession(session.id);
-            }}
-          />
+        {menuOpen && (
+          <FloatingOptionsMenu
+            anchorRect={openMenu.anchorRect}
+            onClose={() => setOpenMenu(null)}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.99] active:bg-muted/80"
+              role="menuitem"
+              onClick={() => {
+                setOpenMenu(null);
+                onRenameSession(session.id);
+              }}
+            >
+              <Pencil size={14} />
+              Rename
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-red-400 transition-[color,background-color,transform] duration-150 ease-out hover:bg-red-400/10 hover:text-red-300 active:scale-[0.99] active:bg-red-400/15"
+              role="menuitem"
+              onClick={() => {
+                setOpenMenu(null);
+                onDeleteSession(session.id);
+              }}
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          </FloatingOptionsMenu>
         )}
       </div>
     </div>

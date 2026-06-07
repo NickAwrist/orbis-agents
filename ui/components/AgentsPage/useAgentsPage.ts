@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type AgentData,
   createAgentApi,
@@ -39,9 +39,11 @@ export function useAgentsPage({
     id: string;
     name: string;
   } | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<{
+    id: string;
+    anchorRect: DOMRect;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const menuWrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const [agentList, tools] = await Promise.all([
@@ -59,17 +61,6 @@ export function useAgentsPage({
   useEffect(() => {
     setDefaultDraft(defaultChatAgent);
   }, [defaultChatAgent]);
-
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!(e.target instanceof Node)) return;
-      if (menuWrapRef.current?.contains(e.target)) return;
-      setMenuOpenId(null);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [menuOpenId]);
 
   const otherAgentNames = agents
     .filter((a) => a.id !== selectedId)
@@ -134,7 +125,7 @@ export function useAgentsPage({
   const performDelete = async () => {
     if (!pendingDelete) return;
     const { id } = pendingDelete;
-    setMenuOpenId(null);
+    setOpenMenu(null);
     setDeleting(true);
     setError(null);
     try {
@@ -200,10 +191,9 @@ export function useAgentsPage({
     defaultSaving,
     pendingDelete,
     setPendingDelete,
-    menuOpenId,
-    setMenuOpenId,
+    openMenu,
+    setOpenMenu,
     deleting,
-    menuWrapRef,
     load,
     otherAgentNames,
     selectAgent,

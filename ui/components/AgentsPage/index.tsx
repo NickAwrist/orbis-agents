@@ -62,9 +62,8 @@ export function AgentsPage({
           agents={p.agents}
           selectedId={p.selectedId}
           isNew={p.isNew}
-          menuOpenId={p.menuOpenId}
-          setMenuOpenId={p.setMenuOpenId}
-          menuWrapRef={p.menuWrapRef}
+          openMenu={p.openMenu}
+          setOpenMenu={p.setOpenMenu}
           deleting={p.deleting}
           onSelectAgent={p.selectAgent}
           onStartNew={p.startNew}

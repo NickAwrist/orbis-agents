@@ -1,16 +1,15 @@
 import { Bot, MoreVertical, Plus, Trash2 } from "lucide-react";
-import type { RefObject } from "react";
 import type { AgentData } from "../../persist/agents";
 import { cx, eyebrowText } from "../../styles";
+import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 import { canDeleteAgent } from "./agentsPageUtils";
 
 type Props = {
   agents: AgentData[];
   selectedId: string | null;
   isNew: boolean;
-  menuOpenId: string | null;
-  setMenuOpenId: (id: string | null) => void;
-  menuWrapRef: RefObject<HTMLDivElement | null>;
+  openMenu: { id: string; anchorRect: DOMRect } | null;
+  setOpenMenu: (menu: { id: string; anchorRect: DOMRect } | null) => void;
   deleting: boolean;
   onSelectAgent: (a: AgentData) => void;
   onStartNew: () => void;
@@ -21,9 +20,8 @@ export function AgentList({
   agents,
   selectedId,
   isNew,
-  menuOpenId,
-  setMenuOpenId,
-  menuWrapRef,
+  openMenu,
+  setOpenMenu,
   deleting,
   onSelectAgent,
   onStartNew,
@@ -46,6 +44,7 @@ export function AgentList({
         {agents.map((a) => {
           const deletable = canDeleteAgent(a);
           const active = selectedId === a.id && !isNew;
+          const menuOpen = openMenu?.id === a.id;
           return (
             <div
               key={a.id}
@@ -58,7 +57,7 @@ export function AgentList({
               <button
                 type="button"
                 onClick={() => {
-                  setMenuOpenId(null);
+                  setOpenMenu(null);
                   onSelectAgent(a);
                 }}
                 className={cx(
@@ -79,31 +78,34 @@ export function AgentList({
                 </div>
               </button>
               {deletable && (
-                <div
-                  className="relative flex items-start justify-center pr-0.5 pt-2 max-[700px]:opacity-100 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-                  ref={menuOpenId === a.id ? menuWrapRef : undefined}
-                >
+                <div className="relative flex items-start justify-center pr-0.5 pt-2 max-[700px]:opacity-100 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button
                     type="button"
                     className={cx(
                       "inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted hover:text-foreground active:scale-[0.94] active:bg-muted/70 max-[700px]:opacity-100",
-                      menuOpenId === a.id &&
-                        "bg-muted text-foreground md:opacity-100",
+                      menuOpen && "bg-muted text-foreground md:opacity-100",
                     )}
-                    aria-expanded={menuOpenId === a.id}
+                    aria-expanded={menuOpen}
                     aria-haspopup="menu"
                     aria-label="Agent options"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setMenuOpenId(menuOpenId === a.id ? null : a.id);
+                      if (menuOpen) {
+                        setOpenMenu(null);
+                        return;
+                      }
+                      setOpenMenu({
+                        id: a.id,
+                        anchorRect: e.currentTarget.getBoundingClientRect(),
+                      });
                     }}
                   >
                     <MoreVertical size={16} />
                   </button>
-                  {menuOpenId === a.id && (
-                    <div
-                      className="ui-animate-slide-up absolute right-0 top-full z-50 mt-1 min-w-[140px] origin-top-right rounded-lg border border-border-subtle bg-surface p-1 shadow-[0_10px_28px_rgba(0,0,0,0.4)]"
-                      role="menu"
+                  {menuOpen && (
+                    <FloatingOptionsMenu
+                      anchorRect={openMenu.anchorRect}
+                      onClose={() => setOpenMenu(null)}
                     >
                       <button
                         type="button"
@@ -111,14 +113,14 @@ export function AgentList({
                         role="menuitem"
                         disabled={deleting}
                         onClick={() => {
-                          setMenuOpenId(null);
+                          setOpenMenu(null);
                           onRequestDeleteAgent(a);
                         }}
                       >
                         <Trash2 size={14} />
                         Delete
                       </button>
-                    </div>
+                    </FloatingOptionsMenu>
                   )}
                 </div>
               )}
