@@ -51,7 +51,7 @@ function TraceSubagentPanel({ run }: { run: SubagentRun }) {
           {run.agentName ? (
             <span className="font-normal text-muted-foreground">
               {" "}
-              · {run.agentName}
+              - {run.agentName}
             </span>
           ) : null}
         </span>

@@ -29,5 +29,5 @@ export function toolErrorToString(
     logger.error({ err }, "tool error");
   }
   const msg = redactPaths(raw, sessionDir);
-  return msg.length > 2000 ? `${msg.slice(0, 2000)}…` : msg;
+  return msg.length > 2000 ? `${msg.slice(0, 2000)}...` : msg;
 }

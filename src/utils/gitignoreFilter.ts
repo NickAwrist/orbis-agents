@@ -83,7 +83,7 @@ export async function loadGitignore(startDir?: string): Promise<Ignore> {
 /**
  * Map a loose path token from command output to a path the `ignore` package
  * accepts (same shape as `path.relative(cwd, abs)`). Returns null if the token
- * is not a plausible repo-relative path — then we must not filter the line.
+ * is not a plausible repo-relative path - then we must not filter the line.
  */
 function normalizePathTokenForIgnore(
   token: string,
@@ -213,7 +213,7 @@ export function filterOutputLines(
  * `tree` output, `grep`-style `file:line:` prefixes, etc.
  */
 function extractPathToken(line: string): string | null {
-  const treeStripped = line.replace(/^[│├└─┬┤\s|`\\+-]+/, "").trim();
+  const treeStripped = line.replace(/^[\s|`+\\-]+/, "").trim();
   if (treeStripped && !treeStripped.includes(" ")) {
     return treeStripped.replace(/\/$/, "");
   }

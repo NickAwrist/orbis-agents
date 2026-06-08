@@ -32,7 +32,7 @@ export interface Message {
   steps?: MessageStep[];
 }
 
-/** Confirm truncate + retry/edit from chat UI */
+/** Confirm truncate + retry/edit from run UI */
 export type TruncateConfirmState =
   | { kind: "edit"; userIndex: number; text: string }
   | { kind: "retry"; userIndex: number }

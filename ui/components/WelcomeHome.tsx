@@ -5,16 +5,16 @@ import type { SessionSummary } from "../types";
 type WelcomeHomeProps = {
   sessions: SessionSummary[];
   isLoading: boolean;
-  onNewChat: () => void;
-  onNewEphemeralChat: () => void;
+  onNewRun: () => void;
+  onNewEphemeralRun: () => void;
   onOpenSession: (id: string) => void;
 };
 
 export function WelcomeHome({
   sessions,
   isLoading,
-  onNewChat,
-  onNewEphemeralChat,
+  onNewRun,
+  onNewEphemeralRun,
   onOpenSession,
 }: WelcomeHomeProps) {
   return (
@@ -27,7 +27,7 @@ export function WelcomeHome({
           <Sparkles size={22} />
         </div>
         <h2 className="mb-2.5 text-[1.375rem] font-semibold leading-[1.25] tracking-[-0.02em] text-foreground">
-          Pick a chat or start fresh
+          Pick a run or start fresh
         </h2>
         <p className="m-0 max-w-[34ch] text-[0.9375rem] leading-[1.65] text-muted-foreground">
           Your conversations live in the sidebar. Open one to continue, or
@@ -36,16 +36,16 @@ export function WelcomeHome({
         <div className="mt-[22px] flex items-center gap-2.5">
           <button
             type="button"
-            onClick={onNewChat}
+            onClick={onNewRun}
             disabled={isLoading}
             className={cx(primaryButton)}
           >
             <MessageSquarePlus size={16} />
-            New chat
+            New run
           </button>
           <button
             type="button"
-            onClick={onNewEphemeralChat}
+            onClick={onNewEphemeralRun}
             className="inline-flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-2.5 text-[0.8125rem] font-semibold text-amber-400 transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-amber-500/40 hover:bg-amber-500/10 active:scale-[0.98] active:bg-amber-500/15"
           >
             <EyeOff size={16} />
@@ -67,7 +67,7 @@ export function WelcomeHome({
                   onClick={() => onOpenSession(s.id)}
                 >
                   <span className="min-w-0 truncate whitespace-nowrap font-medium text-foreground">
-                    {s.preview || "Chat"}
+                    {s.preview || "Run"}
                   </span>
                   <span className="shrink-0 text-[0.75rem] text-muted-foreground">
                     {new Date(s.updatedAt).toLocaleDateString()}

@@ -119,7 +119,7 @@ export class RunContext {
 
   /**
    * Error recovery when the caller did not keep a step handle (e.g. thrown from `run`).
-   * Prefer explicit `failStep(step, …)` in new code.
+   * Prefer explicit `failStep(step, ...)` in new code.
    */
   failLastRunningStep(error: string): void {
     for (let i = this._steps.length - 1; i >= 0; i--) {

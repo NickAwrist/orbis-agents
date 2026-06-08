@@ -1,13 +1,13 @@
 import type { Response } from "express";
-import { buildServerChatPromptContext } from "../agents/agentManager";
-import { DEFAULT_CHAT_MODEL } from "../constants";
+import { buildServerRunPromptContext } from "../agents/agentManager";
+import { DEFAULT_RUN_MODEL } from "../constants";
 import { type SessionRow, getAgentByName, getSessionById } from "../db/index";
 import type { PromptContext } from "../prompts/render";
-import { type ChatBody, ChatBodySchema } from "../schemas/chat";
+import { type RunBody, RunBodySchema } from "../schemas/run";
 import { resolveEffectiveToolSessionDir } from "../sessionDirectory";
 
-export type ChatTurnContext = {
-  body: ChatBody;
+export type RunTurnContext = {
+  body: RunBody;
   ephemeral: boolean;
   /** Empty string for ephemeral turns. */
   sessionId: string;
@@ -26,8 +26,8 @@ export type ChatTurnContext = {
 export function buildTurnContext(
   rawBody: unknown,
   res: Response,
-): ChatTurnContext | null {
-  const parsed = ChatBodySchema.safeParse(rawBody);
+): RunTurnContext | null {
+  const parsed = RunBodySchema.safeParse(rawBody);
   if (!parsed.success) {
     res.status(400).json({
       error: "Invalid request body",
@@ -67,10 +67,10 @@ export function buildTurnContext(
     body,
     ephemeral,
     sessionId,
-    model: body.model?.trim() || DEFAULT_CHAT_MODEL,
+    model: body.model?.trim() || DEFAULT_RUN_MODEL,
     agentName,
     toolSessionDir,
-    promptContext: buildServerChatPromptContext({
+    promptContext: buildServerRunPromptContext({
       metadata: body.metadata,
       toolSessionDir,
     }),

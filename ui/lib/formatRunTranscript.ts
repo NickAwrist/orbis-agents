@@ -7,10 +7,10 @@ function block(roleLabel: "USER" | "MODEL", content: string): string {
 }
 
 /**
- * Full chat export: alternating USER / MODEL blocks with `===` under each label.
+ * Full run export: alternating USER / MODEL blocks with `===` under each label.
  * Optionally appends the in-flight assistant reply when `streamingAssistant` is non-empty.
  */
-export function formatChatTranscript(
+export function formatRunTranscript(
   messages: Message[],
   options?: { streamingAssistant?: string },
 ): string {

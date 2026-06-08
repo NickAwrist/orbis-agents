@@ -1,7 +1,7 @@
 import type { Message } from "../../types";
 
-/** Wired from useChatApp so loadSession can restore mid-flight UI when returning to that session. */
-export type ChatFlightApi = {
+/** Wired from useRunApp so loadSession can restore mid-flight UI when returning to that session. */
+export type RunFlightApi = {
   shouldPreserveMessages: (sessionId: string) => boolean;
   getTurnSnapshot: () => Message[] | null;
   hydrateStreaming: () => void;

@@ -20,14 +20,14 @@ import type {
   TraceModalSelection,
   TruncateConfirmState,
 } from "../../types";
-import type { ChatFlightApi } from "./chatTypes";
-export type { ChatFlightApi };
+import type { RunFlightApi } from "./runTypes";
+export type { RunFlightApi };
 import { getClientOs } from "../../lib/clientOs";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import type { UserSettings } from "../../persist/userSettings";
-import { useChatFlight } from "./useChatFlight";
+import { useRunFlight } from "./useRunFlight";
 import { useTurnBuffer } from "./useTurnBuffer";
 
 type Args = {
@@ -57,18 +57,18 @@ type Args = {
   setEditingUserIndex: Dispatch<SetStateAction<number | null>>;
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
-  chatFlightRef: MutableRefObject<ChatFlightApi | null>;
+  runFlightRef: MutableRefObject<RunFlightApi | null>;
 };
 
-export function useChatStreaming(p: Args) {
+export function useRunStreaming(p: Args) {
   const [input, setInput] = useState("");
   const [streamingStep, setStreamingStep] = useState<MessageStep | null>(null);
   const [streamingSteps, setStreamingSteps] = useState<MessageStep[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingThinking, setStreamingThinking] = useState("");
-  const [chatPending, setChatPending] = useState(false);
+  const [runPending, setRunPending] = useState(false);
 
-  const rawChatPendingRef = useRef(false);
+  const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
 
@@ -91,7 +91,7 @@ export function useChatStreaming(p: Args) {
     });
   }, [p.bindStreamingReset, resetStreamBuffers]);
 
-  const flight = useChatFlight(
+  const flight = useRunFlight(
     {
       activeSessionIdRef: p.activeSessionIdRef,
       modelMessagesRef: p.modelMessagesRef,
@@ -103,10 +103,10 @@ export function useChatStreaming(p: Args) {
       setStreamingSteps,
       setStreamingContent,
       setStreamingThinking,
-      setChatPending,
+      setRunPending,
     },
-    p.chatFlightRef,
-    rawChatPendingRef,
+    p.runFlightRef,
+    rawRunPendingRef,
     inFlightSessionIdRef,
     inFlightEphemeralRef,
     turnMessagesSnapshotRef,
@@ -188,7 +188,7 @@ export function useChatStreaming(p: Args) {
     [p.isEphemeralRef, p.setDebugData, renderCurrentSystemPrompt],
   );
 
-  const runChatTurn = useCallback(
+  const runTurn = useCallback(
     async (
       turnSessionId: string,
       priorMessages: Message[],
@@ -213,9 +213,9 @@ export function useChatStreaming(p: Args) {
         ...priorMessages,
         { role: "user" as const, content: msg },
       ];
-      rawChatPendingRef.current = true;
+      rawRunPendingRef.current = true;
       setInFlightSessionId(turnSessionId);
-      setChatPending(true);
+      setRunPending(true);
       setStreamingStep(null);
       setStreamingSteps([]);
       setStreamingContent("");
@@ -283,7 +283,7 @@ export function useChatStreaming(p: Args) {
           if (u.location?.trim()) metadata.location = u.location.trim();
           if (u.preferredFormats?.trim())
             metadata.preferredFormats = u.preferredFormats.trim();
-          const chatBody: Record<string, unknown> = {
+          const runBody: Record<string, unknown> = {
             message: msg,
             history: priorMessages,
             model: p.selectedModel,
@@ -292,16 +292,16 @@ export function useChatStreaming(p: Args) {
             ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
           };
           if (ephemeral) {
-            chatBody.ephemeral = true;
+            runBody.ephemeral = true;
           } else {
-            chatBody.sessionId = turnSessionId;
+            runBody.sessionId = turnSessionId;
           }
-          chatBody.sessionDirectory =
+          runBody.sessionDirectory =
             p.sessionDirectoryRef.current.trim() || undefined;
-          res = await fetch("/api/chat", {
+          res = await fetch("/api/runs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(chatBody),
+            body: JSON.stringify(runBody),
             signal: controller.signal,
           });
         } catch (err) {
@@ -331,11 +331,11 @@ export function useChatStreaming(p: Args) {
 
         try {
           await readSseBlocks(reader, async (data) => {
-            if (data.type === "chat_started") {
+            if (data.type === "run_started") {
               if (typeof data.requestId === "string") {
                 activeRequestIdRef.current = data.requestId;
               }
-            } else if (data.type === "stream_delta") {
+            } else if (data.type === "run_delta") {
               const cd =
                 typeof data.contentDelta === "string" ? data.contentDelta : "";
               const td =
@@ -354,7 +354,7 @@ export function useChatStreaming(p: Args) {
                 setStreamingContent((prev) => prev + cd);
               }
               if (td) setStreamingThinking((prev) => prev + td);
-            } else if (data.type === "step") {
+            } else if (data.type === "run_step") {
               const step = data.step as MessageStep;
               const buf = streamBufferRef.current;
               if (step.status === "running") {
@@ -376,7 +376,7 @@ export function useChatStreaming(p: Args) {
               setStreamingStep(step);
               if (Array.isArray(data.steps))
                 setStreamingSteps(data.steps as MessageStep[]);
-            } else if (data.type === "chat_done") {
+            } else if (data.type === "run_done") {
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -427,7 +427,7 @@ export function useChatStreaming(p: Args) {
               }
               if (p.debugOpenRef.current && viewingThisTurn())
                 void fetchDebugData(turnSessionId);
-            } else if (data.type === "chat_aborted") {
+            } else if (data.type === "run_aborted") {
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -450,7 +450,7 @@ export function useChatStreaming(p: Args) {
                 }
                 await p.refreshSessions();
               }
-            } else if (data.type === "error") {
+            } else if (data.type === "run_error") {
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -474,7 +474,7 @@ export function useChatStreaming(p: Args) {
         activeRequestIdRef.current = null;
         inFlightSessionIdRef.current = null;
         inFlightEphemeralRef.current = false;
-        rawChatPendingRef.current = false;
+        rawRunPendingRef.current = false;
         streamBufferRef.current = {
           content: "",
           thinking: "",
@@ -483,7 +483,7 @@ export function useChatStreaming(p: Args) {
         };
         turnMessagesSnapshotRef.current = null;
         setInFlightSessionId(null);
-        setChatPending(false);
+        setRunPending(false);
       }
     },
     [
@@ -511,7 +511,7 @@ export function useChatStreaming(p: Args) {
     const turnEphemeral = inFlightEphemeralRef.current;
 
     if (requestId) {
-      fetch("/api/chat/abort", {
+      fetch("/api/runs/abort", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),
@@ -526,11 +526,11 @@ export function useChatStreaming(p: Args) {
     setStreamingSteps([]);
     setStreamingContent("");
     setStreamingThinking("");
-    setChatPending(false);
+    setRunPending(false);
     setInFlightSessionId(null);
     inFlightSessionIdRef.current = null;
     inFlightEphemeralRef.current = false;
-    rawChatPendingRef.current = false;
+    rawRunPendingRef.current = false;
     streamBufferRef.current = {
       content: "",
       thinking: "",
@@ -562,9 +562,9 @@ export function useChatStreaming(p: Args) {
       const msg = input.trim();
       if (!p.ollamaSendReady) return;
       setInput("");
-      await runChatTurn(sid, p.messages, msg, { rebuildModelMessages: false });
+      await runTurn(sid, p.messages, msg, { rebuildModelMessages: false });
     },
-    [input, p.activeSessionId, p.messages, p.ollamaSendReady, runChatTurn],
+    [input, p.activeSessionId, p.messages, p.ollamaSendReady, runTurn],
   );
 
   const confirmTruncateAndRetry = useCallback(async () => {
@@ -577,7 +577,7 @@ export function useChatStreaming(p: Args) {
     if (!row || row.role !== "user") return;
     const text = tc.kind === "edit" ? tc.text : row.content;
     if (!text.trim()) return;
-    await runChatTurn(sid, p.messages.slice(0, tc.userIndex), text, {
+    await runTurn(sid, p.messages.slice(0, tc.userIndex), text, {
       rebuildModelMessages: true,
     });
   }, [
@@ -586,7 +586,7 @@ export function useChatStreaming(p: Args) {
     p.setEditingUserIndex,
     p.setTruncateConfirm,
     p.truncateConfirm,
-    runChatTurn,
+    runTurn,
   ]);
 
   const toggleDebug = useCallback(() => {
@@ -603,8 +603,8 @@ export function useChatStreaming(p: Args) {
     p.setDebugOpen,
   ]);
 
-  const sessionChatBusy =
-    (chatPending || streamingStep !== null || streamingSteps.length > 0) &&
+  const sessionRunBusy =
+    (runPending || streamingStep !== null || streamingSteps.length > 0) &&
     inFlightSessionId != null &&
     inFlightSessionId === p.activeSessionId;
 
@@ -625,13 +625,13 @@ export function useChatStreaming(p: Args) {
     setEditingUserIndex: p.setEditingUserIndex,
     truncateConfirm: p.truncateConfirm,
     setTruncateConfirm: p.setTruncateConfirm,
-    chatPending: sessionChatBusy,
-    runChatTurn,
+    runPending: sessionRunBusy,
+    runTurn,
     stopGeneration,
     sendMessage,
     confirmTruncateAndRetry,
     toggleDebug,
     fetchDebugData,
-    headerChatBusy: sessionChatBusy,
+    headerRunBusy: sessionRunBusy,
   };
 }

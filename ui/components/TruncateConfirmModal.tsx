@@ -15,7 +15,7 @@ export function TruncateConfirmModal({
   title,
   description,
   confirmLabel = "Continue",
-  busyConfirmLabel = "Please wait…",
+  busyConfirmLabel = "Please wait...",
   onConfirm,
   onClose,
   busy = false,

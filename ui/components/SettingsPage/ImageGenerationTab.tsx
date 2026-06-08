@@ -67,7 +67,7 @@ export function ImageGenerationTab({
             className="shrink-0 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-[0.875rem] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
           >
             {comfyTestState.status === "loading"
-              ? "Testing…"
+              ? "Testing..."
               : "Test connection"}
           </button>
         </div>

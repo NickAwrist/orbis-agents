@@ -2,20 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AgentData,
   fetchAgents,
-  fetchDefaultChatAgent,
+  fetchDefaultRunAgent,
 } from "../../persist/agents";
 
-export function useChatAgentsBootstrap() {
-  const [chatAgents, setChatAgents] = useState<{ name: string }[]>([]);
-  const [serverDefaultChatAgent, setServerDefaultChatAgent] =
+export function useRunAgentsBootstrap() {
+  const [runAgents, setRunAgents] = useState<{ name: string }[]>([]);
+  const [serverDefaultRunAgent, setServerDefaultRunAgent] =
     useState("general_agent");
   /** Keeps the full agent records (including `system_prompt`) for client-side rendering. */
   const agentMapRef = useRef<Map<string, AgentData>>(new Map());
 
   const apply = useCallback((list: AgentData[], def: string) => {
     agentMapRef.current = new Map(list.map((a) => [a.name, a]));
-    setChatAgents(list.map((a) => ({ name: a.name })));
-    setServerDefaultChatAgent(def);
+    setRunAgents(list.map((a) => ({ name: a.name })));
+    setServerDefaultRunAgent(def);
   }, []);
 
   useEffect(() => {
@@ -24,13 +24,13 @@ export function useChatAgentsBootstrap() {
       try {
         const [list, def] = await Promise.all([
           fetchAgents(),
-          fetchDefaultChatAgent(),
+          fetchDefaultRunAgent(),
         ]);
         if (cancelled) return;
         apply(list, def);
       } catch {
         if (!cancelled) {
-          setChatAgents([]);
+          setRunAgents([]);
         }
       }
     })();
@@ -43,7 +43,7 @@ export function useChatAgentsBootstrap() {
     try {
       const [list, def] = await Promise.all([
         fetchAgents(),
-        fetchDefaultChatAgent(),
+        fetchDefaultRunAgent(),
       ]);
       apply(list, def);
     } catch {
@@ -52,9 +52,9 @@ export function useChatAgentsBootstrap() {
   }, [apply]);
 
   return {
-    chatAgents,
-    serverDefaultChatAgent,
-    setServerDefaultChatAgent,
+    runAgents,
+    serverDefaultRunAgent,
+    setServerDefaultRunAgent,
     refreshAgentDefaults,
     agentMapRef,
   };

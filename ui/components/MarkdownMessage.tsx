@@ -164,7 +164,7 @@ function MarkdownImg({
  *  - JSON wrapper:  { "image_url": "/api/comfyui/view/..." }
  *  - Quoted URL:    "/api/comfyui/view/..."
  *  - Bare URL:      /api/comfyui/view/...
- *  - Already valid: ![alt](/api/comfyui/view/...) — left untouched
+ *  - Already valid: ![alt](/api/comfyui/view/...) - left untouched
  */
 function convertComfyUIUrls(markdown: string): string {
   // 1. Replace full JSON object wrappers like { "image_url": "..." }

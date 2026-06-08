@@ -10,7 +10,7 @@ type UseAppKeybindsOptions = {
   setSidebarOpen: Dispatch<SetStateAction<boolean>>;
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   goToHome: () => void | Promise<void>;
-  headerChatBusy: boolean;
+  headerRunBusy: boolean;
 };
 
 function suppress(e: KeyboardEvent) {
@@ -78,11 +78,11 @@ export function useAppKeybinds(opts: UseAppKeybindsOptions) {
       }
 
       if (k === "m" && !e.shiftKey) {
-        if (o.headerChatBusy || !o.activeSessionId) return;
+        if (o.headerRunBusy || !o.activeSessionId) return;
         suppress(e);
         queueMicrotask(() => {
           const el = document.getElementById(
-            "chat-model",
+            "run-model",
           ) as HTMLSelectElement | null;
           if (!el || el.disabled) return;
           el.focus();

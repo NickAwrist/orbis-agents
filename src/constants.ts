@@ -1,1 +1,1 @@
-export const DEFAULT_CHAT_MODEL = "gemma4:e4b";
+export const DEFAULT_RUN_MODEL = "gemma4:e4b";

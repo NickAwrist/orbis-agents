@@ -1,1 +1,1 @@
-export type AppView = "chat" | "agents" | "settings";
+export type AppView = "run" | "agents" | "settings";

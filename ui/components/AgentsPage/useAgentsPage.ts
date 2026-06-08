@@ -5,7 +5,7 @@ import {
   deleteAgentApi,
   fetchAgents,
   fetchBuiltinTools,
-  putDefaultChatAgentApi,
+  putDefaultRunAgentApi,
   updateAgentApi,
 } from "../../persist/agents";
 import {
@@ -17,11 +17,11 @@ import {
 import type { AgentEditorState } from "./types";
 
 export function useAgentsPage({
-  defaultChatAgent,
-  onDefaultChatAgentChange,
+  defaultRunAgent,
+  onDefaultRunAgentChange,
 }: {
-  defaultChatAgent: string;
-  onDefaultChatAgentChange: (name: string) => void;
+  defaultRunAgent: string;
+  onDefaultRunAgentChange: (name: string) => void;
 }) {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [builtinTools, setBuiltinTools] = useState<string[]>([]);
@@ -33,7 +33,7 @@ export function useAgentsPage({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [defaultDraft, setDefaultDraft] = useState(defaultChatAgent);
+  const [defaultDraft, setDefaultDraft] = useState(defaultRunAgent);
   const [defaultSaving, setDefaultSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{
     id: string;
@@ -59,8 +59,8 @@ export function useAgentsPage({
   }, [load]);
 
   useEffect(() => {
-    setDefaultDraft(defaultChatAgent);
-  }, [defaultChatAgent]);
+    setDefaultDraft(defaultRunAgent);
+  }, [defaultRunAgent]);
 
   const otherAgentNames = agents
     .filter((a) => a.id !== selectedId)
@@ -152,9 +152,9 @@ export function useAgentsPage({
 
   const persistDefaultAgent = async (name: string, previous: string) => {
     try {
-      const next = await putDefaultChatAgentApi(name);
+      const next = await putDefaultRunAgentApi(name);
       setDefaultDraft(next);
-      onDefaultChatAgentChange(next);
+      onDefaultRunAgentChange(next);
     } catch (err: unknown) {
       setDefaultDraft(previous);
       setError(err instanceof Error ? err.message : "Failed to save default");

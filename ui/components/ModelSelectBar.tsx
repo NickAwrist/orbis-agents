@@ -36,11 +36,11 @@ export function ModelSelectBar({
 
   return (
     <div className="relative min-w-0">
-      <label htmlFor="chat-model" className="sr-only">
+      <label htmlFor="run-model" className="sr-only">
         Model
       </label>
       <select
-        id="chat-model"
+        id="run-model"
         value={hasModels ? selectedModel : placeholderValue}
         onChange={(e) => onModelChange(e.target.value)}
         disabled={disabled || !hasModels}

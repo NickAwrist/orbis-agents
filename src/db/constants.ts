@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 export const DB_PATH = join(process.cwd(), "data", "agents.db");
 
-export const DEFAULT_CHAT_AGENT_KEY = "default_chat_agent";
+export const DEFAULT_RUN_AGENT_KEY = "default_run_agent";
 export const OLLAMA_HOST_KEY = "ollama_host";
 export const COMFYUI_HOST_KEY = "comfyui_host";
 export const COMFYUI_DEFAULT_MODEL_KEY = "comfyui_default_model";

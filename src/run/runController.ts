@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { createChatPersistence } from "./chatPersistence";
-import { buildTurnContext } from "./chatRequestContext";
-import { openChatStream } from "./chatStream";
-import { runChatTurn } from "./chatTurnRunner";
+import { createRunPersistence } from "./runPersistence";
+import { buildTurnContext } from "./runRequestContext";
+import { openRunStream } from "./runStream";
+import { runTurn } from "./runTurnRunner";
 import type { SseManager } from "./sseManager";
 
 /**
@@ -10,7 +10,7 @@ import type { SseManager } from "./sseManager";
  * stream, hand those off to the turn runner, then close the stream.
  * All real work lives in the injected collaborators.
  */
-export async function handleChat(
+export async function handleRun(
   req: Request,
   res: Response,
   sse: SseManager,
@@ -18,18 +18,18 @@ export async function handleChat(
   const ctx = buildTurnContext(req.body, res);
   if (!ctx) return;
 
-  const stream = openChatStream(res, sse, {
+  const stream = openRunStream(res, sse, {
     ephemeral: ctx.ephemeral,
     sessionId: ctx.sessionId,
   });
-  const persistence = createChatPersistence({
+  const persistence = createRunPersistence({
     sessionId: ctx.sessionId,
     model: ctx.model,
     ephemeral: ctx.ephemeral,
   });
 
   try {
-    await runChatTurn(ctx, stream, persistence);
+    await runTurn(ctx, stream, persistence);
   } finally {
     stream.close();
   }

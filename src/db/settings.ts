@@ -7,27 +7,27 @@ import {
   COMFYUI_DEFAULT_WIDTH_KEY,
   COMFYUI_HOST_KEY,
   COMFYUI_NEGATIVE_PROMPT_KEY,
-  DEFAULT_CHAT_AGENT_KEY,
   DEFAULT_COMFYUI_NEGATIVE_PROMPT,
+  DEFAULT_RUN_AGENT_KEY,
   OLLAMA_HOST_KEY,
   SEARXNG_HOST_KEY,
 } from "./constants";
 
-export function getDefaultChatAgent(): string {
+export function getDefaultRunAgent(): string {
   const row = getDb()
     .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(DEFAULT_CHAT_AGENT_KEY) as { value: string } | null;
+    .get(DEFAULT_RUN_AGENT_KEY) as { value: string } | null;
   const v = row?.value?.trim();
   if (v && agentNameExistsInDb(v)) return v;
   return "general_agent";
 }
 
-export function setDefaultChatAgent(name: string): boolean {
+export function setDefaultRunAgent(name: string): boolean {
   const t = name.trim();
   if (!t || !agentNameExistsInDb(t)) return false;
   getDb().run(
     "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    [DEFAULT_CHAT_AGENT_KEY, t],
+    [DEFAULT_RUN_AGENT_KEY, t],
   );
   return true;
 }

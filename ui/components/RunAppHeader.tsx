@@ -14,7 +14,7 @@ import type { OllamaModelOption } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
 import { ModelSelectBar } from "./ModelSelectBar";
 
-type ChatAppHeaderProps = {
+type RunAppHeaderProps = {
   activeSessionId: string | null;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
@@ -23,13 +23,13 @@ type ChatAppHeaderProps = {
   modelsLoadError: string | null;
   selectedModel: string;
   onModelChange: (model: string) => void;
-  chatAgents: { name: string }[];
+  runAgents: { name: string }[];
   selectedSessionAgent: string;
   onSessionAgentChange: (name: string) => void;
-  headerChatBusy: boolean;
+  headerRunBusy: boolean;
   debugOpen: boolean;
   onToggleDebug: () => void;
-  onCopyEntireChat?: () => Promise<boolean>;
+  onCopyEntireRun?: () => Promise<boolean>;
   isEphemeral?: boolean;
   sessionDirectory?: string;
   onSessionDirectoryDraft?: (value: string) => void;
@@ -141,7 +141,7 @@ function FolderPickerButton({
         {hasDir ? <Folder size={14} /> : <FolderOpen size={14} />}
         {hasDir && (
           <span className="max-w-[5rem] truncate sm:max-w-[7rem]">
-            {pickingFolder ? "…" : folderBasename}
+            {pickingFolder ? "..." : folderBasename}
           </span>
         )}
       </button>
@@ -185,7 +185,7 @@ function FolderPickerButton({
 /*  Header                                                            */
 /* ------------------------------------------------------------------ */
 
-export function ChatAppHeader({
+export function RunAppHeader({
   activeSessionId,
   sidebarOpen,
   onOpenSidebar,
@@ -194,26 +194,26 @@ export function ChatAppHeader({
   modelsLoadError,
   selectedModel,
   onModelChange,
-  chatAgents,
+  runAgents,
   selectedSessionAgent,
   onSessionAgentChange,
-  headerChatBusy,
+  headerRunBusy,
   debugOpen,
   onToggleDebug,
-  onCopyEntireChat,
+  onCopyEntireRun,
   isEphemeral,
   sessionDirectory = "",
   onSessionDirectoryDraft,
   onSessionDirectoryPersist,
-}: ChatAppHeaderProps) {
-  const [chatCopied, setChatCopied] = useState(false);
+}: RunAppHeaderProps) {
+  const [runCopied, setRunCopied] = useState(false);
 
-  const handleCopyChat = async () => {
-    if (!onCopyEntireChat) return;
-    const ok = await onCopyEntireChat();
+  const handleCopyRun = async () => {
+    if (!onCopyEntireRun) return;
+    const ok = await onCopyEntireRun();
     if (ok) {
-      setChatCopied(true);
-      window.setTimeout(() => setChatCopied(false), 1500);
+      setRunCopied(true);
+      window.setTimeout(() => setRunCopied(false), 1500);
     }
   };
 
@@ -230,7 +230,7 @@ export function ChatAppHeader({
           type="button"
           onClick={onOpenSidebar}
           className={cx(iconButton, "shrink-0 min-[901px]:hidden")}
-          title="Open chats"
+          title="Open runs"
           aria-expanded={sidebarOpen}
           aria-controls="app-sidebar"
         >
@@ -250,13 +250,13 @@ export function ChatAppHeader({
               modelsLoadError={modelsLoadError}
               selectedModel={selectedModel}
               onModelChange={onModelChange}
-              disabled={headerChatBusy}
+              disabled={headerRunBusy}
             />
             <AgentSelectBar
-              agents={chatAgents}
+              agents={runAgents}
               selectedAgent={selectedSessionAgent}
               onAgentChange={onSessionAgentChange}
-              disabled={headerChatBusy}
+              disabled={headerRunBusy}
             />
           </div>
         )}
@@ -269,18 +269,18 @@ export function ChatAppHeader({
               sessionDirectory={sessionDirectory}
               onSessionDirectoryDraft={onSessionDirectoryDraft}
               onSessionDirectoryPersist={onSessionDirectoryPersist}
-              disabled={headerChatBusy}
+              disabled={headerRunBusy}
             />
           )}
-        {activeSessionId && onCopyEntireChat && (
+        {activeSessionId && onCopyEntireRun && (
           <button
             type="button"
-            onClick={() => void handleCopyChat()}
+            onClick={() => void handleCopyRun()}
             className={cx(iconButton)}
-            title={chatCopied ? "Copied" : "Copy entire chat"}
-            aria-label={chatCopied ? "Copied" : "Copy entire chat"}
+            title={runCopied ? "Copied" : "Copy entire run"}
+            aria-label={runCopied ? "Copied" : "Copy entire run"}
           >
-            {chatCopied ? <Check size={18} /> : <Copy size={18} />}
+            {runCopied ? <Check size={18} /> : <Copy size={18} />}
           </button>
         )}
         {activeSessionId && (

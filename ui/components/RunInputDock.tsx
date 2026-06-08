@@ -3,12 +3,12 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep } from "../types";
 
-export function ChatInputDock({
+export function RunInputDock({
   input,
   setInput,
   onSendMessage,
   onStopGeneration,
-  chatPending,
+  runPending,
   streamingStep,
   streamingSteps,
   ollamaSendReady,
@@ -18,7 +18,7 @@ export function ChatInputDock({
   setInput: (v: string) => void;
   onSendMessage: (e: React.FormEvent) => void;
   onStopGeneration: () => void;
-  chatPending: boolean;
+  runPending: boolean;
   streamingStep: MessageStep | null;
   streamingSteps: MessageStep[];
   ollamaSendReady: boolean;
@@ -27,7 +27,7 @@ export function ChatInputDock({
   const footerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isBusy =
-    chatPending || streamingStep !== null || streamingSteps.length > 0;
+    runPending || streamingStep !== null || streamingSteps.length > 0;
   const canSend = ollamaSendReady && !isBusy;
 
   const syncInputHeight = useCallback(() => {
@@ -84,7 +84,7 @@ export function ChatInputDock({
             }
           }}
           disabled={isBusy}
-          placeholder="Send a message…"
+          placeholder="Send a message..."
           className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
         />

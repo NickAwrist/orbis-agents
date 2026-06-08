@@ -72,17 +72,17 @@ export async function fetchBuiltinTools(): Promise<string[]> {
   return data.tools;
 }
 
-export async function fetchDefaultChatAgent(): Promise<string> {
-  const res = await fetch("/api/settings/default-chat-agent");
+export async function fetchDefaultRunAgent(): Promise<string> {
+  const res = await fetch("/api/settings/default-run-agent");
   if (!res.ok) throw new Error("Failed to fetch default agent");
   const data = await res.json();
   return typeof data.agentName === "string" ? data.agentName : "general_agent";
 }
 
-export async function putDefaultChatAgentApi(
+export async function putDefaultRunAgentApi(
   agentName: string,
 ): Promise<string> {
-  const res = await fetch("/api/settings/default-chat-agent", {
+  const res = await fetch("/api/settings/default-run-agent", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ agentName }),

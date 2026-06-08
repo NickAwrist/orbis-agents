@@ -36,7 +36,7 @@ export function SessionListItem({
           active &&
             "before:pointer-events-none before:absolute before:left-1 before:top-1/2 before:h-5 before:w-px before:-translate-y-1/2 before:rounded-full before:bg-foreground/45 before:content-['']",
         )}
-        title={session.preview || "Chat"}
+        title={session.preview || "Run"}
       >
         <div className="min-w-0">
           <div
@@ -65,7 +65,7 @@ export function SessionListItem({
       >
         <div className="min-w-0">
           <div className="overflow-hidden text-[0.8125rem] leading-[1.4] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-            {session.preview || "New chat"}
+            {session.preview || "New run"}
           </div>
           <div className="mt-1 text-[0.6875rem] text-muted-foreground">
             {new Date(session.updatedAt).toLocaleString()}
@@ -81,7 +81,7 @@ export function SessionListItem({
           )}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          aria-label="Chat options"
+          aria-label="Run options"
           onClick={(e) => {
             e.stopPropagation();
             if (menuOpen) {

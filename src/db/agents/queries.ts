@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "../connection";
-import { DEFAULT_CHAT_AGENT_KEY } from "../constants";
+import { DEFAULT_RUN_AGENT_KEY } from "../constants";
 import type { AgentRow, AgentWithTools } from "./types";
 
 export function listAgents(): AgentWithTools[] {
@@ -126,7 +126,7 @@ export function deleteAgentRow(id: string): boolean {
   if (!row) return false;
   db.run("UPDATE app_settings SET value = ? WHERE key = ? AND value = ?", [
     fallback,
-    DEFAULT_CHAT_AGENT_KEY,
+    DEFAULT_RUN_AGENT_KEY,
     row.name,
   ]);
   const r = db.run("DELETE FROM agents WHERE id = ?", [id]);

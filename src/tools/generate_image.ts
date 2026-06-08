@@ -49,7 +49,7 @@ export class GenerateImageTool extends BaseTool {
     return client.runSerialized(async () => {
       const health = await client.healthCheck();
       if (!health.ok) {
-        return `Error: ComfyUI is not reachable — ${health.error ?? "unknown error"}`;
+        return `Error: ComfyUI is not reachable - ${health.error ?? "unknown error"}`;
       }
 
       const defaultModel = getComfyUIDefaultModel();

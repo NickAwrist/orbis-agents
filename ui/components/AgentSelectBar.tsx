@@ -21,11 +21,11 @@ export function AgentSelectBar({
 
   return (
     <div className="relative min-w-0">
-      <label htmlFor="chat-agent" className="sr-only">
+      <label htmlFor="run-agent" className="sr-only">
         Agent
       </label>
       <select
-        id="chat-agent"
+        id="run-agent"
         value={selectedAgent}
         onChange={(e) => onAgentChange(e.target.value)}
         disabled={disabled}

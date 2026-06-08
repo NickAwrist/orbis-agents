@@ -5,14 +5,14 @@ import { traceStepsForDisplay } from "../ExecutionTrace";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { MessageItem } from "../MessageItem";
 import { StreamingStatusRow } from "./StreamingStatusRow";
-import type { ChatAreaProps } from "./types";
+import type { RunAreaProps } from "./types";
 
-export function ChatArea({
+export function RunArea({
   messages,
   streamingSteps,
   streamingStep,
   streamingContent,
-  chatPending,
+  runPending,
   footerInset,
   onViewSteps,
   editingUserIndex,
@@ -20,13 +20,13 @@ export function ChatArea({
   onCancelEditUser,
   onRequestEditConfirm,
   onRequestRetryConfirm,
-}: ChatAreaProps) {
+}: RunAreaProps) {
   const { scrollRef, contentRef, scrollToBottom, isAtBottom } =
     useStickToBottom({
       initial: "instant",
     });
   const isBusy =
-    chatPending || streamingStep !== null || streamingSteps.length > 0;
+    runPending || streamingStep !== null || streamingSteps.length > 0;
 
   useLayoutEffect(() => {
     if (isAtBottom) {

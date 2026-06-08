@@ -13,7 +13,7 @@ function previewFromTitleAndFirstUser(
     const u = firstUser.trim();
     return u.length > 40 ? `${u.slice(0, 40)}...` : u;
   }
-  return "New chat";
+  return "New run";
 }
 
 export function listSessionSummaries(): SessionSummaryRow[] {
@@ -171,7 +171,7 @@ export function patchSessionRow(
 }
 
 /**
- * Persists chat history without rewriting the full table each time: truncates when the
+ * Persists run history without rewriting the full table each time: truncates when the
  * client sends a shorter history, appends new tail rows, or updates the last row when
  * the count is unchanged (e.g. assistant steps filled in).
  */
@@ -180,14 +180,14 @@ export function persistSessionMessages(
   messages: WireMessage[],
   modelMessages: Array<Record<string, unknown>> | null,
   updatedAt: number,
-  chatModel?: string | null,
+  runModel?: string | null,
 ): boolean {
   const row = getSessionById(sessionId);
   if (!row) return false;
   const db = getDb();
   const nextModel =
-    typeof chatModel === "string" && chatModel.trim()
-      ? chatModel.trim()
+    typeof runModel === "string" && runModel.trim()
+      ? runModel.trim()
       : row.model;
   const tx = db.transaction(() => {
     let n = countMessagesForSession(sessionId);

@@ -1,18 +1,18 @@
 import crypto from "node:crypto";
 import type { Response } from "express";
+import type { ActiveGeneration, RunEvent } from "./runEvents";
 import type { SseManager } from "./sseManager";
-import type { ActiveGeneration, ChatSseEvent } from "./sseStream";
 
 const PING_INTERVAL_MS = 15_000;
 
 /**
- * Small handle returned from `openChatStream` — everything the turn
+ * Small handle returned from `openRunStream` - everything the turn
  * runner needs to push events, check for abort, and tear down cleanly.
  */
-export type ChatStream = {
+export type RunStream = {
   readonly requestId: string;
   readonly signal: AbortSignal;
-  emit(event: ChatSseEvent): void;
+  emit(event: RunEvent): void;
   close(): void;
 };
 
@@ -21,11 +21,11 @@ export type ChatStream = {
  * (for persistent sessions) registers a session generation so reconnecting
  * clients can resume.
  */
-export function openChatStream(
+export function openRunStream(
   res: Response,
   sse: SseManager,
   opts: { ephemeral: boolean; sessionId: string },
-): ChatStream {
+): RunStream {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");

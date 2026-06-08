@@ -158,7 +158,7 @@ export function AgentEditor({
                   <code className="font-mono text-[0.7rem] text-foreground/80">
                     {p.token}
                   </code>{" "}
-                  — {p.description}
+                  - {p.description}
                 </span>
               ))}
             </div>

@@ -1,6 +1,6 @@
 # Orbis Agents
 
-A local-first agent runtime with a chat UI, powered by [Ollama](https://ollama.com/).
+A local-first agent runtime with a run UI, powered by [Ollama](https://ollama.com/).
 
 Build custom agents directly from the UI. Each agent can have its own system prompt and a configurable set of tools, letting you tailor behavior to specific tasks without touching code.
 
@@ -87,6 +87,6 @@ or switch the Compose file back to port publishing plus
 
 ## Project Structure
 
-- `src/` — backend server, agent loop, tools, and session storage
-- `ui/` — React frontend
-- `data/` — local persisted data
+- `src/` - backend server, agent loop, tools, and session storage
+- `ui/` - React frontend
+- `data/` - local persisted data

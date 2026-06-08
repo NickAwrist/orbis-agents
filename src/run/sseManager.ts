@@ -2,16 +2,16 @@ import type { Response } from "express";
 import { logger } from "../logger";
 import {
   type ActiveGeneration,
-  type ChatSseEvent,
+  type RunEvent,
   broadcastSse,
   writeSse,
-} from "./sseStream";
+} from "./runEvents";
 
 const log = logger.child({ component: "sseManager" });
 const ORPHAN_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
- * Owns active-generation bookkeeping for the chat endpoint: per-request
+ * Owns active-generation bookkeeping for the run endpoint: per-request
  * abort controllers, per-session generation state, SSE client sets, and
  * orphan timers that abort silent generations when every viewer disconnects.
  */
@@ -86,12 +86,12 @@ export class SseManager {
   }
 
   /** Send an event to every SSE client subscribed to a session generation. */
-  broadcast(gen: ActiveGeneration, event: ChatSseEvent): void {
+  broadcast(gen: ActiveGeneration, event: RunEvent): void {
     broadcastSse(gen, event);
   }
 
   /** Send an event to a single standalone (ephemeral) SSE response. */
-  sendTo(res: Response, event: ChatSseEvent): void {
+  sendTo(res: Response, event: RunEvent): void {
     writeSse(res, event);
   }
 

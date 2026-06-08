@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { handleChat } from "../chat/chatController";
-import { sseManager } from "../chat/sseManager";
-import { AbortBodySchema } from "../schemas/chat";
+import { handleRun } from "../run/runController";
+import { sseManager } from "../run/sseManager";
+import { AbortRunBodySchema } from "../schemas/run";
 
 const router = Router();
 router.post("/", (req, res) => {
-  void handleChat(req, res, sseManager);
+  void handleRun(req, res, sseManager);
 });
 
 router.post("/abort", (req, res) => {
-  const parsed = AbortBodySchema.safeParse(req.body);
+  const parsed = AbortRunBodySchema.safeParse(req.body);
   if (!parsed.success) {
     res.json({ aborted: false });
     return;

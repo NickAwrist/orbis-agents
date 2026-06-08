@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { seedDefaultAgents } from "./agents/seed";
-import { ensureDefaultChatAgentSetting } from "./bootstrap";
+import { ensureDefaultRunAgentSetting } from "./bootstrap";
 import { DB_PATH } from "./constants";
 import { runMigrations } from "./migrations";
 
@@ -69,7 +69,7 @@ export function getDb(): Database {
 
   runMigrations(db);
   seedDefaultAgents(db);
-  ensureDefaultChatAgentSetting(db);
+  ensureDefaultRunAgentSetting(db);
 
   dbSingleton = db;
   return db;

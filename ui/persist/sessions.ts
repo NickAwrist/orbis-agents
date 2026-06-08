@@ -1,7 +1,7 @@
 import type { Message } from "../types";
 import type { SessionSummary } from "../types";
 
-export type StoredChatSession = {
+export type StoredRunSession = {
   id: string;
   createdAt: number;
   updatedAt: number;
@@ -35,7 +35,7 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
       id: String(s.id ?? ""),
       createdAt: Number(s.createdAt) || 0,
       updatedAt: Number(s.updatedAt) || 0,
-      preview: String(s.preview ?? "New chat"),
+      preview: String(s.preview ?? "New run"),
     }))
     .filter((s) => s.id.length > 0)
     .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -43,7 +43,7 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
 
 export async function fetchSession(
   id: string,
-): Promise<StoredChatSession | null> {
+): Promise<StoredRunSession | null> {
   const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(await readError(res));

@@ -20,7 +20,7 @@ export type SessionStepEvent = {
   steps: HistoryWireStep[];
 };
 
-export type SessionStreamDeltaEvent = {
+export type SessionRunDeltaEvent = {
   contentDelta: string;
   thinkingDelta: string;
   agentName: string;
@@ -35,14 +35,14 @@ export type SessionAbortedEvent = {
 
 type SessionEvents = {
   step: SessionStepEvent;
-  stream_delta: SessionStreamDeltaEvent;
+  run_delta: SessionRunDeltaEvent;
   aborted: SessionAbortedEvent;
 };
 
 export type AgentSessionOptions = {
   model?: string;
   agentName?: string;
-  /** Pre-rendered system prompt from the chat request. Takes precedence over `promptContext`. */
+  /** Pre-rendered system prompt from the run request. Takes precedence over `promptContext`. */
   systemPrompt?: string;
   /** Values for `{{PLACEHOLDERS}}` passed to subagents via `RunContext`. */
   promptContext?: PromptContext;
@@ -117,7 +117,7 @@ export class AgentSession extends EventEmitter {
     }
   }
 
-  public async sendChat(prompt: string, signal?: AbortSignal): Promise<string> {
+  public async sendRun(prompt: string, signal?: AbortSignal): Promise<string> {
     this.history.push({ role: "user", content: prompt });
 
     const turnStartedAt = Date.now();
@@ -139,7 +139,7 @@ export class AgentSession extends EventEmitter {
         });
       },
       (contentDelta, thinkingDelta, agentName) => {
-        this.emit("stream_delta", { contentDelta, thinkingDelta, agentName });
+        this.emit("run_delta", { contentDelta, thinkingDelta, agentName });
       },
       signal,
       this.toolSessionDir,

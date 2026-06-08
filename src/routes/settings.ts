@@ -1,20 +1,20 @@
 import { Router } from "express";
-import { getDefaultChatAgent, setDefaultChatAgent } from "../db/index";
+import { getDefaultRunAgent, setDefaultRunAgent } from "../db/index";
 
 const settingsRoutes = Router();
 
-settingsRoutes.get("/default-chat-agent", (_req, res) => {
-  res.json({ agentName: getDefaultChatAgent() });
+settingsRoutes.get("/default-run-agent", (_req, res) => {
+  res.json({ agentName: getDefaultRunAgent() });
 });
 
-settingsRoutes.put("/default-chat-agent", (req, res) => {
+settingsRoutes.put("/default-run-agent", (req, res) => {
   const raw = (req.body as { agentName?: unknown }).agentName;
   const name = typeof raw === "string" ? raw.trim() : "";
-  if (!name || !setDefaultChatAgent(name)) {
+  if (!name || !setDefaultRunAgent(name)) {
     res.status(400).json({ error: "Invalid agent name" });
     return;
   }
-  res.json({ ok: true, agentName: getDefaultChatAgent() });
+  res.json({ ok: true, agentName: getDefaultRunAgent() });
 });
 
 export default settingsRoutes;

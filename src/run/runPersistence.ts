@@ -1,10 +1,10 @@
 import { type WireMessage, persistSessionMessages } from "../db/index";
 
 /**
- * Persistence boundary for a single chat turn. All calls are no-ops for
+ * Persistence boundary for a single run. All calls are no-ops for
  * ephemeral turns, so the caller never has to branch on that itself.
  */
-export type ChatPersistence = {
+export type RunPersistence = {
   saveInitial(
     history: WireMessage[],
     userMessage: string,
@@ -16,11 +16,11 @@ export type ChatPersistence = {
   ): void;
 };
 
-export function createChatPersistence(opts: {
+export function createRunPersistence(opts: {
   sessionId: string;
   model: string;
   ephemeral: boolean;
-}): ChatPersistence {
+}): RunPersistence {
   if (opts.ephemeral) {
     return { saveInitial: () => {}, saveFinal: () => {} };
   }

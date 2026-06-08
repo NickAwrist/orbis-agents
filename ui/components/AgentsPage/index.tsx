@@ -6,15 +6,15 @@ import { PROTECTED_AGENT_NAME, emptyEditor } from "./agentsPageUtils";
 import { useAgentsPage } from "./useAgentsPage";
 
 export function AgentsPage({
-  defaultChatAgent,
-  onDefaultChatAgentChange,
+  defaultRunAgent,
+  onDefaultRunAgentChange,
   onBack,
 }: {
-  defaultChatAgent: string;
-  onDefaultChatAgentChange: (name: string) => void;
+  defaultRunAgent: string;
+  onDefaultRunAgentChange: (name: string) => void;
   onBack: () => void;
 }) {
-  const p = useAgentsPage({ defaultChatAgent, onDefaultChatAgentChange });
+  const p = useAgentsPage({ defaultRunAgent, onDefaultRunAgentChange });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -25,7 +25,7 @@ export function AgentsPage({
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft size={15} />
-          Back to chat
+          Back to run
         </button>
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">
@@ -104,9 +104,9 @@ export function AgentsPage({
       {p.pendingDelete && (
         <TruncateConfirmModal
           title="Delete this agent?"
-          description={`Remove “${p.pendingDelete.name}” from your agents. Sessions that used it will switch to ${PROTECTED_AGENT_NAME}. This cannot be undone.`}
+          description={`Remove "${p.pendingDelete.name}" from your agents. Sessions that used it will switch to ${PROTECTED_AGENT_NAME}. This cannot be undone.`}
           confirmLabel="Delete"
-          busyConfirmLabel="Deleting…"
+          busyConfirmLabel="Deleting..."
           busy={p.deleting}
           onClose={() => p.setPendingDelete(null)}
           onConfirm={() => void p.performDelete()}

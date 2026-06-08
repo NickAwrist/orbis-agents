@@ -6,20 +6,20 @@ import type {
   TraceModalSelection,
   TruncateConfirmState,
 } from "../types";
-import type { ChatFlightApi } from "./chat/chatTypes";
-import { useChatAgentsBootstrap } from "./chat/useChatAgentsBootstrap";
-import { useChatStreaming } from "./chat/useChatStreaming";
-import { useComfyUIConnection } from "./chat/useComfyUIConnection";
-import { useOllamaConnection } from "./chat/useOllamaConnection";
-import { useSearXNGConnection } from "./chat/useSearXNGConnection";
-import { useSessionsAndNavigation } from "./chat/useSessionsAndNavigation";
-import { useSettings } from "./chat/useSettings";
+import type { RunFlightApi } from "./run/runTypes";
+import { useComfyUIConnection } from "./run/useComfyUIConnection";
+import { useOllamaConnection } from "./run/useOllamaConnection";
+import { useRunAgentsBootstrap } from "./run/useRunAgentsBootstrap";
+import { useRunStreaming } from "./run/useRunStreaming";
+import { useSearXNGConnection } from "./run/useSearXNGConnection";
+import { useSessionsAndNavigation } from "./run/useSessionsAndNavigation";
+import { useSettings } from "./run/useSettings";
 
-export function useChatApp() {
+export function useRunApp() {
   const ollama = useOllamaConnection();
   const comfy = useComfyUIConnection();
   const searxng = useSearXNGConnection();
-  const agents = useChatAgentsBootstrap();
+  const agents = useRunAgentsBootstrap();
 
   const activeSessionIdRef = useRef<string | null>(null);
   const isEphemeralRef = useRef(false);
@@ -27,7 +27,7 @@ export function useChatApp() {
   const modelMessagesRef = useRef<Array<Record<string, unknown>> | null>(null);
   const debugOpenRef = useRef(false);
   const resetStreamingUiRef = useRef<() => void>(() => {});
-  const chatFlightRef = useRef<ChatFlightApi | null>(null);
+  const runFlightRef = useRef<RunFlightApi | null>(null);
 
   const bindStreamingReset = useCallback((fn: () => void) => {
     resetStreamingUiRef.current = fn;
@@ -59,7 +59,7 @@ export function useChatApp() {
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
     serverDefaultModel: ollama.serverDefaultModel,
-    serverDefaultChatAgent: agents.serverDefaultChatAgent,
+    serverDefaultRunAgent: agents.serverDefaultRunAgent,
     userSettingsRef: settings.userSettingsRef,
     userSettingsDefaultModel: settings.userSettings.defaultModel,
     messages,
@@ -74,10 +74,10 @@ export function useChatApp() {
     activeSessionIdRef,
     isEphemeralRef,
     selectedSessionAgentRef,
-    chatFlightRef,
+    runFlightRef,
   });
 
-  const stream = useChatStreaming({
+  const stream = useRunStreaming({
     messages,
     setMessages,
     activeSessionId: sessions.activeSessionId,
@@ -104,7 +104,7 @@ export function useChatApp() {
     setEditingUserIndex,
     truncateConfirm,
     setTruncateConfirm,
-    chatFlightRef,
+    runFlightRef,
   });
 
   const modalSteps = traceStepsForModal(
@@ -141,13 +141,13 @@ export function useChatApp() {
     setTruncateConfirm,
     pendingDeleteSessionId: sessions.pendingDeleteSessionId,
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
-    chatPending: stream.chatPending,
+    runPending: stream.runPending,
     ollamaModels: ollama.ollamaModels,
     modelsLoadError: ollama.modelsLoadError,
     selectedModel: sessions.selectedModel,
-    chatAgents: agents.chatAgents,
-    serverDefaultChatAgent: agents.serverDefaultChatAgent,
-    setServerDefaultChatAgent: agents.setServerDefaultChatAgent,
+    runAgents: agents.runAgents,
+    serverDefaultRunAgent: agents.serverDefaultRunAgent,
+    setServerDefaultRunAgent: agents.setServerDefaultRunAgent,
     selectedSessionAgent: sessions.selectedSessionAgent,
     sessionDirectory: sessions.sessionDirectory,
     setSessionDirectoryDraft: sessions.setSessionDirectoryDraft,
@@ -184,7 +184,7 @@ export function useChatApp() {
     saveSessionTitle: sessions.saveSessionTitle,
     modalSteps,
     renameTarget: sessions.renameTarget,
-    headerChatBusy: stream.headerChatBusy,
+    headerRunBusy: stream.headerRunBusy,
     sidebarCols: sessions.sidebarCols,
   };
 }

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { DEFAULT_CHAT_MODEL } from "../constants";
+import { DEFAULT_RUN_MODEL } from "../constants";
 import { getOllamaClient } from "../ollamaClient";
 
 const modelsRoutes = Router();
@@ -8,7 +8,7 @@ modelsRoutes.get("/", async (_req, res) => {
   try {
     const { models } = await getOllamaClient().list();
     res.json({
-      defaultModel: DEFAULT_CHAT_MODEL,
+      defaultModel: DEFAULT_RUN_MODEL,
       models: models.map((m) => ({
         name: m.name,
         size: m.size,
@@ -23,7 +23,7 @@ modelsRoutes.get("/", async (_req, res) => {
   } catch (e) {
     res.status(502).json({
       error: e instanceof Error ? e.message : String(e),
-      defaultModel: DEFAULT_CHAT_MODEL,
+      defaultModel: DEFAULT_RUN_MODEL,
       models: [],
     });
   }

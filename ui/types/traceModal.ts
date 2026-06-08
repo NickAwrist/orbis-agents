@@ -1,4 +1,4 @@
-import type { MessageStep } from "./chat";
+import type { MessageStep } from "./run";
 
 /** Steps modal: persisted steps, live SSE, or closed. */
 export type TraceModalSelection = MessageStep[] | "live" | null;

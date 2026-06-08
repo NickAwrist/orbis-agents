@@ -27,7 +27,7 @@ export function SettingsPage(props: SettingsPageProps) {
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft size={15} />
-          Back to chat
+          Back to run
         </button>
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">

@@ -1,6 +1,6 @@
 import os from "node:os";
 import type { RunContext } from "../RunContext";
-import { DEFAULT_CHAT_MODEL } from "../constants";
+import { DEFAULT_RUN_MODEL } from "../constants";
 import { getAgentByName } from "../db/index";
 import {
   type PersonalizationFields,
@@ -38,7 +38,7 @@ export type CreateAgentOptions = {
   /**
    * Pre-rendered system prompt. When provided it is used verbatim (plus
    * appended core directives). When omitted the stored template is rendered
-   * on the server using `promptContext` — used for subagent invocations.
+   * on the server using `promptContext` - used for subagent invocations.
    */
   systemPrompt?: string;
   /** Resolved absolute directory tools use; also drives `{{SESSION_DIRECTORY}}`. */
@@ -58,8 +58,8 @@ function serverPromptContext(
   };
 }
 
-/** PromptContext for chat turns: OS + session dir from server; personalization from request metadata. */
-export function buildServerChatPromptContext(opts: {
+/** PromptContext for run turns: OS + session dir from server; personalization from request metadata. */
+export function buildServerRunPromptContext(opts: {
   metadata?: {
     name?: string | undefined;
     location?: string | undefined;
@@ -94,7 +94,7 @@ export const agentManager = {
     if (typeof parentModel === "string" && parentModel.length > 0) {
       agent.model = parentModel;
     } else {
-      agent.model = DEFAULT_CHAT_MODEL;
+      agent.model = DEFAULT_RUN_MODEL;
     }
     return agent;
   },

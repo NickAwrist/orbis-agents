@@ -1,7 +1,7 @@
 import type { ChatResponse, ToolCall } from "ollama";
 import type { Plan } from "../Plan";
 import type { LlmMetrics, RunContext, Step } from "../RunContext";
-import { DEFAULT_CHAT_MODEL } from "../constants";
+import { DEFAULT_RUN_MODEL } from "../constants";
 import { logger } from "../logger";
 import { getOllamaClient } from "../ollamaClient";
 import { CORE_DIRECTIVES } from "../prompts/render";
@@ -82,7 +82,7 @@ export class BaseAgent {
     this.description = description;
 
     this.tools = tools || [];
-    this.model = model ?? DEFAULT_CHAT_MODEL;
+    this.model = model ?? DEFAULT_RUN_MODEL;
     const base = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
     this.systemPrompt = base
       ? `${base}\n\n${CORE_DIRECTIVES}`
@@ -261,7 +261,7 @@ export class BaseAgent {
       }
 
       if (fullContent && toolCalls.length) {
-        const toolStr = `→ ${toolCalls.map((c) => c.function.name).join(", ")}`;
+        const toolStr = `-> ${toolCalls.map((c) => c.function.name).join(", ")}`;
         ctx.endStep(
           llmStep,
           `${fullContent}\n\n${toolStr}`,
@@ -278,7 +278,7 @@ export class BaseAgent {
       } else if (toolCalls.length) {
         ctx.endStep(
           llmStep,
-          `→ ${toolCalls.map((c) => c.function.name).join(", ")}`,
+          `-> ${toolCalls.map((c) => c.function.name).join(", ")}`,
           fullThinking || undefined,
           llmMetrics,
         );

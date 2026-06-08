@@ -1,7 +1,7 @@
 import type { UserSettings } from "../../persist/userSettings";
 
-/** Model for new chats: Settings default, else server default (not the active session's model). */
-export function effectiveDefaultChatModel(
+/** Model for new runs: Settings default, else server default (not the active session's model). */
+export function effectiveDefaultRunModel(
   settings: UserSettings,
   serverDefault: string,
 ): string {

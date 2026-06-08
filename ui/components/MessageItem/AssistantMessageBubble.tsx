@@ -113,7 +113,7 @@ export function AssistantMessageBubble({
                 stats.calls === 1 ? "1 LLM call" : `${stats.calls} LLM calls`,
               ]
                 .filter(Boolean)
-                .join(" · ")}
+                .join(" - ")}
               aria-label="Generation speed"
             >
               <Gauge size={msgIconSize} strokeWidth={msgIconStroke} />

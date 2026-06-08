@@ -29,7 +29,7 @@ export function DebugModal({
   const ollamaLine =
     ollamaConnected === null ? (
       <span className="text-[0.6875rem] text-muted-foreground">
-        Ollama: checking…
+        Ollama: checking...
       </span>
     ) : ollamaConnected ? (
       <span className="text-[0.6875rem] text-muted-foreground">
@@ -112,7 +112,7 @@ export function DebugModal({
           ) : (
             <div className="flex min-h-[200px] items-center justify-center gap-2.5 text-[0.875rem] text-muted-foreground">
               <Loader2 className="animate-spin" size={20} />
-              Loading…
+              Loading...
             </div>
           )}
         </div>

@@ -24,7 +24,7 @@ export function ollamaConnectionFeedback(
       return {
         variant: "loading",
         verifyingLabel: state.previousVersion
-          ? `Connected — Ollama version ${state.previousVersion}`
+          ? `Connected - Ollama version ${state.previousVersion}`
           : state.holdSavedConnected
             ? "Connected"
             : undefined,
@@ -32,7 +32,7 @@ export function ollamaConnectionFeedback(
     case "ok":
       return {
         variant: "ok",
-        okLabel: `Connected — Ollama version ${state.version}`,
+        okLabel: `Connected - Ollama version ${state.version}`,
       };
     case "idle":
       if (ollamaConnected === true) {
@@ -102,7 +102,7 @@ export function ConnectionTestFeedback(model: ConnectionTestFeedbackModel) {
             aria-live="polite"
           >
             <span className="opacity-65">{model.verifyingLabel}</span>
-            <span className="text-muted-foreground"> · Verifying…</span>
+            <span className="text-muted-foreground"> - Verifying...</span>
           </output>
         );
       }
@@ -111,7 +111,7 @@ export function ConnectionTestFeedback(model: ConnectionTestFeedbackModel) {
           className={cx(lineClass, "block text-muted-foreground")}
           aria-live="polite"
         >
-          Checking connection…
+          Checking connection...
         </output>
       );
     case "ok":

@@ -33,7 +33,7 @@ export const CORE_DIRECTIVES = [
   "",
   "<agency>",
   "You are an action-oriented agent. When you decide on a next step, immediately execute it with a tool call.",
-  "Never end your turn with only a plan or commentary — always follow through with the corresponding tool call unless the task is fully complete.",
+  "Never end your turn with only a plan or commentary - always follow through with the corresponding tool call unless the task is fully complete.",
   "</agency>",
 ].join("\n");
 
@@ -59,12 +59,12 @@ export const PROMPT_PLACEHOLDER_LIST: Array<{
   {
     key: "SESSION_DIRECTORY",
     token: PROMPT_PLACEHOLDERS.SESSION_DIRECTORY,
-    description: "Absolute working directory for this chat session.",
+    description: "Absolute working directory for this run session.",
   },
   {
     key: "OS",
     token: PROMPT_PLACEHOLDERS.OS,
-    description: "Operating system of the machine running the chat client.",
+    description: "Operating system of the machine running the run client.",
   },
 ];
 

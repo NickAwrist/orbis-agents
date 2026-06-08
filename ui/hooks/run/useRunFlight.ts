@@ -10,7 +10,7 @@ import {
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession } from "../../persist/sessions";
 import type { Message, MessageStep } from "../../types";
-import type { ChatFlightApi } from "./chatTypes";
+import type { RunFlightApi } from "./runTypes";
 import type { StreamBuffer } from "./useTurnBuffer";
 
 type FlightDeps = {
@@ -24,13 +24,13 @@ type FlightDeps = {
   setStreamingSteps: Dispatch<SetStateAction<MessageStep[]>>;
   setStreamingContent: Dispatch<SetStateAction<string>>;
   setStreamingThinking: Dispatch<SetStateAction<string>>;
-  setChatPending: Dispatch<SetStateAction<boolean>>;
+  setRunPending: Dispatch<SetStateAction<boolean>>;
 };
 
-export function useChatFlight(
+export function useRunFlight(
   deps: FlightDeps,
-  chatFlightRef: MutableRefObject<ChatFlightApi | null>,
-  rawChatPendingRef: MutableRefObject<boolean>,
+  runFlightRef: MutableRefObject<RunFlightApi | null>,
+  rawRunPendingRef: MutableRefObject<boolean>,
   inFlightSessionIdRef: MutableRefObject<string | null>,
   inFlightEphemeralRef: MutableRefObject<boolean>,
   turnMessagesSnapshotRef: MutableRefObject<Message[] | null>,
@@ -46,7 +46,7 @@ export function useChatFlight(
 
   const reconnectToStream = useCallback(
     (sessionId: string, _requestId: string) => {
-      if (rawChatPendingRef.current) return;
+      if (rawRunPendingRef.current) return;
 
       const d = depsRef.current;
       const controller = new AbortController();
@@ -54,7 +54,7 @@ export function useChatFlight(
       activeRequestIdRef.current = _requestId;
       inFlightSessionIdRef.current = sessionId;
       inFlightEphemeralRef.current = false;
-      rawChatPendingRef.current = true;
+      rawRunPendingRef.current = true;
       d.streamBufferRef.current = {
         content: "",
         thinking: "",
@@ -63,7 +63,7 @@ export function useChatFlight(
       };
 
       setInFlightSessionId(sessionId);
-      d.setChatPending(true);
+      d.setRunPending(true);
       d.setStreamingStep(null);
       d.setStreamingSteps([]);
       d.setStreamingContent("");
@@ -75,7 +75,7 @@ export function useChatFlight(
       void (async () => {
         try {
           const res = await fetch(
-            `/api/chat/stream/${encodeURIComponent(sessionId)}`,
+            `/api/runs/stream/${encodeURIComponent(sessionId)}`,
             {
               signal: controller.signal,
             },
@@ -102,11 +102,11 @@ export function useChatFlight(
           };
 
           await readSseBlocks(reader, async (data) => {
-            if (data.type === "chat_started") {
+            if (data.type === "run_started") {
               if (typeof data.requestId === "string") {
                 activeRequestIdRef.current = data.requestId;
               }
-            } else if (data.type === "stream_delta") {
+            } else if (data.type === "run_delta") {
               const cd =
                 typeof data.contentDelta === "string" ? data.contentDelta : "";
               const td =
@@ -122,7 +122,7 @@ export function useChatFlight(
               if (cd && agent === rootAgent)
                 d.setStreamingContent((prev) => prev + cd);
               if (td) d.setStreamingThinking((prev) => prev + td);
-            } else if (data.type === "step") {
+            } else if (data.type === "run_step") {
               const step = data.step as MessageStep;
               const buf = d.streamBufferRef.current;
               if (step.status === "running") {
@@ -141,11 +141,11 @@ export function useChatFlight(
               if (Array.isArray(data.steps))
                 d.setStreamingSteps(data.steps as MessageStep[]);
             } else if (
-              data.type === "chat_done" ||
-              data.type === "chat_aborted"
+              data.type === "run_done" ||
+              data.type === "run_aborted"
             ) {
               await finalizeReconnect();
-            } else if (data.type === "error") {
+            } else if (data.type === "run_error") {
               if (viewing()) {
                 d.setStreamingStep(null);
                 d.setStreamingSteps([]);
@@ -162,7 +162,7 @@ export function useChatFlight(
           activeRequestIdRef.current = null;
           inFlightSessionIdRef.current = null;
           inFlightEphemeralRef.current = false;
-          rawChatPendingRef.current = false;
+          rawRunPendingRef.current = false;
           depsRef.current.streamBufferRef.current = {
             content: "",
             thinking: "",
@@ -171,12 +171,12 @@ export function useChatFlight(
           };
           turnMessagesSnapshotRef.current = null;
           setInFlightSessionId(null);
-          depsRef.current.setChatPending(false);
+          depsRef.current.setRunPending(false);
         }
       })();
     },
     [
-      rawChatPendingRef,
+      rawRunPendingRef,
       inFlightSessionIdRef,
       inFlightEphemeralRef,
       turnMessagesSnapshotRef,
@@ -184,9 +184,9 @@ export function useChatFlight(
   );
 
   useLayoutEffect(() => {
-    chatFlightRef.current = {
+    runFlightRef.current = {
       shouldPreserveMessages: (sessionId: string) =>
-        rawChatPendingRef.current && inFlightSessionIdRef.current === sessionId,
+        rawRunPendingRef.current && inFlightSessionIdRef.current === sessionId,
       getTurnSnapshot: () => turnMessagesSnapshotRef.current,
       hydrateStreaming: () => {
         const d = depsRef.current;
@@ -199,8 +199,8 @@ export function useChatFlight(
       reconnectToStream,
     };
   }, [
-    chatFlightRef,
-    rawChatPendingRef,
+    runFlightRef,
+    rawRunPendingRef,
     inFlightSessionIdRef,
     reconnectToStream,
     turnMessagesSnapshotRef,

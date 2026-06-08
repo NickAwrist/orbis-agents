@@ -12,13 +12,13 @@ export type WireMessageInput = z.infer<typeof WireMessageSchema>;
 
 const ModelMessageSchema = z.record(z.string(), z.unknown());
 
-export const ChatMetadataSchema = z.object({
+export const RunMetadataSchema = z.object({
   name: z.string().optional(),
   location: z.string().optional(),
   preferredFormats: z.string().optional(),
 });
 
-export const ChatBodySchema = z.object({
+export const RunBodySchema = z.object({
   sessionId: z.string().min(1).optional(),
   message: z.string().min(1),
   history: z.array(WireMessageSchema),
@@ -26,14 +26,14 @@ export const ChatBodySchema = z.object({
   modelMessages: z.array(ModelMessageSchema).nullable().optional(),
   ephemeral: z.boolean().optional(),
   agentName: z.string().min(1),
-  metadata: ChatMetadataSchema.optional(),
+  metadata: RunMetadataSchema.optional(),
   sessionDirectory: z.string().optional(),
 });
 
-export type ChatBody = z.infer<typeof ChatBodySchema>;
+export type RunBody = z.infer<typeof RunBodySchema>;
 
-export const AbortBodySchema = z.object({
+export const AbortRunBodySchema = z.object({
   requestId: z.string().min(1),
 });
 
-export type AbortBody = z.infer<typeof AbortBodySchema>;
+export type AbortRunBody = z.infer<typeof AbortRunBodySchema>;

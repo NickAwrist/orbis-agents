@@ -6,7 +6,7 @@ export type {
   SessionSummary,
   SubagentRun,
   TruncateConfirmState,
-} from "./chat";
+} from "./run";
 export type { OllamaModelOption } from "./models";
 export type { ComfyUIConfigPayload, SearXNGConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";

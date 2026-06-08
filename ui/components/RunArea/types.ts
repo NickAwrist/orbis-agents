@@ -1,11 +1,11 @@
 import type { Message, MessageStep, TraceModalOpenPayload } from "../../types";
 
-export type ChatAreaProps = {
+export type RunAreaProps = {
   messages: Message[];
   streamingSteps: MessageStep[];
   streamingStep: MessageStep | null;
   streamingContent: string;
-  chatPending: boolean;
+  runPending: boolean;
   footerInset: number;
   onViewSteps: (payload: TraceModalOpenPayload) => void;
   editingUserIndex: number | null;

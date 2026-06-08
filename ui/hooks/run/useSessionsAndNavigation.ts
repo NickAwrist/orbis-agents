@@ -24,33 +24,33 @@ import type {
   TruncateConfirmState,
 } from "../../types";
 import type { OllamaModelOption } from "../../types";
-import type { ChatFlightApi } from "./chatTypes";
+import type { RunFlightApi } from "./runTypes";
 import {
-  effectiveDefaultChatModel,
+  effectiveDefaultRunModel,
   newEphemeralSessionId,
 } from "./sessionUtils";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
-const CHAT_PATH_PREFIX = "/chat/";
+const RUN_PATH_PREFIX = "/run/";
 
 function sessionIdFromUrl(): string | null {
   const { pathname } = window.location;
-  if (pathname.startsWith(CHAT_PATH_PREFIX)) {
-    const id = decodeURIComponent(pathname.slice(CHAT_PATH_PREFIX.length));
+  if (pathname.startsWith(RUN_PATH_PREFIX)) {
+    const id = decodeURIComponent(pathname.slice(RUN_PATH_PREFIX.length));
     return id || null;
   }
   return null;
 }
 
 function pushSessionUrl(id: string | null) {
-  const target = id ? `${CHAT_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
+  const target = id ? `${RUN_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
   if (window.location.pathname !== target) {
     window.history.pushState({ sessionId: id }, "", target);
   }
 }
 
 function replaceSessionUrl(id: string | null) {
-  const target = id ? `${CHAT_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
+  const target = id ? `${RUN_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
   if (window.location.pathname !== target) {
     window.history.replaceState({ sessionId: id }, "", target);
   }
@@ -59,7 +59,7 @@ function replaceSessionUrl(id: string | null) {
 type Args = {
   ollamaModels: OllamaModelOption[];
   serverDefaultModel: string;
-  serverDefaultChatAgent: string;
+  serverDefaultRunAgent: string;
   userSettingsRef: MutableRefObject<UserSettings>;
   userSettingsDefaultModel: string;
   messages: Message[];
@@ -74,7 +74,7 @@ type Args = {
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  chatFlightRef: MutableRefObject<ChatFlightApi | null>;
+  runFlightRef: MutableRefObject<RunFlightApi | null>;
 };
 
 export function useSessionsAndNavigation(p: Args) {
@@ -91,7 +91,7 @@ export function useSessionsAndNavigation(p: Args) {
     string | null
   >(null);
   const [selectedModel, setSelectedModel] = useState(() =>
-    effectiveDefaultChatModel(loadUserSettings(), "gemma4:e4b"),
+    effectiveDefaultRunModel(loadUserSettings(), "gemma4:e4b"),
   );
   const [selectedSessionAgent, setSelectedSessionAgent] =
     useState("general_agent");
@@ -120,7 +120,7 @@ export function useSessionsAndNavigation(p: Args) {
     if (!activeSessionId) return;
     if (isEphemeral) {
       const names = new Set(p.ollamaModels.map((m) => m.name));
-      const pref = effectiveDefaultChatModel(
+      const pref = effectiveDefaultRunModel(
         p.userSettingsRef.current,
         p.serverDefaultModel,
       );
@@ -139,7 +139,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (cancelled) return;
       const preference =
         stored?.model?.trim() ||
-        effectiveDefaultChatModel(
+        effectiveDefaultRunModel(
           p.userSettingsRef.current,
           p.serverDefaultModel,
         );
@@ -216,7 +216,7 @@ export function useSessionsAndNavigation(p: Args) {
     async (id: string) => {
       const gen = ++loadGenRef.current;
       setActiveSessionId(id);
-      const cf = p.chatFlightRef.current;
+      const cf = p.runFlightRef.current;
       if (cf?.shouldPreserveMessages(id)) {
         p.resetStreamingUi();
         p.setMessages(cf.getTurnSnapshot() ?? []);
@@ -265,7 +265,7 @@ export function useSessionsAndNavigation(p: Args) {
 
       try {
         const statusRes = await fetch(
-          `/api/chat/active/${encodeURIComponent(id)}`,
+          `/api/runs/active/${encodeURIComponent(id)}`,
         );
         if (gen !== loadGenRef.current) return;
         const status = (await statusRes.json()) as {
@@ -273,14 +273,14 @@ export function useSessionsAndNavigation(p: Args) {
           requestId?: string;
         };
         if (status.active && status.requestId) {
-          p.chatFlightRef.current?.reconnectToStream(id, status.requestId);
+          p.runFlightRef.current?.reconnectToStream(id, status.requestId);
         }
       } catch {
-        /* no active generation — normal case */
+        /* no active generation - normal case */
       }
     },
     [
-      p.chatFlightRef,
+      p.runFlightRef,
       p.setMessages,
       p.resetStreamingUi,
       p.setEditingUserIndex,
@@ -367,9 +367,9 @@ export function useSessionsAndNavigation(p: Args) {
         }
       }
       setIsEphemeral(false);
-      const agentForNewChat = p.serverDefaultChatAgent;
+      const agentForNewRun = p.serverDefaultRunAgent;
       const names = new Set(p.ollamaModels.map((m) => m.name));
-      let modelForNew = effectiveDefaultChatModel(
+      let modelForNew = effectiveDefaultRunModel(
         p.userSettingsRef.current,
         p.serverDefaultModel,
       );
@@ -378,7 +378,7 @@ export function useSessionsAndNavigation(p: Args) {
           ? p.serverDefaultModel
           : (p.ollamaModels[0]?.name ?? modelForNew);
       }
-      setSelectedSessionAgent(agentForNewChat);
+      setSelectedSessionAgent(agentForNewRun);
       const { id } = await createSessionApi({
         model: modelForNew,
       });
@@ -397,7 +397,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     p.messages.length,
     p.ollamaModels,
-    p.serverDefaultChatAgent,
+    p.serverDefaultRunAgent,
     p.serverDefaultModel,
     p.userSettingsRef,
     refreshSessions,
@@ -422,7 +422,7 @@ export function useSessionsAndNavigation(p: Args) {
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
     setSidebarOpen(false);
-    setSelectedSessionAgent(p.serverDefaultChatAgent);
+    setSelectedSessionAgent(p.serverDefaultRunAgent);
     setSessionDirectory("");
     sessionDirectoryRef.current = "";
     pushSessionUrl(null);
@@ -431,7 +431,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     p.messages.length,
     p.modelMessagesRef,
-    p.serverDefaultChatAgent,
+    p.serverDefaultRunAgent,
     p.setMessages,
     p.resetStreamingUi,
     p.setEditingUserIndex,
@@ -495,7 +495,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setDebugOpen(false);
     p.setDebugData(null);
     setSidebarOpen(false);
-    setSelectedSessionAgent(p.serverDefaultChatAgent);
+    setSelectedSessionAgent(p.serverDefaultRunAgent);
     setSessionDirectory("");
     sessionDirectoryRef.current = "";
     pushSessionUrl(null);
@@ -503,7 +503,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.activeSessionIdRef,
     p.isEphemeralRef,
     p.messages.length,
-    p.serverDefaultChatAgent,
+    p.serverDefaultRunAgent,
     p.setDebugData,
     p.setDebugOpen,
     p.setEditingUserIndex,

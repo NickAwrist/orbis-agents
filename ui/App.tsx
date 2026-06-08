@@ -1,12 +1,12 @@
 import { type CSSProperties, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
-import { ChatAppHeader } from "./components/ChatAppHeader";
-import { ChatArea } from "./components/ChatArea";
-import { ChatInputDock } from "./components/ChatInputDock";
 import { DebugModal } from "./components/DebugModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { OllamaDisconnectedBanner } from "./components/OllamaDisconnectedBanner";
 import { RenameSessionModal } from "./components/RenameSessionModal";
+import { RunAppHeader } from "./components/RunAppHeader";
+import { RunArea } from "./components/RunArea";
+import { RunInputDock } from "./components/RunInputDock";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarBackdrop } from "./components/SidebarBackdrop";
@@ -14,16 +14,16 @@ import { StepsModal } from "./components/StepsModal";
 import { TruncateConfirmModal } from "./components/TruncateConfirmModal";
 import { WelcomeHome } from "./components/WelcomeHome";
 import { useAppKeybinds } from "./hooks/useAppKeybinds";
-import { useChatApp } from "./hooks/useChatApp";
+import { useRunApp } from "./hooks/useRunApp";
 import { copyTextToClipboard } from "./lib/copyTextToClipboard";
-import { formatChatTranscript } from "./lib/formatChatTranscript";
+import { formatRunTranscript } from "./lib/formatRunTranscript";
 import { cx } from "./styles";
 import type { AppView } from "./types";
 
 export default function App() {
-  const app = useChatApp();
-  const [chatFooterInset, setChatFooterInset] = useState(104);
-  const [currentView, setCurrentView] = useState<AppView>("chat");
+  const app = useRunApp();
+  const [runFooterInset, setRunFooterInset] = useState(104);
+  const [currentView, setCurrentView] = useState<AppView>("run");
 
   const stepsModalOpen = shouldShowStepsModal(
     app.stepsModalData,
@@ -45,7 +45,7 @@ export default function App() {
     setSidebarOpen: app.setSidebarOpen,
     setSidebarCollapsed: app.setSidebarCollapsed,
     goToHome: app.goToHome,
-    headerChatBusy: app.headerChatBusy,
+    headerRunBusy: app.headerRunBusy,
   });
 
   return (
@@ -81,15 +81,15 @@ export default function App() {
               activeSessionId={app.activeSessionId}
               onSelectSession={(id) => {
                 app.setSidebarOpen(false);
-                setCurrentView("chat");
+                setCurrentView("run");
                 app.switchToSession(id);
               }}
               onNewSession={() => {
-                setCurrentView("chat");
+                setCurrentView("run");
                 app.createSession();
               }}
               onNewEphemeralSession={() => {
-                setCurrentView("chat");
+                setCurrentView("run");
                 app.createEphemeralSession();
               }}
               onRenameSession={(id) => app.setRenameSessionId(id)}
@@ -118,11 +118,11 @@ export default function App() {
           <main className="relative min-h-0 min-w-0 bg-background">
             {currentView === "agents" ? (
               <AgentsPage
-                defaultChatAgent={app.serverDefaultChatAgent}
-                onDefaultChatAgentChange={app.setServerDefaultChatAgent}
+                defaultRunAgent={app.serverDefaultRunAgent}
+                onDefaultRunAgentChange={app.setServerDefaultRunAgent}
                 onBack={() => {
                   void app.refreshAgentDefaults();
-                  setCurrentView("chat");
+                  setCurrentView("run");
                 }}
               />
             ) : currentView === "settings" ? (
@@ -140,11 +140,11 @@ export default function App() {
                 searxngHost={app.searxngHost}
                 searxngConnected={app.searxngConnected}
                 onSave={app.saveUserSettings}
-                onBack={() => setCurrentView("chat")}
+                onBack={() => setCurrentView("run")}
               />
             ) : (
               <>
-                <ChatAppHeader
+                <RunAppHeader
                   activeSessionId={app.activeSessionId}
                   sidebarOpen={app.sidebarOpen}
                   onOpenSidebar={() => app.setSidebarOpen(true)}
@@ -153,17 +153,17 @@ export default function App() {
                   modelsLoadError={app.modelsLoadError}
                   selectedModel={app.selectedModel}
                   onModelChange={app.handleModelChange}
-                  chatAgents={app.chatAgents}
+                  runAgents={app.runAgents}
                   selectedSessionAgent={app.selectedSessionAgent}
                   onSessionAgentChange={app.handleSessionAgentChange}
-                  headerChatBusy={app.headerChatBusy}
+                  headerRunBusy={app.headerRunBusy}
                   debugOpen={app.debugOpen}
                   onToggleDebug={app.toggleDebug}
-                  onCopyEntireChat={
+                  onCopyEntireRun={
                     app.activeSessionId
                       ? async () =>
                           copyTextToClipboard(
-                            formatChatTranscript(app.messages, {
+                            formatRunTranscript(app.messages, {
                               streamingAssistant: app.streamingContent.trim()
                                 ? app.streamingContent
                                 : undefined,
@@ -188,13 +188,13 @@ export default function App() {
                       key={app.activeSessionId}
                       className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
                     >
-                      <ChatArea
+                      <RunArea
                         messages={app.messages}
                         streamingSteps={app.streamingSteps}
                         streamingStep={app.streamingStep}
                         streamingContent={app.streamingContent}
-                        chatPending={app.chatPending}
-                        footerInset={chatFooterInset}
+                        runPending={app.runPending}
+                        footerInset={runFooterInset}
                         onViewSteps={app.setStepsModalData}
                         editingUserIndex={app.editingUserIndex}
                         onStartEditUser={app.setEditingUserIndex}
@@ -216,25 +216,25 @@ export default function App() {
                       key="home"
                       sessions={app.sessions}
                       isLoading={app.isLoading}
-                      onNewChat={app.createSession}
-                      onNewEphemeralChat={app.createEphemeralSession}
+                      onNewRun={app.createSession}
+                      onNewEphemeralRun={app.createEphemeralSession}
                       onOpenSession={app.switchToSession}
                     />
                   )}
                 </section>
 
                 {app.activeSessionId && (
-                  <ChatInputDock
+                  <RunInputDock
                     key={app.activeSessionId}
                     input={app.input}
                     setInput={app.setInput}
                     onSendMessage={app.sendMessage}
                     onStopGeneration={app.stopGeneration}
-                    chatPending={app.chatPending}
+                    runPending={app.runPending}
                     streamingStep={app.streamingStep}
                     streamingSteps={app.streamingSteps}
                     ollamaSendReady={app.ollamaSendReady}
-                    onFooterHeightChange={setChatFooterInset}
+                    onFooterHeightChange={setRunFooterInset}
                   />
                 )}
               </>
@@ -275,8 +275,8 @@ export default function App() {
         )}
         {app.pendingDeleteSessionId && (
           <TruncateConfirmModal
-            title="Delete this chat?"
-            description="This chat and all of its messages will be permanently deleted. This cannot be undone."
+            title="Delete this run?"
+            description="This run and all of its messages will be permanently deleted. This cannot be undone."
             confirmLabel="Delete"
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}

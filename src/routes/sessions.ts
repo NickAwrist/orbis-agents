@@ -113,11 +113,11 @@ router.patch("/:id", (req, res) => {
             ? (body.modelMessages as Array<Record<string, unknown>>)
             : parseModelMessages(row.model_messages)
         : parseModelMessages(row.model_messages);
-    const chatModel =
+    const runModel =
       typeof body.model === "string" && body.model.trim()
         ? body.model.trim()
         : undefined;
-    persistSessionMessages(id, hist, mm, now, chatModel);
+    persistSessionMessages(id, hist, mm, now, runModel);
   }
 
   const patch: Parameters<typeof patchSessionRow>[1] = { updated_at: now };

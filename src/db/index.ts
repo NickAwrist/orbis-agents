@@ -26,7 +26,7 @@ export type {
   WireMessage,
 } from "./types";
 export {
-  getDefaultChatAgent,
+  getDefaultRunAgent,
   getComfyUIDefaultModel,
   getComfyUIHost,
   getComfyUIImageSize,
@@ -37,7 +37,7 @@ export {
   setComfyUIHost,
   setComfyUIImageSize,
   setComfyUINegativePrompt,
-  setDefaultChatAgent,
+  setDefaultRunAgent,
   setOllamaHost,
   setSearXNGHost,
 } from "./settings";
