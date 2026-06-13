@@ -2,6 +2,8 @@ import type { Response } from "express";
 import { buildServerRunPromptContext } from "../agents/agentManager";
 import { DEFAULT_RUN_MODEL } from "../constants";
 import { type SessionRow, getAgentByName, getSessionById } from "../db/index";
+import { sendApiError } from "../http/errors";
+import { sendValidationError } from "../http/validation";
 import type { PromptContext } from "../prompts/render";
 import { type RunBody, RunBodySchema } from "../schemas/run";
 import { resolveEffectiveToolSessionDir } from "../sessionDirectory";
@@ -29,10 +31,7 @@ export function buildTurnContext(
 ): RunTurnContext | null {
   const parsed = RunBodySchema.safeParse(rawBody);
   if (!parsed.success) {
-    res.status(400).json({
-      error: "Invalid request body",
-      details: parsed.error.flatten(),
-    });
+    sendValidationError(res, parsed.error);
     return null;
   }
   const body = parsed.data;
@@ -42,19 +41,19 @@ export function buildTurnContext(
   let persistedSession: SessionRow | null = null;
   if (!ephemeral) {
     if (!sessionId) {
-      res.status(400).json({ error: "sessionId required" });
+      sendApiError(res, 400, "BAD_REQUEST", "sessionId required");
       return null;
     }
     persistedSession = getSessionById(sessionId);
     if (!persistedSession) {
-      res.status(404).json({ error: "Session not found" });
+      sendApiError(res, 404, "NOT_FOUND", "Session not found");
       return null;
     }
   }
 
   const agentName = body.agentName.trim();
   if (!getAgentByName(agentName)) {
-    res.status(400).json({ error: `Unknown agent: ${agentName}` });
+    sendApiError(res, 400, "BAD_REQUEST", `Unknown agent: ${agentName}`);
     return null;
   }
 

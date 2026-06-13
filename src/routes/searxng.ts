@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { setSearXNGHost } from "../db/index";
+import { sendValidationError } from "../http/validation";
 import {
   SearXNGConfigPutSchema,
   SearXNGTestBodySchema,
@@ -27,10 +28,7 @@ router.get("/config", (_req, res) => {
 router.put("/config", (req, res) => {
   const parsed = SearXNGConfigPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      error: "Invalid request body",
-      details: parsed.error.flatten(),
-    });
+    sendValidationError(res, parsed.error);
     return;
   }
   if (parsed.data.host !== undefined) {
@@ -43,10 +41,7 @@ router.put("/config", (req, res) => {
 router.post("/test", async (req, res) => {
   const parsed = SearXNGTestBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      error: "Invalid request body",
-      details: parsed.error.flatten(),
-    });
+    sendValidationError(res, parsed.error);
     return;
   }
   const raw = parsed.data.host?.trim() ?? "";

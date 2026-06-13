@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { readApiError } from "../../lib/readApiError";
 import type { OllamaModelOption } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
 
@@ -41,18 +42,15 @@ export function useOllamaConnection() {
   const refreshOllamaModels = useCallback(async () => {
     try {
       const res = await fetch("/api/models");
-      const data = (await res.json()) as {
-        models?: unknown;
-        defaultModel?: string;
-        error?: string;
-      };
       if (!res.ok) {
-        setModelsLoadError(
-          typeof data.error === "string" ? data.error : res.statusText,
-        );
+        setModelsLoadError(await readApiError(res));
         setOllamaModels([]);
         return;
       }
+      const data = (await res.json()) as {
+        models?: unknown;
+        defaultModel?: string;
+      };
       setModelsLoadError(null);
       const raw = Array.isArray(data.models) ? data.models : [];
       const list: OllamaModelOption[] = raw

@@ -1,3 +1,5 @@
+import { readApiError } from "../lib/readApiError";
+
 export type AgentData = {
   id: string;
   name: string;
@@ -18,14 +20,16 @@ export type AgentWriteBody = {
 
 export async function fetchAgents(): Promise<AgentData[]> {
   const res = await fetch("/api/agents");
-  if (!res.ok) throw new Error("Failed to fetch agents");
+  if (!res.ok)
+    throw new Error(await readApiError(res, "Failed to fetch agents"));
   const data = await res.json();
   return data.agents;
 }
 
 export async function fetchAgent(id: string): Promise<AgentData> {
   const res = await fetch(`/api/agents/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch agent");
+  if (!res.ok)
+    throw new Error(await readApiError(res, "Failed to fetch agent"));
   return res.json();
 }
 
@@ -36,8 +40,7 @@ export async function createAgentApi(body: AgentWriteBody): Promise<AgentData> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to create agent");
+    throw new Error(await readApiError(res, "Failed to create agent"));
   }
   return res.json();
 }
@@ -52,29 +55,30 @@ export async function updateAgentApi(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to update agent");
+    throw new Error(await readApiError(res, "Failed to update agent"));
   }
 }
 
 export async function deleteAgentApi(id: string): Promise<void> {
   const res = await fetch(`/api/agents/${id}`, { method: "DELETE" });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to delete agent");
+    throw new Error(await readApiError(res, "Failed to delete agent"));
   }
 }
 
 export async function fetchBuiltinTools(): Promise<string[]> {
   const res = await fetch("/api/tools");
-  if (!res.ok) throw new Error("Failed to fetch tools");
+  if (!res.ok)
+    throw new Error(await readApiError(res, "Failed to fetch tools"));
   const data = await res.json();
   return data.tools;
 }
 
 export async function fetchDefaultRunAgent(): Promise<string> {
   const res = await fetch("/api/settings/default-run-agent");
-  if (!res.ok) throw new Error("Failed to fetch default agent");
+  if (!res.ok) {
+    throw new Error(await readApiError(res, "Failed to fetch default agent"));
+  }
   const data = await res.json();
   return typeof data.agentName === "string" ? data.agentName : "general_agent";
 }
@@ -88,8 +92,7 @@ export async function putDefaultRunAgentApi(
     body: JSON.stringify({ agentName }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to update default agent");
+    throw new Error(await readApiError(res, "Failed to update default agent"));
   }
   const data = await res.json();
   return typeof data.agentName === "string" ? data.agentName : agentName;

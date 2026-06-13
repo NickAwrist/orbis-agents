@@ -17,6 +17,9 @@ import {
   setComfyUIImageSize,
   setComfyUINegativePrompt,
 } from "../db/index";
+import { asyncRoute } from "../http/asyncRoute";
+import { errorMessage, sendApiError } from "../http/errors";
+import { sendValidationError } from "../http/validation";
 import { logger } from "../logger";
 import {
   ComfyUIConfigPutSchema,
@@ -58,10 +61,7 @@ router.get("/config", (_req, res) => {
 router.put("/config", (req, res) => {
   const parsed = ComfyUIConfigPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      error: "Invalid request body",
-      details: parsed.error.flatten(),
-    });
+    sendValidationError(res, parsed.error);
     return;
   }
   const body = parsed.data;
@@ -92,10 +92,7 @@ router.put("/config", (req, res) => {
 router.post("/test", async (req, res) => {
   const parsed = ComfyUITestBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      error: "Invalid request body",
-      details: parsed.error.flatten(),
-    });
+    sendValidationError(res, parsed.error);
     return;
   }
   const raw = parsed.data.host?.trim() ?? "";
@@ -123,46 +120,54 @@ router.get("/models", async (_req, res) => {
 });
 
 // Viewing a generated image from the ComfyUI server.
-router.get("/view/:filename", async (req, res) => {
-  const { filename } = req.params;
-  const q = ComfyUIViewQuerySchema.safeParse(req.query);
-  if (!q.success) {
-    res.status(400).json({
-      error: "Invalid query",
-      details: q.error.flatten(),
-    });
-    return;
-  }
-  const { subfolder, type } = q.data;
-
-  try {
-    const client = getComfyUIClient();
-    const upstream = await client.fetchViewAsset(filename, subfolder, type);
-    if (!upstream.ok) {
-      res
-        .status(upstream.status)
-        .json({ error: `ComfyUI returned ${upstream.status}` });
+router.get(
+  "/view/:filename",
+  asyncRoute(async (req, res) => {
+    const rawFilename = req.params.filename;
+    const filename = Array.isArray(rawFilename) ? rawFilename[0] : rawFilename;
+    if (!filename) {
+      sendApiError(res, 400, "BAD_REQUEST", "filename is required");
       return;
     }
-
-    const contentType = upstream.headers.get("content-type");
-    if (contentType) res.setHeader("Content-Type", contentType);
-
-    const contentLength = upstream.headers.get("content-length");
-    if (contentLength) res.setHeader("Content-Length", contentLength);
-
-    if (upstream.body) {
-      Readable.fromWeb(
-        upstream.body as unknown as import("node:stream/web").ReadableStream,
-      ).pipe(res);
-    } else {
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      res.send(buffer);
+    const q = ComfyUIViewQuerySchema.safeParse(req.query);
+    if (!q.success) {
+      sendValidationError(res, q.error, "Invalid query");
+      return;
     }
-  } catch (e) {
-    log.error({ err: e }, "comfyui view proxy");
-    res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
-  }
-});
+    const { subfolder, type } = q.data;
+
+    try {
+      const client = getComfyUIClient();
+      const upstream = await client.fetchViewAsset(filename, subfolder, type);
+      if (!upstream.ok) {
+        sendApiError(
+          res,
+          upstream.status,
+          "UPSTREAM_ERROR",
+          `ComfyUI returned ${upstream.status}`,
+        );
+        return;
+      }
+
+      const contentType = upstream.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+
+      const contentLength = upstream.headers.get("content-length");
+      if (contentLength) res.setHeader("Content-Length", contentLength);
+
+      if (upstream.body) {
+        Readable.fromWeb(
+          upstream.body as unknown as import("node:stream/web").ReadableStream,
+        ).pipe(res);
+      } else {
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        res.send(buffer);
+      }
+    } catch (e) {
+      log.error({ err: e }, "comfyui view proxy");
+      sendApiError(res, 502, "UPSTREAM_ERROR", errorMessage(e));
+    }
+  }),
+);
 
 export default router;

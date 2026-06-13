@@ -23,6 +23,7 @@ import type {
 import type { RunFlightApi } from "./runTypes";
 export type { RunFlightApi };
 import { getClientOs } from "../../lib/clientOs";
+import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
@@ -314,12 +315,7 @@ export function useRunStreaming(p: Args) {
         }
 
         if (!res.ok) {
-          const errBody = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          await failWithAssistantError(
-            typeof errBody.error === "string" ? errBody.error : res.statusText,
-          );
+          await failWithAssistantError(await readApiError(res));
           return;
         }
 

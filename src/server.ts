@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import { getDb } from "./db/index";
 import { envConfig } from "./env";
+import { errorHandler, sendApiError } from "./http/errors";
 import { logger } from "./logger";
 import agentsRoutes from "./routes/agents";
 import comfyuiRoutes from "./routes/comfyui";
@@ -47,7 +48,7 @@ app.use("/api/runs", runRoutes);
 const distPath = join(process.cwd(), "dist");
 const indexPath = join(distPath, "index.html");
 
-if (existsSync(indexPath)) {
+if (envConfig.serveFrontend && existsSync(indexPath)) {
   app.use(express.static(distPath));
   app.use((req, res, next) => {
     if (req.method !== "GET" || req.path.startsWith("/api/")) {
@@ -59,10 +60,20 @@ if (existsSync(indexPath)) {
   });
 }
 
+app.use("/api", (_req, res) => {
+  sendApiError(res, 404, "NOT_FOUND", "API route not found");
+});
+
+app.use(errorHandler);
+
 const PORT = envConfig.backendPort;
 app.listen(PORT, envConfig.backendHost, () => {
   logger.info(
-    { port: PORT, host: envConfig.backendHost },
+    {
+      port: PORT,
+      host: envConfig.backendHost,
+      serveFrontend: envConfig.serveFrontend,
+    },
     "API server listening",
   );
 });

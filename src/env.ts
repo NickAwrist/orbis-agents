@@ -28,6 +28,14 @@ function getPort(names: string[], fallback: number): number {
   return fallback;
 }
 
+function getBoolean(names: string[], fallback: boolean): boolean {
+  const raw = getFirstEnv(names).toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  return fallback;
+}
+
 export const envConfig = {
   backendPort: getPort(
     ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
@@ -43,4 +51,5 @@ export const envConfig = {
   ollamaHost: getFirstEnv(["AGENTS_OLLAMA_HOST", "OLLAMA_HOST"]),
   comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
   searxngHost: getFirstEnv(["AGENTS_SEARXNG_HOST", "SEARXNG_HOST"]),
+  serveFrontend: getBoolean(["AGENTS_SERVE_FRONTEND"], true),
 };

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { DEFAULT_RUN_MODEL } from "../constants";
+import { errorMessage, sendApiError } from "../http/errors";
 import { getOllamaClient } from "../ollamaClient";
 
 const modelsRoutes = Router();
@@ -21,8 +22,7 @@ modelsRoutes.get("/", async (_req, res) => {
       })),
     });
   } catch (e) {
-    res.status(502).json({
-      error: e instanceof Error ? e.message : String(e),
+    sendApiError(res, 502, "UPSTREAM_ERROR", errorMessage(e), {
       defaultModel: DEFAULT_RUN_MODEL,
       models: [],
     });

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { sendApiError } from "../http/errors";
 import { handleRun } from "../run/runController";
 import { sseManager } from "../run/sseManager";
 import { AbortRunBodySchema } from "../schemas/run";
@@ -30,7 +31,12 @@ router.get("/active/:sessionId", (req, res) => {
 router.get("/stream/:sessionId", (req, res) => {
   const gen = sseManager.getActive(req.params.sessionId);
   if (!gen) {
-    res.status(404).json({ error: "No active generation for this session" });
+    sendApiError(
+      res,
+      404,
+      "NOT_FOUND",
+      "No active generation for this session",
+    );
     return;
   }
 

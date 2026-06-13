@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readApiError } from "../lib/readApiError";
 import { cx, iconButton } from "../styles";
 import type { OllamaModelOption } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
@@ -91,16 +92,13 @@ function FolderPickerButton({
       const res = await fetch("/api/sessions/pick-directory", {
         method: "POST",
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        path?: string | null;
-        error?: string;
-      };
       if (!res.ok) {
-        window.alert(
-          typeof data.error === "string" ? data.error : res.statusText,
-        );
+        window.alert(await readApiError(res));
         return;
       }
+      const data = (await res.json().catch(() => ({}))) as {
+        path?: string | null;
+      };
       if (typeof data.path === "string" && data.path.trim().length > 0) {
         onSessionDirectoryDraft(data.path.trim());
         await onSessionDirectoryPersist();

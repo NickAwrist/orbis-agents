@@ -11,6 +11,7 @@ import {
   patchSessionRow,
   persistSessionMessages,
 } from "../db/index";
+import { sendApiError } from "../http/errors";
 import { pickFolderNative } from "../nativeFolderPicker";
 
 const router = Router();
@@ -27,19 +28,24 @@ function isFolderPickerAllowed(req: Request): boolean {
 
 router.post("/pick-directory", async (req, res) => {
   if (!isFolderPickerAllowed(req)) {
-    res.status(403).json({
-      error:
-        "Folder picker only runs on the machine where the API server is started (localhost).",
-    });
+    sendApiError(
+      res,
+      403,
+      "FORBIDDEN",
+      "Folder picker only runs on the machine where the API server is started (localhost).",
+    );
     return;
   }
   try {
     const path = await pickFolderNative();
     res.json({ path });
   } catch (e) {
-    res.status(500).json({
-      error: e instanceof Error ? e.message : "Failed to open folder dialog",
-    });
+    sendApiError(
+      res,
+      500,
+      "INTERNAL_ERROR",
+      e instanceof Error ? e.message : "Failed to open folder dialog",
+    );
   }
 });
 
@@ -59,7 +65,7 @@ router.get("/:id", (req, res) => {
   const id = req.params.id;
   const row = getSessionById(id);
   if (!row) {
-    res.status(404).json({ error: "Session not found" });
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
   const history = getMessagesForSession(id);
@@ -91,7 +97,7 @@ router.patch("/:id", (req, res) => {
   const id = req.params.id;
   const row = getSessionById(id);
   if (!row) {
-    res.status(404).json({ error: "Session not found" });
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
   const body = req.body as {
@@ -168,7 +174,7 @@ router.patch("/:id", (req, res) => {
 router.delete("/:id", (req, res) => {
   const ok = deleteSessionRow(req.params.id);
   if (!ok) {
-    res.status(404).json({ error: "Session not found" });
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
   res.json({ ok: true });

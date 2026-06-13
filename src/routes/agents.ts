@@ -6,6 +6,7 @@ import {
   listAgents,
   updateAgentRow,
 } from "../db/index";
+import { sendApiError } from "../http/errors";
 
 const agentsRoutes = Router();
 
@@ -46,7 +47,7 @@ agentsRoutes.get("/", (_req, res) => {
 agentsRoutes.get("/:id", (req, res) => {
   const agent = getAgentById(req.params.id);
   if (!agent) {
-    res.status(404).json({ error: "Agent not found" });
+    sendApiError(res, 404, "NOT_FOUND", "Agent not found");
     return;
   }
   res.json(agent);
@@ -55,7 +56,7 @@ agentsRoutes.get("/:id", (req, res) => {
 agentsRoutes.post("/", (req, res) => {
   const parsed = parseAgentBody(req.body as AgentWriteBody);
   if (!parsed.ok) {
-    res.status(400).json({ error: parsed.error });
+    sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
     return;
   }
   try {
@@ -64,7 +65,12 @@ agentsRoutes.post("/", (req, res) => {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("UNIQUE constraint")) {
-      res.status(409).json({ error: "An agent with that name already exists" });
+      sendApiError(
+        res,
+        409,
+        "CONFLICT",
+        "An agent with that name already exists",
+      );
       return;
     }
     throw e;
@@ -74,20 +80,25 @@ agentsRoutes.post("/", (req, res) => {
 agentsRoutes.put("/:id", (req, res) => {
   const parsed = parseAgentBody(req.body as AgentWriteBody);
   if (!parsed.ok) {
-    res.status(400).json({ error: parsed.error });
+    sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
     return;
   }
   try {
     const ok = updateAgentRow(req.params.id, parsed.data);
     if (!ok) {
-      res.status(404).json({ error: "Agent not found" });
+      sendApiError(res, 404, "NOT_FOUND", "Agent not found");
       return;
     }
     res.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("UNIQUE constraint")) {
-      res.status(409).json({ error: "An agent with that name already exists" });
+      sendApiError(
+        res,
+        409,
+        "CONFLICT",
+        "An agent with that name already exists",
+      );
       return;
     }
     throw e;
@@ -97,10 +108,12 @@ agentsRoutes.put("/:id", (req, res) => {
 agentsRoutes.delete("/:id", (req, res) => {
   const ok = deleteAgentRow(req.params.id);
   if (!ok) {
-    res.status(400).json({
-      error:
-        "Agent not found or cannot delete the required general_agent fallback",
-    });
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      "Agent not found or cannot delete the required general_agent fallback",
+    );
     return;
   }
   res.json({ ok: true });
