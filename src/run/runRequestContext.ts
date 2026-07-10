@@ -18,7 +18,7 @@ import { resolveEffectiveToolSessionDir } from "../sessionDirectory";
 export type RunTurnContext = {
   body: RunBody;
   ephemeral: boolean;
-  /** Empty string for ephemeral turns. */
+  /** Stable app conversation ID when supplied, including ephemeral chats. */
   sessionId: string;
   model: string;
   agentName: string;

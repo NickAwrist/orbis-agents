@@ -87,6 +87,7 @@ export class AgentSession extends EventEmitter {
       toolSessionDir: options?.toolSessionDir,
       promptContext: options?.promptContext,
     });
+    this.generalAgent.providerSessionId = sessionId;
     const m = options?.model?.trim();
     if (m) this.generalAgent.model = m;
   }

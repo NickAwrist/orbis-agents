@@ -13,6 +13,8 @@ describe("trace metrics", () => {
           cost: 0.00042,
           promptTokens: 10,
           outputTokens: 5,
+          cachedTokens: 8,
+          cacheWriteTokens: 2,
           outputDurationMs: 500,
         },
       },
@@ -26,6 +28,8 @@ describe("trace metrics", () => {
                 cost: 0.00084,
                 promptTokens: 20,
                 outputTokens: 15,
+                cachedTokens: 12,
+                cacheWriteTokens: 0,
                 outputDurationMs: 500,
               },
             },
@@ -39,6 +43,8 @@ describe("trace metrics", () => {
       cost: 0.00126,
       inputTokens: 30,
       outputTokens: 20,
+      cachedTokens: 20,
+      cacheWriteTokens: 2,
       tokensPerSecond: 20,
     });
   });

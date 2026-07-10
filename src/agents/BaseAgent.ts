@@ -20,6 +20,7 @@ export class BaseAgent {
   description: string;
   tools: BaseTool[];
   history: LlmMessage[];
+  providerSessionId?: string;
 
   TOOL_MAP: Record<string, BaseTool>;
 
@@ -161,6 +162,7 @@ export class BaseAgent {
         model: this.model,
         messages,
         tools: this.tools.map((tool) => tool.toTool()),
+        sessionId: this.providerSessionId,
       });
 
       const onAbort = () => stream.abort();

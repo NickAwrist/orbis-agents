@@ -12,6 +12,7 @@ export const COMFYUI_DEFAULT_HEIGHT_KEY = "comfyui_default_height";
 export const COMFYUI_NEGATIVE_PROMPT_KEY = "comfyui_negative_prompt";
 export const SEARXNG_HOST_KEY = "searxng_host";
 export const OPENROUTER_API_KEY_KEY = "openrouter_api_key";
+export const OPENROUTER_PROMPT_CACHING_KEY = "openrouter_prompt_caching";
 export const OPENROUTER_MODELS_SEEDED_KEY = "openrouter_models_seeded_v3";
 export const LEGACY_OPENROUTER_MODELS_SEEDED_KEYS = [
   "openrouter_models_seeded_v1",

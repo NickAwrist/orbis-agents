@@ -17,6 +17,8 @@ export interface MessageStep {
     outputTokens?: number;
     outputDurationMs?: number;
     promptTokens?: number;
+    cachedTokens?: number;
+    cacheWriteTokens?: number;
     promptDurationMs?: number;
     totalDurationMs?: number;
     loadDurationMs?: number;

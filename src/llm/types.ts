@@ -23,6 +23,8 @@ export type LlmChatRequest = {
   model: string;
   messages: LlmMessage[];
   tools: Tool[];
+  /** Stable application conversation ID used for provider-side routing. */
+  sessionId?: string;
 };
 
 export type LlmStreamChunk = {

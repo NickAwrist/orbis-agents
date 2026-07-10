@@ -17,6 +17,7 @@ type RegistryModel = {
   name: string;
   route: string;
   ai_lab: string;
+  promptCaching?: "supported" | "unsupported" | "unknown";
 };
 
 type Lookup = {
@@ -24,6 +25,7 @@ type Lookup = {
   name: string;
   ai_lab: string;
   found: boolean;
+  promptCaching: "supported" | "unsupported" | "unknown";
 };
 
 export function OpenRouterSettingsTab({
@@ -33,6 +35,7 @@ export function OpenRouterSettingsTab({
 }) {
   const [hasKey, setHasKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [promptCachingEnabled, setPromptCachingEnabled] = useState(false);
   const [keySaved, setKeySaved] = useState(false);
   const [models, setModels] = useState<RegistryModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,9 +57,13 @@ export function OpenRouterSettingsTab({
       ]);
       if (!keyRes.ok) throw new Error(await readApiError(keyRes));
       if (!modelsRes.ok) throw new Error(await readApiError(modelsRes));
-      const keyData = (await keyRes.json()) as { hasKey?: boolean };
+      const keyData = (await keyRes.json()) as {
+        hasKey?: boolean;
+        promptCachingEnabled?: boolean;
+      };
       const modelsData = (await modelsRes.json()) as { models?: unknown };
       setHasKey(keyData.hasKey === true);
+      setPromptCachingEnabled(keyData.promptCachingEnabled === true);
       setModels(
         Array.isArray(modelsData.models)
           ? (modelsData.models as RegistryModel[])
@@ -97,6 +104,24 @@ export function OpenRouterSettingsTab({
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSavingKey(false);
+    }
+  };
+
+  const savePromptCaching = async (enabled: boolean) => {
+    setError(null);
+    setPromptCachingEnabled(enabled);
+    try {
+      const res = await fetch("/api/settings/openrouter", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promptCachingEnabled: enabled }),
+      });
+      if (!res.ok) throw new Error(await readApiError(res));
+      const data = (await res.json()) as { promptCachingEnabled?: boolean };
+      setPromptCachingEnabled(data.promptCachingEnabled === true);
+    } catch (cause) {
+      setPromptCachingEnabled(!enabled);
+      setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
 
@@ -240,6 +265,46 @@ export function OpenRouterSettingsTab({
 
       <hr className="border-border-subtle" />
 
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className={eyebrowText}>Prompt caching</h2>
+            <p className={cx(hintClass, "mt-2 max-w-2xl")}>
+              Send this app&apos;s stable conversation ID for OpenRouter sticky
+              routing and request automatic cache breakpoints. Supported models
+              can reuse unchanged history; unsupported models continue normally.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={promptCachingEnabled}
+            onClick={() => void savePromptCaching(!promptCachingEnabled)}
+            className={cx(
+              "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors",
+              promptCachingEnabled
+                ? "border-emerald-500/40 bg-emerald-500/25"
+                : "border-border-subtle bg-muted",
+            )}
+          >
+            <span
+              className={cx(
+                "absolute left-0 top-0.5 h-4.5 w-4.5 rounded-full bg-foreground transition-transform",
+                promptCachingEnabled ? "translate-x-5" : "translate-x-0.5",
+              )}
+            />
+            <span className="sr-only">Enable OpenRouter prompt caching</span>
+          </button>
+        </div>
+        <p className={hintClass}>
+          OpenRouter and the selected provider still decide whether a request is
+          eligible. Automatic provider caching cannot necessarily be disabled by
+          this toggle.
+        </p>
+      </section>
+
+      <hr className="border-border-subtle" />
+
       <section className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -280,6 +345,22 @@ export function OpenRouterSettingsTab({
                       {model.name}
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         {model.ai_lab}
+                      </span>
+                      <span
+                        className={cx(
+                          "ml-2 rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium",
+                          model.promptCaching === "supported"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : model.promptCaching === "unsupported"
+                              ? "bg-muted text-muted-foreground"
+                              : "bg-amber-500/10 text-amber-400",
+                        )}
+                      >
+                        {model.promptCaching === "supported"
+                          ? "Cache supported"
+                          : model.promptCaching === "unsupported"
+                            ? "No cache pricing"
+                            : "Cache unknown"}
                       </span>
                     </p>
                     <p className="truncate font-mono text-xs text-muted-foreground">
@@ -362,6 +443,9 @@ export function OpenRouterSettingsTab({
                     </p>
                     <p className="mt-1 font-mono text-xs text-muted-foreground">
                       {lookup.route}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Prompt caching: {lookup.promptCaching}
                     </p>
                     {!lookup.found && (
                       <p className="mt-2 text-xs text-amber-400">

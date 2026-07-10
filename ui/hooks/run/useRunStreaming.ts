@@ -285,6 +285,7 @@ export function useRunStreaming(p: Args) {
           if (u.preferredFormats?.trim())
             metadata.preferredFormats = u.preferredFormats.trim();
           const runBody: Record<string, unknown> = {
+            sessionId: turnSessionId,
             message: msg,
             history: priorMessages,
             model: p.selectedModel,
@@ -294,8 +295,6 @@ export function useRunStreaming(p: Args) {
           };
           if (ephemeral) {
             runBody.ephemeral = true;
-          } else {
-            runBody.sessionId = turnSessionId;
           }
           runBody.sessionDirectory =
             p.sessionDirectoryRef.current.trim() || undefined;

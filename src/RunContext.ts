@@ -8,6 +8,8 @@ export type LlmMetrics = {
   outputTokens?: number;
   outputDurationMs?: number;
   promptTokens?: number;
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
   promptDurationMs?: number;
   totalDurationMs?: number;
   loadDurationMs?: number;

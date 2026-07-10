@@ -5,6 +5,8 @@ export type TraceMetricsSummary = {
   cost?: number;
   inputTokens?: number;
   outputTokens?: number;
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
   tokensPerSecond?: number;
 };
 
@@ -39,6 +41,10 @@ export function summarizeTraceMetrics(
   let hasInputTokens = false;
   let outputTokens = 0;
   let hasOutputTokens = false;
+  let cachedTokens = 0;
+  let hasCachedTokens = false;
+  let cacheWriteTokens = 0;
+  let hasCacheWriteTokens = false;
   let outputDurationMs = 0;
   let lastTokensPerSecond: number | undefined;
 
@@ -58,6 +64,16 @@ export function summarizeTraceMetrics(
       outputTokens += metricOutputTokens;
       hasOutputTokens = true;
     }
+    const metricCachedTokens = finiteNumber(metric.cachedTokens);
+    if (metricCachedTokens !== undefined) {
+      cachedTokens += metricCachedTokens;
+      hasCachedTokens = true;
+    }
+    const metricCacheWriteTokens = finiteNumber(metric.cacheWriteTokens);
+    if (metricCacheWriteTokens !== undefined) {
+      cacheWriteTokens += metricCacheWriteTokens;
+      hasCacheWriteTokens = true;
+    }
     outputDurationMs += finiteNumber(metric.outputDurationMs) ?? 0;
     lastTokensPerSecond =
       finiteNumber(metric.tokensPerSecond) ?? lastTokensPerSecond;
@@ -73,6 +89,8 @@ export function summarizeTraceMetrics(
     cost: hasCost ? cost : undefined,
     inputTokens: hasInputTokens ? inputTokens : undefined,
     outputTokens: hasOutputTokens ? outputTokens : undefined,
+    cachedTokens: hasCachedTokens ? cachedTokens : undefined,
+    cacheWriteTokens: hasCacheWriteTokens ? cacheWriteTokens : undefined,
     tokensPerSecond,
   };
 }

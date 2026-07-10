@@ -91,7 +91,7 @@ export async function runTurn(
 }
 
 function buildSession(ctx: RunTurnContext): AgentSession {
-  const session = new AgentSession(crypto.randomUUID(), {
+  const session = new AgentSession(ctx.sessionId || crypto.randomUUID(), {
     model: ctx.model,
     agentName: ctx.agentName,
     promptContext: ctx.promptContext,

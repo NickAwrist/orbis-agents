@@ -5,13 +5,18 @@ import {
   deleteOpenRouterModel,
   getDefaultRunAgent,
   getOpenRouterApiKey,
+  getOpenRouterPromptCachingEnabled,
   listOpenRouterModels,
   setDefaultRunAgent,
   setOpenRouterApiKey,
+  setOpenRouterPromptCachingEnabled,
 } from "../db/index";
 import { asyncRoute } from "../http/asyncRoute";
 import { sendApiError } from "../http/errors";
-import { lookupOpenRouterModel } from "../openRouterModels";
+import {
+  lookupOpenRouterModel,
+  lookupOpenRouterPromptCaching,
+} from "../openRouterModels";
 
 const settingsRoutes = Router();
 
@@ -30,24 +35,56 @@ settingsRoutes.put("/default-run-agent", (req, res) => {
 });
 
 settingsRoutes.get("/openrouter", (_req, res) => {
-  res.json({ hasKey: getOpenRouterApiKey().length > 0 });
+  res.json({
+    hasKey: getOpenRouterApiKey().length > 0,
+    promptCachingEnabled: getOpenRouterPromptCachingEnabled(),
+  });
 });
 
 settingsRoutes.put("/openrouter", (req, res) => {
   const parsed = z
-    .object({ apiKey: z.string().max(512).default("") })
+    .object({
+      apiKey: z.string().max(512).optional(),
+      promptCachingEnabled: z.boolean().optional(),
+    })
     .safeParse(req.body);
   if (!parsed.success) {
-    sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
+    sendApiError(res, 400, "BAD_REQUEST", "Invalid OpenRouter settings");
     return;
   }
-  setOpenRouterApiKey(parsed.data.apiKey);
-  res.json({ ok: true, hasKey: getOpenRouterApiKey().length > 0 });
+  // Preserve the legacy behavior where an empty object clears the key, while
+  // allowing the prompt-caching toggle to update independently of the secret.
+  if (
+    parsed.data.apiKey !== undefined ||
+    parsed.data.promptCachingEnabled === undefined
+  ) {
+    setOpenRouterApiKey(parsed.data.apiKey ?? "");
+  }
+  if (parsed.data.promptCachingEnabled !== undefined) {
+    setOpenRouterPromptCachingEnabled(parsed.data.promptCachingEnabled);
+  }
+  res.json({
+    ok: true,
+    hasKey: getOpenRouterApiKey().length > 0,
+    promptCachingEnabled: getOpenRouterPromptCachingEnabled(),
+  });
 });
 
-settingsRoutes.get("/openrouter/models", (_req, res) => {
-  res.json({ models: listOpenRouterModels() });
-});
+settingsRoutes.get(
+  "/openrouter/models",
+  asyncRoute(async (_req, res) => {
+    const models = listOpenRouterModels();
+    const support = await lookupOpenRouterPromptCaching(
+      models.map((model) => model.route),
+    );
+    res.json({
+      models: models.map((model) => ({
+        ...model,
+        promptCaching: support[model.route] ?? "unknown",
+      })),
+    });
+  }),
+);
 
 const OpenRouterRouteSchema = z.object({
   route: z
@@ -79,10 +116,12 @@ settingsRoutes.post(
       return;
     }
     try {
-      const model = createOpenRouterModel(
-        await lookupOpenRouterModel(parsed.data.route),
-      );
-      res.status(201).json(model);
+      const details = await lookupOpenRouterModel(parsed.data.route);
+      const model = createOpenRouterModel(details);
+      res.status(201).json({
+        ...model,
+        promptCaching: details.promptCaching,
+      });
     } catch (error) {
       if (
         error instanceof Error &&

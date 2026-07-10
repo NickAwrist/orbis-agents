@@ -1,4 +1,7 @@
-import { getOpenRouterApiKey } from "../db/index";
+import {
+  getOpenRouterApiKey,
+  getOpenRouterPromptCachingEnabled,
+} from "../db/index";
 import { compactReasoningDetails } from "./reasoningDetails";
 import type {
   LlmChatRequest,
@@ -30,6 +33,10 @@ type OpenRouterChunk = {
     cost?: number;
     prompt_tokens?: number;
     completion_tokens?: number;
+    prompt_tokens_details?: {
+      cached_tokens?: number;
+      cache_write_tokens?: number;
+    };
   };
   error?: { message?: string; code?: number | string };
 };
@@ -197,6 +204,19 @@ async function* openRouterChunks(
         ...(typeof payload.usage.completion_tokens === "number"
           ? { outputTokens: payload.usage.completion_tokens }
           : {}),
+        ...(typeof payload.usage.prompt_tokens_details?.cached_tokens ===
+        "number"
+          ? {
+              cachedTokens: payload.usage.prompt_tokens_details.cached_tokens,
+            }
+          : {}),
+        ...(typeof payload.usage.prompt_tokens_details?.cache_write_tokens ===
+        "number"
+          ? {
+              cacheWriteTokens:
+                payload.usage.prompt_tokens_details.cache_write_tokens,
+            }
+          : {}),
       };
     }
 
@@ -281,6 +301,12 @@ export async function streamOpenRouterChat(
       model: request.model,
       messages: request.messages,
       tools: request.tools,
+      ...(getOpenRouterPromptCachingEnabled()
+        ? {
+            cache_control: { type: "ephemeral" },
+            ...(request.sessionId ? { session_id: request.sessionId } : {}),
+          }
+        : {}),
       stream: true,
       stream_options: { include_usage: true },
     }),

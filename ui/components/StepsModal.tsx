@@ -109,9 +109,10 @@ export function StepsModal({
               (metrics.inputTokens !== undefined ||
                 metrics.outputTokens !== undefined ||
                 metrics.tokensPerSecond !== undefined ||
+                metrics.cachedTokens !== undefined ||
                 metrics.cost !== undefined) && (
                 <div
-                  className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-border-subtle bg-muted/25 p-2.5 sm:grid-cols-4"
+                  className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-border-subtle bg-muted/25 p-2.5 sm:grid-cols-5"
                   aria-label="Execution metrics"
                 >
                   <TraceMetric
@@ -128,6 +129,15 @@ export function StepsModal({
                     value={
                       metrics.outputTokens !== undefined
                         ? metrics.outputTokens.toLocaleString()
+                        : "—"
+                    }
+                    suffix="tokens"
+                  />
+                  <TraceMetric
+                    label="Cached"
+                    value={
+                      metrics.cachedTokens !== undefined
+                        ? metrics.cachedTokens.toLocaleString()
                         : "—"
                     }
                     suffix="tokens"

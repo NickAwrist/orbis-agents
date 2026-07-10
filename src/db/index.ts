@@ -35,6 +35,7 @@ export {
   getOllamaHost,
   getSearXNGHost,
   getOpenRouterApiKey,
+  getOpenRouterPromptCachingEnabled,
   setComfyUIDefaultModel,
   setComfyUIHost,
   setComfyUIImageSize,
@@ -43,6 +44,7 @@ export {
   setOllamaHost,
   setSearXNGHost,
   setOpenRouterApiKey,
+  setOpenRouterPromptCachingEnabled,
 } from "./settings";
 
 export {

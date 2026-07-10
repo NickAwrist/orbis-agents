@@ -187,10 +187,12 @@ const originalFetch = globalThis.fetch;
             {
               id: "example/test-model",
               name: "Example AI: Test Model",
+              pricing: { input_cache_read: "0" },
             },
             {
               id: "openai/gpt-5.4-mini",
               name: "OpenAI: GPT-5.4 Mini",
+              pricing: { input_cache_read: "0.00000025" },
             },
           ],
         }),

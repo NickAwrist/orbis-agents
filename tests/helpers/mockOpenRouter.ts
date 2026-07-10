@@ -205,6 +205,10 @@ export async function handleOpenRouterRequest(
         completion_tokens: 5,
         total_tokens: 15,
         cost: 0.00042,
+        prompt_tokens_details: {
+          cached_tokens: 8,
+          cache_write_tokens: 2,
+        },
       },
     },
     "[DONE]",

@@ -55,7 +55,8 @@ export function AssistantMessageBubble({
           {stats &&
             (stats.tokensPerSecond !== undefined ||
               stats.inputTokens !== undefined ||
-              stats.outputTokens !== undefined) && (
+              stats.outputTokens !== undefined ||
+              stats.cachedTokens !== undefined) && (
               <span
                 className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-1.5 text-[0.6875rem] font-medium text-muted-foreground"
                 title={[
@@ -67,6 +68,12 @@ export function AssistantMessageBubble({
                     : null,
                   stats.outputTokens !== undefined
                     ? `${stats.outputTokens} output tokens`
+                    : null,
+                  stats.cachedTokens !== undefined
+                    ? `${stats.cachedTokens} cached input tokens`
+                    : null,
+                  stats.cacheWriteTokens !== undefined
+                    ? `${stats.cacheWriteTokens} cache write tokens`
                     : null,
                   stats.cost !== undefined
                     ? `${formatCost(stats.cost)} OpenRouter cost`

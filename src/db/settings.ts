@@ -11,6 +11,7 @@ import {
   DEFAULT_RUN_AGENT_KEY,
   OLLAMA_HOST_KEY,
   OPENROUTER_API_KEY_KEY,
+  OPENROUTER_PROMPT_CACHING_KEY,
   SEARXNG_HOST_KEY,
 } from "./constants";
 
@@ -122,4 +123,12 @@ export function getOpenRouterApiKey(): string {
 
 export function setOpenRouterApiKey(key: string): void {
   setAppSetting(OPENROUTER_API_KEY_KEY, key);
+}
+
+export function getOpenRouterPromptCachingEnabled(): boolean {
+  return getAppSetting(OPENROUTER_PROMPT_CACHING_KEY) === "true";
+}
+
+export function setOpenRouterPromptCachingEnabled(enabled: boolean): void {
+  setAppSetting(OPENROUTER_PROMPT_CACHING_KEY, String(enabled));
 }

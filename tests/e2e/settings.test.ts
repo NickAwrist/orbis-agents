@@ -1,6 +1,9 @@
 import "../setup";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { getOpenRouterApiKey } from "../../src/db";
+import {
+  getOpenRouterApiKey,
+  getOpenRouterPromptCachingEnabled,
+} from "../../src/db";
 import { getDb } from "../../src/db/connection";
 import { startTestServer } from "../helpers/server";
 
@@ -50,6 +53,18 @@ describe("Settings E2E Tests", () => {
       });
       expect(putRes.status).toBe(200);
       expect(getOpenRouterApiKey()).toBe("sk-or-new-key-6789");
+
+      // Prompt caching can be toggled without replacing or exposing the key.
+      putRes = await fetch(`${url}/api/settings/openrouter`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promptCachingEnabled: true }),
+      });
+      expect(putRes.status).toBe(200);
+      expect(getOpenRouterPromptCachingEnabled()).toBeTrue();
+      expect(getOpenRouterApiKey()).toBe("sk-or-new-key-6789");
+      getData = await (await fetch(`${url}/api/settings/openrouter`)).json();
+      expect(getData.promptCachingEnabled).toBeTrue();
 
       // 4. Clear key (empty payload / empty string / clear)
       putRes = await fetch(`${url}/api/settings/openrouter`, {

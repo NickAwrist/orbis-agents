@@ -70,9 +70,11 @@ describe("OpenRouter API integration", () => {
         id: number;
         name: string;
         ai_lab: string;
+        promptCaching: string;
       };
       expect(created.name).toBe("Test Model");
       expect(created.ai_lab).toBe("Example AI");
+      expect(created.promptCaching).toBe("unsupported");
 
       const lookup = await fetch(
         `${url}/api/settings/openrouter/models/lookup`,
@@ -87,6 +89,7 @@ describe("OpenRouter API integration", () => {
         name: "GPT-5.4 Mini",
         ai_lab: "OpenAI",
         found: true,
+        promptCaching: "supported",
       });
 
       const duplicate = await fetch(`${url}/api/settings/openrouter/models`, {
