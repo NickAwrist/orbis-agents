@@ -6,6 +6,7 @@ export type WireMessage = {
 
 export type SessionRow = {
   id: string;
+  owner_uuid: string;
   created_at: number;
   updated_at: number;
   title: string | null;

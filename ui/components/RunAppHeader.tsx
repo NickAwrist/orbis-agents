@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readApiError } from "../lib/readApiError";
+import { userScopedFetch } from "../persist/userIdentity";
 import { cx, iconButton } from "../styles";
 import type { ModelOption } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
@@ -89,7 +90,7 @@ function FolderPickerButton({
   const pickFolder = async () => {
     setPickingFolder(true);
     try {
-      const res = await fetch("/api/sessions/pick-directory", {
+      const res = await userScopedFetch("/api/sessions/pick-directory", {
         method: "POST",
       });
       if (!res.ok) {

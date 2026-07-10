@@ -20,6 +20,7 @@ export {
   persistSessionMessages,
   countMessagesForSession,
 } from "./sessions";
+export { ensureUserData } from "./users";
 export type {
   SessionRow,
   SessionSummaryRow,

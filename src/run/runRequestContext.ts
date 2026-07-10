@@ -25,6 +25,7 @@ export type RunTurnContext = {
   toolSessionDir?: string;
   promptContext: PromptContext;
   persistedSession: SessionRow | null;
+  ownerUuid: string;
 };
 
 /**
@@ -35,6 +36,7 @@ export type RunTurnContext = {
 export function buildTurnContext(
   rawBody: unknown,
   res: Response,
+  ownerUuid: string,
 ): RunTurnContext | null {
   const parsed = RunBodySchema.safeParse(rawBody);
   if (!parsed.success) {
@@ -51,7 +53,7 @@ export function buildTurnContext(
       sendApiError(res, 400, "BAD_REQUEST", "sessionId required");
       return null;
     }
-    persistedSession = getSessionById(sessionId);
+    persistedSession = getSessionById(ownerUuid, sessionId);
     if (!persistedSession) {
       sendApiError(res, 404, "NOT_FOUND", "Session not found");
       return null;
@@ -59,7 +61,7 @@ export function buildTurnContext(
   }
 
   const agentName = body.agentName.trim();
-  if (!getAgentByName(agentName)) {
+  if (!getAgentByName(ownerUuid, agentName)) {
     sendApiError(res, 400, "BAD_REQUEST", `Unknown agent: ${agentName}`);
     return null;
   }
@@ -102,5 +104,6 @@ export function buildTurnContext(
       toolSessionDir,
     }),
     persistedSession,
+    ownerUuid,
   };
 }

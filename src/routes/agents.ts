@@ -7,6 +7,7 @@ import {
   updateAgentRow,
 } from "../db/index";
 import { sendApiError } from "../http/errors";
+import { requireUserId } from "../userIdentity";
 
 const agentsRoutes = Router();
 
@@ -40,12 +41,16 @@ function parseAgentBody(body: AgentWriteBody):
   return { ok: true, data: { name, description, system_prompt, tools } };
 }
 
-agentsRoutes.get("/", (_req, res) => {
-  res.json({ agents: listAgents() });
+agentsRoutes.get("/", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  res.json({ agents: listAgents(ownerUuid) });
 });
 
 agentsRoutes.get("/:id", (req, res) => {
-  const agent = getAgentById(req.params.id);
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const agent = getAgentById(ownerUuid, req.params.id);
   if (!agent) {
     sendApiError(res, 404, "NOT_FOUND", "Agent not found");
     return;
@@ -54,13 +59,15 @@ agentsRoutes.get("/:id", (req, res) => {
 });
 
 agentsRoutes.post("/", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const parsed = parseAgentBody(req.body as AgentWriteBody);
   if (!parsed.ok) {
     sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
     return;
   }
   try {
-    const agent = createAgentRow(parsed.data);
+    const agent = createAgentRow(ownerUuid, parsed.data);
     res.status(201).json(agent);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
@@ -78,13 +85,15 @@ agentsRoutes.post("/", (req, res) => {
 });
 
 agentsRoutes.put("/:id", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const parsed = parseAgentBody(req.body as AgentWriteBody);
   if (!parsed.ok) {
     sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
     return;
   }
   try {
-    const ok = updateAgentRow(req.params.id, parsed.data);
+    const ok = updateAgentRow(ownerUuid, req.params.id, parsed.data);
     if (!ok) {
       sendApiError(res, 404, "NOT_FOUND", "Agent not found");
       return;
@@ -106,7 +115,9 @@ agentsRoutes.put("/:id", (req, res) => {
 });
 
 agentsRoutes.delete("/:id", (req, res) => {
-  const ok = deleteAgentRow(req.params.id);
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const ok = deleteAgentRow(ownerUuid, req.params.id);
   if (!ok) {
     sendApiError(
       res,

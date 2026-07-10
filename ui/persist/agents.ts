@@ -1,4 +1,5 @@
 import { readApiError } from "../lib/readApiError";
+import { userScopedFetch } from "./userIdentity";
 
 export type AgentData = {
   id: string;
@@ -19,7 +20,7 @@ export type AgentWriteBody = {
 };
 
 export async function fetchAgents(): Promise<AgentData[]> {
-  const res = await fetch("/api/agents");
+  const res = await userScopedFetch("/api/agents");
   if (!res.ok)
     throw new Error(await readApiError(res, "Failed to fetch agents"));
   const data = await res.json();
@@ -27,14 +28,14 @@ export async function fetchAgents(): Promise<AgentData[]> {
 }
 
 export async function fetchAgent(id: string): Promise<AgentData> {
-  const res = await fetch(`/api/agents/${id}`);
+  const res = await userScopedFetch(`/api/agents/${id}`);
   if (!res.ok)
     throw new Error(await readApiError(res, "Failed to fetch agent"));
   return res.json();
 }
 
 export async function createAgentApi(body: AgentWriteBody): Promise<AgentData> {
-  const res = await fetch("/api/agents", {
+  const res = await userScopedFetch("/api/agents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -49,7 +50,7 @@ export async function updateAgentApi(
   id: string,
   body: AgentWriteBody,
 ): Promise<void> {
-  const res = await fetch(`/api/agents/${id}`, {
+  const res = await userScopedFetch(`/api/agents/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -60,7 +61,9 @@ export async function updateAgentApi(
 }
 
 export async function deleteAgentApi(id: string): Promise<void> {
-  const res = await fetch(`/api/agents/${id}`, { method: "DELETE" });
+  const res = await userScopedFetch(`/api/agents/${id}`, {
+    method: "DELETE",
+  });
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to delete agent"));
   }
@@ -75,7 +78,7 @@ export async function fetchBuiltinTools(): Promise<string[]> {
 }
 
 export async function fetchDefaultRunAgent(): Promise<string> {
-  const res = await fetch("/api/settings/default-run-agent");
+  const res = await userScopedFetch("/api/settings/default-run-agent");
   if (!res.ok) {
     throw new Error(await readApiError(res, "Failed to fetch default agent"));
   }
@@ -86,7 +89,7 @@ export async function fetchDefaultRunAgent(): Promise<string> {
 export async function putDefaultRunAgentApi(
   agentName: string,
 ): Promise<string> {
-  const res = await fetch("/api/settings/default-run-agent", {
+  const res = await userScopedFetch("/api/settings/default-run-agent", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ agentName }),

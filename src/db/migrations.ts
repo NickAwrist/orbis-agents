@@ -18,6 +18,52 @@ export function migrateSessionsDirectoryColumn(db: Database) {
   }
 }
 
+export function migrateSessionsOwnerColumn(db: Database) {
+  const cols = db.query("PRAGMA table_info(sessions)").all() as {
+    name: string;
+  }[];
+  if (!cols.some((c) => c.name === "owner_uuid")) {
+    db.run("ALTER TABLE sessions ADD COLUMN owner_uuid TEXT");
+  }
+}
+
+export function migrateAgentsOwnerColumn(db: Database) {
+  const cols = db.query("PRAGMA table_info(agents)").all() as {
+    name: string;
+  }[];
+  if (cols.some((c) => c.name === "owner_uuid")) return;
+
+  db.run("PRAGMA foreign_keys = OFF");
+  try {
+    const tx = db.transaction(() => {
+      db.run(`
+        CREATE TABLE agents_with_owners (
+          id TEXT PRIMARY KEY,
+          owner_uuid TEXT,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          system_prompt TEXT NOT NULL DEFAULT '',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE(owner_uuid, name)
+        )
+      `);
+      db.run(`
+        INSERT INTO agents_with_owners
+          (id, owner_uuid, name, description, system_prompt, is_default, created_at, updated_at)
+        SELECT id, NULL, name, description, system_prompt, is_default, created_at, updated_at
+        FROM agents
+      `);
+      db.run("DROP TABLE agents");
+      db.run("ALTER TABLE agents_with_owners RENAME TO agents");
+    });
+    tx();
+  } finally {
+    db.run("PRAGMA foreign_keys = ON");
+  }
+}
+
 /**
  * One-shot migration from the old `include_personalization` / `include_session_directory` /
  * `include_os_info` flags to inline `{{PLACEHOLDER}}` tokens in `system_prompt`.
@@ -80,4 +126,6 @@ export function runMigrations(db: Database) {
   migrateSessionsAgentColumn(db);
   migrateSessionsDirectoryColumn(db);
   migrateAgentsInlinePlaceholders(db);
+  migrateSessionsOwnerColumn(db);
+  migrateAgentsOwnerColumn(db);
 }

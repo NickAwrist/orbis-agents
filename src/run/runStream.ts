@@ -24,7 +24,7 @@ export type RunStream = {
 export function openRunStream(
   res: Response,
   sse: SseManager,
-  opts: { ephemeral: boolean; sessionId: string },
+  opts: { ephemeral: boolean; sessionId: string; ownerUuid: string },
 ): RunStream {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -33,7 +33,7 @@ export function openRunStream(
 
   const requestId = crypto.randomUUID();
   const abortController = new AbortController();
-  sse.registerRequest(requestId, abortController);
+  sse.registerRequest(requestId, opts.ownerUuid, abortController);
 
   const pingInterval = setInterval(() => {
     res.write(":\n\n");
@@ -45,6 +45,7 @@ export function openRunStream(
     : sse.openSessionGeneration({
         requestId,
         sessionId: opts.sessionId,
+        ownerUuid: opts.ownerUuid,
         abortController,
         initialClient: res,
       });

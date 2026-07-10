@@ -16,27 +16,35 @@ const ORPHAN_TIMEOUT_MS = 5 * 60 * 1000;
  * orphan timers that abort silent generations when every viewer disconnects.
  */
 export class SseManager {
-  private readonly activeRequests = new Map<string, AbortController>();
+  private readonly activeRequests = new Map<
+    string,
+    { ownerUuid: string; controller: AbortController }
+  >();
   private readonly activeBySession = new Map<string, ActiveGeneration>();
 
-  registerRequest(requestId: string, controller: AbortController): void {
-    this.activeRequests.set(requestId, controller);
+  registerRequest(
+    requestId: string,
+    ownerUuid: string,
+    controller: AbortController,
+  ): void {
+    this.activeRequests.set(requestId, { ownerUuid, controller });
   }
 
   unregisterRequest(requestId: string): void {
     this.activeRequests.delete(requestId);
   }
 
-  abortRequest(requestId: string): boolean {
-    const ctrl = this.activeRequests.get(requestId);
-    if (!ctrl) return false;
-    ctrl.abort();
+  abortRequest(requestId: string, ownerUuid: string): boolean {
+    const active = this.activeRequests.get(requestId);
+    if (!active || active.ownerUuid !== ownerUuid) return false;
+    active.controller.abort();
     this.activeRequests.delete(requestId);
     return true;
   }
 
-  getActive(sessionId: string): ActiveGeneration | null {
-    return this.activeBySession.get(sessionId) ?? null;
+  getActive(sessionId: string, ownerUuid: string): ActiveGeneration | null {
+    const active = this.activeBySession.get(sessionId);
+    return active?.ownerUuid === ownerUuid ? active : null;
   }
 
   /**
@@ -46,6 +54,7 @@ export class SseManager {
   openSessionGeneration(init: {
     requestId: string;
     sessionId: string;
+    ownerUuid: string;
     abortController: AbortController;
     initialClient: Response;
   }): ActiveGeneration {
@@ -65,6 +74,7 @@ export class SseManager {
     const gen: ActiveGeneration = {
       requestId: init.requestId,
       sessionId: init.sessionId,
+      ownerUuid: init.ownerUuid,
       abortController: init.abortController,
       eventBuffer: [],
       clients: new Set([init.initialClient]),

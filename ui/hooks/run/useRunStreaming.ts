@@ -27,6 +27,7 @@ import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
+import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
 import { useRunFlight } from "./useRunFlight";
 import { useTurnBuffer } from "./useTurnBuffer";
@@ -299,7 +300,7 @@ export function useRunStreaming(p: Args) {
           }
           runBody.sessionDirectory =
             p.sessionDirectoryRef.current.trim() || undefined;
-          res = await fetch("/api/runs", {
+          res = await userScopedFetch("/api/runs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(runBody),
@@ -507,7 +508,7 @@ export function useRunStreaming(p: Args) {
     const turnEphemeral = inFlightEphemeralRef.current;
 
     if (requestId) {
-      fetch("/api/runs/abort", {
+      userScopedFetch("/api/runs/abort", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),

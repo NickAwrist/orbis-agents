@@ -37,6 +37,7 @@ export type RunEvent =
 export type ActiveGeneration = {
   requestId: string;
   sessionId: string;
+  ownerUuid: string;
   abortController: AbortController;
   eventBuffer: RunEvent[];
   clients: Set<Response>;

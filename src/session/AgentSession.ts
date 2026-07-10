@@ -49,6 +49,7 @@ export type AgentSessionOptions = {
   /** Values for `{{PLACEHOLDERS}}` passed to subagents via `RunContext`. */
   promptContext?: PromptContext;
   toolSessionDir?: string;
+  ownerUuid: string;
 };
 
 export class AgentSession extends EventEmitter {
@@ -57,6 +58,7 @@ export class AgentSession extends EventEmitter {
   private generalAgent: BaseAgent;
   private readonly toolSessionDir?: string;
   private readonly promptContext?: PromptContext;
+  private readonly ownerUuid: string;
 
   override on<K extends keyof SessionEvents>(
     event: K,
@@ -81,11 +83,13 @@ export class AgentSession extends EventEmitter {
     this.sessionId = sessionId;
     this.toolSessionDir = options?.toolSessionDir;
     this.promptContext = options?.promptContext;
+    this.ownerUuid = options?.ownerUuid ?? "";
     const agentName = options?.agentName?.trim() || "general_agent";
     this.generalAgent = agentManager.createAgent(agentName, {
       systemPrompt: options?.systemPrompt,
       toolSessionDir: options?.toolSessionDir,
       promptContext: options?.promptContext,
+      ownerUuid: this.ownerUuid,
     });
     const m = options?.model?.trim();
     if (m) this.generalAgent.model = m;
@@ -156,6 +160,7 @@ export class AgentSession extends EventEmitter {
       signal,
       this.toolSessionDir,
       this.promptContext,
+      this.ownerUuid,
     );
 
     let result = "Error running agent.";

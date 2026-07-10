@@ -45,6 +45,7 @@ export class RunContext {
   readonly sessionDir?: string;
   /** Values used to render `{{PLACEHOLDERS}}` in subagent templates. */
   readonly promptContext?: PromptContext;
+  readonly ownerUuid: string;
   private _steps: Step[] = [];
   private _onChange?: OnStepChange;
   private _onStreamDelta?: OnStreamDelta;
@@ -57,6 +58,7 @@ export class RunContext {
     signal?: AbortSignal,
     sessionDir?: string,
     promptContext?: PromptContext,
+    ownerUuid = "",
   ) {
     this.agentInstance = agentInstance;
     this.agentName = agentInstance.name;
@@ -66,6 +68,7 @@ export class RunContext {
     this.signal = signal;
     this.sessionDir = sessionDir;
     this.promptContext = promptContext;
+    this.ownerUuid = ownerUuid;
   }
 
   /** Emit a streaming token delta for content and/or thinking. */
@@ -146,6 +149,7 @@ export class RunContext {
       this.signal,
       this.sessionDir,
       this.promptContext,
+      this.ownerUuid,
     );
     if (parentStep.status === "running") {
       parentStep.childContext = child;

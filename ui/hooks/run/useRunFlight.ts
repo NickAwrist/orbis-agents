@@ -9,6 +9,7 @@ import {
 } from "react";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession } from "../../persist/sessions";
+import { userScopedFetch } from "../../persist/userIdentity";
 import type { Message, MessageStep } from "../../types";
 import type { RunFlightApi } from "./runTypes";
 import type { StreamBuffer } from "./useTurnBuffer";
@@ -74,7 +75,7 @@ export function useRunFlight(
 
       void (async () => {
         try {
-          const res = await fetch(
+          const res = await userScopedFetch(
             `/api/runs/stream/${encodeURIComponent(sessionId)}`,
             {
               signal: controller.signal,

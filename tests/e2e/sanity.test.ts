@@ -1,12 +1,14 @@
 import "../setup";
 import { expect, test } from "bun:test";
-import { startTestServer } from "../helpers/server";
+import { startTestServer, userHeaders } from "../helpers/server";
 
 test("sanity E2E: start server, list agents, create agent", async () => {
   const { url, close } = await startTestServer();
   try {
     // 1. GET /api/agents
-    const getResponse = await fetch(`${url}/api/agents`);
+    const getResponse = await fetch(`${url}/api/agents`, {
+      headers: userHeaders(),
+    });
     expect(getResponse.status).toBe(200);
 
     const getData = (await getResponse.json()) as {
@@ -30,9 +32,9 @@ test("sanity E2E: start server, list agents, create agent", async () => {
 
     const postResponse = await fetch(`${url}/api/agents`, {
       method: "POST",
-      headers: {
+      headers: userHeaders(undefined, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(newAgent),
     });
 
@@ -50,7 +52,9 @@ test("sanity E2E: start server, list agents, create agent", async () => {
     );
 
     // 3. GET /api/agents again to confirm custom agent is listed
-    const getResponse2 = await fetch(`${url}/api/agents`);
+    const getResponse2 = await fetch(`${url}/api/agents`, {
+      headers: userHeaders(),
+    });
     expect(getResponse2.status).toBe(200);
     const getData2 = (await getResponse2.json()) as {
       agents: Array<{ id: string; name: string }>;

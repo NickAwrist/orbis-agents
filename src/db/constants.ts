@@ -4,6 +4,7 @@ export const DB_PATH =
   process.env.AGENTS_DB_PATH || join(process.cwd(), "data", "agents.db");
 
 export const DEFAULT_RUN_AGENT_KEY = "default_run_agent";
+export const LEGACY_USER_DATA_CLAIMED_BY_KEY = "legacy_user_data_claimed_by";
 export const OLLAMA_HOST_KEY = "ollama_host";
 export const COMFYUI_HOST_KEY = "comfyui_host";
 export const COMFYUI_DEFAULT_MODEL_KEY = "comfyui_default_model";

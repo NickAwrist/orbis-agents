@@ -14,6 +14,7 @@ import {
   fetchSessionSummaries,
   patchSessionApi,
 } from "../../persist/sessions";
+import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
 import { loadUserSettings } from "../../persist/userSettings";
 import type {
@@ -264,7 +265,7 @@ export function useSessionsAndNavigation(p: Args) {
       }
 
       try {
-        const statusRes = await fetch(
+        const statusRes = await userScopedFetch(
           `/api/runs/active/${encodeURIComponent(id)}`,
         );
         if (gen !== loadGenRef.current) return;

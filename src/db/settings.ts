@@ -14,21 +14,21 @@ import {
   SEARXNG_HOST_KEY,
 } from "./constants";
 
-export function getDefaultRunAgent(): string {
+export function getDefaultRunAgent(ownerUuid: string): string {
   const row = getDb()
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(DEFAULT_RUN_AGENT_KEY) as { value: string } | null;
+    .query("SELECT value FROM user_settings WHERE owner_uuid = ? AND key = ?")
+    .get(ownerUuid, DEFAULT_RUN_AGENT_KEY) as { value: string } | null;
   const v = row?.value?.trim();
-  if (v && agentNameExistsInDb(v)) return v;
+  if (v && agentNameExistsInDb(ownerUuid, v)) return v;
   return "general_agent";
 }
 
-export function setDefaultRunAgent(name: string): boolean {
+export function setDefaultRunAgent(ownerUuid: string, name: string): boolean {
   const t = name.trim();
-  if (!t || !agentNameExistsInDb(t)) return false;
+  if (!t || !agentNameExistsInDb(ownerUuid, t)) return false;
   getDb().run(
-    "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    [DEFAULT_RUN_AGENT_KEY, t],
+    "INSERT INTO user_settings (owner_uuid, key, value) VALUES (?, ?, ?) ON CONFLICT(owner_uuid, key) DO UPDATE SET value = excluded.value",
+    [ownerUuid, DEFAULT_RUN_AGENT_KEY, t],
   );
   return true;
 }

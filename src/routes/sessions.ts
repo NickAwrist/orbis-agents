@@ -14,6 +14,7 @@ import {
 import { sendApiError } from "../http/errors";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { pickFolderNative } from "../nativeFolderPicker";
+import { requireUserId } from "../userIdentity";
 
 const router = Router();
 
@@ -28,6 +29,7 @@ function isFolderPickerAllowed(req: Request): boolean {
 }
 
 router.post("/pick-directory", async (req, res) => {
+  if (!requireUserId(req, res)) return;
   if (!isFolderPickerAllowed(req)) {
     sendApiError(
       res,
@@ -50,8 +52,10 @@ router.post("/pick-directory", async (req, res) => {
   }
 });
 
-router.get("/", (_req, res) => {
-  const rows = listSessionSummaries();
+router.get("/", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const rows = listSessionSummaries(ownerUuid);
   res.json({
     sessions: rows.map((r) => ({
       id: r.id,
@@ -63,13 +67,15 @@ router.get("/", (_req, res) => {
 });
 
 router.get("/:id", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const id = req.params.id;
-  const row = getSessionById(id);
+  const row = getSessionById(ownerUuid, id);
   if (!row) {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  const history = getMessagesForSession(id);
+  const history = getMessagesForSession(ownerUuid, id);
   res.json({
     id: row.id,
     createdAt: row.created_at,
@@ -85,6 +91,8 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const body = req.body as { model?: unknown };
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -92,13 +100,15 @@ router.post("/", (req, res) => {
     typeof body.model === "string" && body.model.trim()
       ? body.model.trim()
       : null;
-  createSessionRow(id, now, model);
+  createSessionRow(ownerUuid, id, now, model);
   res.status(201).json({ id, createdAt: now, updatedAt: now });
 });
 
 router.patch("/:id", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const id = req.params.id;
-  const row = getSessionById(id);
+  const row = getSessionById(ownerUuid, id);
   if (!row) {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
@@ -126,10 +136,10 @@ router.patch("/:id", (req, res) => {
       typeof body.model === "string" && body.model.trim()
         ? body.model.trim()
         : undefined;
-    persistSessionMessages(id, hist, mm, now, runModel);
+    persistSessionMessages(ownerUuid, id, hist, mm, now, runModel);
   }
 
-  const patch: Parameters<typeof patchSessionRow>[1] = { updated_at: now };
+  const patch: Parameters<typeof patchSessionRow>[2] = { updated_at: now };
   if ("customTitle" in body) {
     const t = body.customTitle;
     patch.title =
@@ -170,12 +180,14 @@ router.patch("/:id", (req, res) => {
           ? d.trim() || null
           : null;
   }
-  patchSessionRow(id, patch);
+  patchSessionRow(ownerUuid, id, patch);
   res.json({ ok: true });
 });
 
 router.delete("/:id", (req, res) => {
-  const ok = deleteSessionRow(req.params.id);
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const ok = deleteSessionRow(ownerUuid, req.params.id);
   if (!ok) {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;

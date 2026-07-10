@@ -1,5 +1,6 @@
 export type AgentRow = {
   id: string;
+  owner_uuid: string;
   name: string;
   description: string;
   system_prompt: string;

@@ -1,5 +1,11 @@
+import { useState } from "react";
+import {
+  getOrCreateUserId,
+  normalizeUserId,
+  switchUserId,
+} from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
-import { cx, eyebrowText } from "../../styles";
+import { cx, eyebrowText, secondaryButton } from "../../styles";
 import type { ModelOption } from "../../types";
 import { hintClass, inputClass, labelClass, selectClass } from "./constants";
 
@@ -14,8 +20,79 @@ export function GeneralSettingsTab({
   onFieldChange,
   availableModels,
 }: Props) {
+  const [currentUserId] = useState(getOrCreateUserId);
+  const [userIdDraft, setUserIdDraft] = useState(currentUserId);
+  const normalizedDraft = normalizeUserId(userIdDraft);
+  const canSwitch =
+    normalizedDraft !== null && normalizedDraft !== currentUserId;
+
+  const handleSwitchUser = () => {
+    if (!canSwitch || !switchUserId(userIdDraft)) return;
+    window.history.replaceState({}, "", "/");
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className={cx(eyebrowText, "mb-4")}>Browser Data UUID</h2>
+        <div className="space-y-2">
+          <label htmlFor="currentUserUuid" className={labelClass}>
+            Current UUID
+          </label>
+          <input
+            type="text"
+            id="currentUserUuid"
+            value={currentUserId}
+            readOnly
+            className={cx(inputClass, "font-mono text-[0.8125rem]")}
+          />
+          <p className={hintClass}>
+            Chats and agents are only loaded for this browser UUID. Anyone with
+            the UUID can load the same data.
+          </p>
+        </div>
+        <div className="mt-4 space-y-2">
+          <label htmlFor="userUuid" className={labelClass}>
+            Load another UUID
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              id="userUuid"
+              value={userIdDraft}
+              onChange={(event) => setUserIdDraft(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              className={cx(inputClass, "font-mono text-[0.8125rem]")}
+            />
+            <button
+              type="button"
+              disabled={!canSwitch}
+              onClick={handleSwitchUser}
+              className={cx(
+                secondaryButton,
+                "shrink-0 justify-center",
+                !canSwitch && "opacity-60",
+              )}
+            >
+              Switch UUID
+            </button>
+          </div>
+          {userIdDraft.trim().length > 0 && normalizedDraft === null && (
+            <p className="text-[0.75rem] text-red-400">
+              Enter a UUID in the form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
+            </p>
+          )}
+          <p className={hintClass}>
+            Switching reloads the app with that UUID&apos;s chats and agents.
+            Connection settings stay global.
+          </p>
+        </div>
+      </div>
+
+      <hr className="border-border-subtle" />
+
       <div>
         <h2 className={cx(eyebrowText, "mb-4")}>Personal Information</h2>
         <div className="space-y-2">

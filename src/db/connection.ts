@@ -1,8 +1,6 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { seedDefaultAgents } from "./agents/seed";
-import { ensureDefaultRunAgentSetting } from "./bootstrap";
 import { DB_PATH } from "./constants";
 import { runMigrations } from "./migrations";
 import { seedDefaultOpenRouterModels } from "./openrouter";
@@ -18,6 +16,7 @@ export function getDb(): Database {
   db.run(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
+      owner_uuid TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       title TEXT,
@@ -43,12 +42,14 @@ export function getDb(): Database {
   db.run(`
     CREATE TABLE IF NOT EXISTS agents (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
+      owner_uuid TEXT NOT NULL,
+      name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       system_prompt TEXT NOT NULL DEFAULT '',
       is_default INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      UNIQUE(owner_uuid, name)
     );
   `);
   db.run(`
@@ -69,6 +70,15 @@ export function getDb(): Database {
   `);
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      owner_uuid TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY(owner_uuid, key)
+    );
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS openrouter_models (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -78,8 +88,6 @@ export function getDb(): Database {
   `);
 
   runMigrations(db);
-  seedDefaultAgents(db);
-  ensureDefaultRunAgentSetting(db);
   seedDefaultOpenRouterModels(db);
 
   dbSingleton = db;

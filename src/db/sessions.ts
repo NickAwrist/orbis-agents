@@ -16,13 +16,13 @@ function previewFromTitleAndFirstUser(
   return "New run";
 }
 
-export function listSessionSummaries(): SessionSummaryRow[] {
+export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   const db = getDb();
   const sessions = db
     .query(
-      "SELECT id, created_at, updated_at, title FROM sessions ORDER BY updated_at DESC",
+      "SELECT id, created_at, updated_at, title FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
     )
-    .all() as Array<{
+    .all(ownerUuid) as Array<{
     id: string;
     created_at: number;
     updated_at: number;
@@ -44,12 +44,15 @@ export function listSessionSummaries(): SessionSummaryRow[] {
   });
 }
 
-export function getSessionById(id: string): SessionRow | null {
+export function getSessionById(
+  ownerUuid: string,
+  id: string,
+): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, created_at, updated_at, title, model, model_messages, agent_name, session_directory FROM sessions WHERE id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name, session_directory FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
-    .get(id) as SessionRow | null;
+    .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
 }
 
@@ -60,7 +63,11 @@ export function countMessagesForSession(sessionId: string): number {
   return row?.c ?? 0;
 }
 
-export function getMessagesForSession(sessionId: string): WireMessage[] {
+export function getMessagesForSession(
+  ownerUuid: string,
+  sessionId: string,
+): WireMessage[] {
+  if (!getSessionById(ownerUuid, sessionId)) return [];
   const rows = getDb()
     .query(
       "SELECT role, content, steps FROM messages WHERE session_id = ? ORDER BY position ASC",
@@ -97,17 +104,19 @@ export function parseModelMessages(
 }
 
 export function createSessionRow(
+  ownerUuid: string,
   id: string,
   now: number,
   model: string | null,
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, created_at, updated_at, title, model, model_messages, agent_name) VALUES (?, ?, ?, NULL, ?, NULL, NULL)",
-    [id, now, now, model],
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL)",
+    [id, ownerUuid, now, now, model],
   );
   return {
     id,
+    owner_uuid: ownerUuid,
     created_at: now,
     updated_at: now,
     title: null,
@@ -118,13 +127,17 @@ export function createSessionRow(
   };
 }
 
-export function deleteSessionRow(id: string): boolean {
+export function deleteSessionRow(ownerUuid: string, id: string): boolean {
   const db = getDb();
-  const r = db.run("DELETE FROM sessions WHERE id = ?", [id]);
+  const r = db.run("DELETE FROM sessions WHERE owner_uuid = ? AND id = ?", [
+    ownerUuid,
+    id,
+  ]);
   return r.changes > 0;
 }
 
 export function patchSessionRow(
+  ownerUuid: string,
   id: string,
   patch: {
     title?: string | null;
@@ -135,7 +148,7 @@ export function patchSessionRow(
     updated_at?: number;
   },
 ): boolean {
-  const existing = getSessionById(id);
+  const existing = getSessionById(ownerUuid, id);
   if (!existing) return false;
 
   const title = patch.title !== undefined ? patch.title : existing.title;
@@ -156,7 +169,7 @@ export function patchSessionRow(
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, agent_name = ?, session_directory = ?, updated_at = ? WHERE id = ?",
+    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, agent_name = ?, session_directory = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
     [
       title,
       model,
@@ -164,6 +177,7 @@ export function patchSessionRow(
       agentName,
       sessionDirectory,
       updatedAt,
+      ownerUuid,
       id,
     ],
   );
@@ -176,13 +190,14 @@ export function patchSessionRow(
  * the count is unchanged (e.g. assistant steps filled in).
  */
 export function persistSessionMessages(
+  ownerUuid: string,
   sessionId: string,
   messages: WireMessage[],
   modelMessages: Array<Record<string, unknown>> | null,
   updatedAt: number,
   runModel?: string | null,
 ): boolean {
-  const row = getSessionById(sessionId);
+  const row = getSessionById(ownerUuid, sessionId);
   if (!row) return false;
   const db = getDb();
   const nextModel =
@@ -225,8 +240,8 @@ export function persistSessionMessages(
 
     const mmJson = modelMessages == null ? null : JSON.stringify(modelMessages);
     db.run(
-      "UPDATE sessions SET model_messages = ?, updated_at = ?, model = ? WHERE id = ?",
-      [mmJson, updatedAt, nextModel, sessionId],
+      "UPDATE sessions SET model_messages = ?, updated_at = ?, model = ? WHERE owner_uuid = ? AND id = ?",
+      [mmJson, updatedAt, nextModel, ownerUuid, sessionId],
     );
   });
   tx();

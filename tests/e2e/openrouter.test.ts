@@ -6,7 +6,7 @@ import {
   setOllamaHost,
   setOpenRouterApiKey,
 } from "../../src/db";
-import { startTestServer } from "../helpers/server";
+import { startTestServer, userHeaders } from "../helpers/server";
 
 const runBody = (model: string) => ({
   ephemeral: true,
@@ -42,7 +42,9 @@ describe("OpenRouter API integration", () => {
 
       await fetch(`${url}/api/settings/openrouter`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify({ apiKey: "sk-or-api-test" }),
       });
       response = await fetch(`${url}/api/models`);
@@ -62,7 +64,9 @@ describe("OpenRouter API integration", () => {
     try {
       const create = await fetch(`${url}/api/settings/openrouter/models`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify({ route: "example/test-model" }),
       });
       expect(create.status).toBe(201);
@@ -91,7 +95,9 @@ describe("OpenRouter API integration", () => {
 
       const duplicate = await fetch(`${url}/api/settings/openrouter/models`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify({ route: "example/test-model" }),
       });
       expect(duplicate.status).toBe(409);
@@ -117,7 +123,9 @@ describe("OpenRouter API integration", () => {
       setOpenRouterApiKey("");
       let response = await fetch(`${url}/api/runs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify(runBody(model)),
       });
       expect(response.status).toBe(400);
@@ -128,14 +136,18 @@ describe("OpenRouter API integration", () => {
       setOpenRouterApiKey("sk-or-run-test");
       response = await fetch(`${url}/api/runs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify(runBody("openrouter:missing/model")),
       });
       expect(response.status).toBe(400);
 
       response = await fetch(`${url}/api/runs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify(runBody(model)),
       });
       expect(response.status).toBe(200);

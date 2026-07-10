@@ -12,21 +12,26 @@ import {
 import { asyncRoute } from "../http/asyncRoute";
 import { sendApiError } from "../http/errors";
 import { lookupOpenRouterModel } from "../openRouterModels";
+import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
 
-settingsRoutes.get("/default-run-agent", (_req, res) => {
-  res.json({ agentName: getDefaultRunAgent() });
+settingsRoutes.get("/default-run-agent", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  res.json({ agentName: getDefaultRunAgent(ownerUuid) });
 });
 
 settingsRoutes.put("/default-run-agent", (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
   const raw = (req.body as { agentName?: unknown }).agentName;
   const name = typeof raw === "string" ? raw.trim() : "";
-  if (!name || !setDefaultRunAgent(name)) {
+  if (!name || !setDefaultRunAgent(ownerUuid, name)) {
     sendApiError(res, 400, "BAD_REQUEST", "Invalid agent name");
     return;
   }
-  res.json({ ok: true, agentName: getDefaultRunAgent() });
+  res.json({ ok: true, agentName: getDefaultRunAgent(ownerUuid) });
 });
 
 settingsRoutes.get("/openrouter", (_req, res) => {

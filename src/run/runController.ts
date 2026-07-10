@@ -14,18 +14,21 @@ export async function handleRun(
   req: Request,
   res: Response,
   sse: SseManager,
+  ownerUuid: string,
 ): Promise<void> {
-  const ctx = buildTurnContext(req.body, res);
+  const ctx = buildTurnContext(req.body, res, ownerUuid);
   if (!ctx) return;
 
   const stream = openRunStream(res, sse, {
     ephemeral: ctx.ephemeral,
     sessionId: ctx.sessionId,
+    ownerUuid,
   });
   const persistence = createRunPersistence({
     sessionId: ctx.sessionId,
     model: ctx.model,
     ephemeral: ctx.ephemeral,
+    ownerUuid,
   });
 
   try {

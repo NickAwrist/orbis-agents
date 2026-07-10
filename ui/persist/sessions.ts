@@ -1,6 +1,7 @@
 import { readApiError } from "../lib/readApiError";
 import type { Message } from "../types";
 import type { SessionSummary } from "../types";
+import { userScopedFetch } from "./userIdentity";
 
 export type StoredRunSession = {
   id: string;
@@ -14,7 +15,7 @@ export type StoredRunSession = {
 };
 
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
-  const res = await fetch("/api/sessions");
+  const res = await userScopedFetch("/api/sessions");
   if (!res.ok) throw new Error(await readApiError(res));
   const data = (await res.json()) as { sessions?: unknown };
   const raw = Array.isArray(data.sessions) ? data.sessions : [];
@@ -35,7 +36,7 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
 export async function fetchSession(
   id: string,
 ): Promise<StoredRunSession | null> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
+  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(await readApiError(res));
   const s = (await res.json()) as Record<string, unknown>;
@@ -68,7 +69,7 @@ export async function createSessionApi(opts?: {
 }> {
   const body: Record<string, string> = {};
   if (opts?.model?.trim()) body.model = opts.model.trim();
-  const res = await fetch("/api/sessions", {
+  const res = await userScopedFetch("/api/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -86,7 +87,7 @@ export async function patchSessionApi(
   id: string,
   body: Record<string, unknown>,
 ): Promise<void> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -95,7 +96,7 @@ export async function patchSessionApi(
 }
 
 export async function deleteSessionApi(id: string): Promise<void> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
   if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));

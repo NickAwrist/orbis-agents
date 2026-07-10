@@ -35,6 +35,7 @@ export const BUILTIN_TOOLS = [
 ] as const;
 
 export type CreateAgentOptions = {
+  ownerUuid: string;
   /**
    * Pre-rendered system prompt. When provided it is used verbatim (plus
    * appended core directives). When omitted the stored template is rendered
@@ -87,6 +88,7 @@ export const agentManager = {
   /** Build a subagent that inherits the parent run's prompt context + session dir. */
   createAgentForContext(agentName: string, ctx?: RunContext): BaseAgent {
     const agent = this.createAgent(agentName, {
+      ownerUuid: ctx?.ownerUuid ?? "",
       toolSessionDir: ctx?.sessionDir,
       promptContext: ctx?.promptContext,
     });
@@ -100,7 +102,7 @@ export const agentManager = {
   },
 
   createAgent(agentName: string, opts?: CreateAgentOptions): BaseAgent {
-    const config = getAgentByName(agentName);
+    const config = getAgentByName(opts?.ownerUuid ?? "", agentName);
     if (!config) {
       throw new Error(
         `Agent configuration for '${agentName}' not found in database`,
@@ -126,16 +128,16 @@ export const agentManager = {
     if (config.tools.length > 0) {
       const tools = config.tools
         .filter((t: string) => this.isToolEnabled(t))
-        .map((t: string) => this.getToolInstance(t));
+        .map((t: string) => this.getToolInstance(t, opts?.ownerUuid ?? ""));
       agent.addTools(tools);
     }
 
     return agent;
   },
 
-  getToolInstance(toolName: string): BaseTool {
+  getToolInstance(toolName: string, ownerUuid: string): BaseTool {
     if (toolName.endsWith("_agent")) {
-      const agentRow = getAgentByName(toolName);
+      const agentRow = getAgentByName(ownerUuid, toolName);
       return new AgentTool(toolName, agentRow?.description ?? toolName);
     }
 

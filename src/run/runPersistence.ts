@@ -20,6 +20,7 @@ export function createRunPersistence(opts: {
   sessionId: string;
   model: string;
   ephemeral: boolean;
+  ownerUuid: string;
 }): RunPersistence {
   if (opts.ephemeral) {
     return { saveInitial: () => {}, saveFinal: () => {} };
@@ -29,6 +30,7 @@ export function createRunPersistence(opts: {
     modelMessages: Array<Record<string, unknown>> | null,
   ) => {
     persistSessionMessages(
+      opts.ownerUuid,
       opts.sessionId,
       history,
       modelMessages,
