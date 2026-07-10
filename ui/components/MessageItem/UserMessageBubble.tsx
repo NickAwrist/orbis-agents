@@ -1,11 +1,18 @@
 import { Check, Copy, Pencil, RotateCcw, Send, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { CSSProperties } from "react";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
+import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
+
+const LONG_PRESS_MS = 520;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
+
+const messageActionMenuItem =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.99] active:bg-muted/80 disabled:pointer-events-none disabled:opacity-45";
 
 type Props = {
   message: Message;
@@ -43,12 +50,58 @@ export function UserMessageBubble({
   copyContent,
 }: Props) {
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressOpenedRef = useRef(false);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<DOMRect | null>(
+    null,
+  );
 
   useEffect(() => {
     if (isEditingUser) {
       editRef.current?.focus();
     }
   }, [isEditingUser]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isEditingUser) setActionMenuAnchor(null);
+  }, [isEditingUser]);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
+  const openActionMenu = (el: HTMLElement) => {
+    if (isEditingUser) return;
+    setActionMenuAnchor(el.getBoundingClientRect());
+  };
+
+  const closeActionMenu = () => {
+    longPressOpenedRef.current = false;
+    setActionMenuAnchor(null);
+  };
+
+  const onMenuRetry = () => {
+    closeActionMenu();
+    onRequestRetryConfirm(messageIndex);
+  };
+
+  const onMenuEdit = () => {
+    closeActionMenu();
+    beginEdit();
+  };
 
   return (
     <div className="ui-animate-slide-up flex justify-end" style={enterStyle}>
@@ -60,6 +113,50 @@ export function UserMessageBubble({
             "max-w-[min(85%,36rem)] min-w-0 max-[640px]:max-w-[92%]",
           )}
           style={bubbleEditStyle}
+          onPointerDown={(e) => {
+            if (
+              isEditingUser ||
+              (e.pointerType !== "touch" && e.pointerType !== "pen")
+            ) {
+              return;
+            }
+            const target = e.currentTarget;
+            longPressOpenedRef.current = false;
+            clearLongPressTimer();
+            longPressStartRef.current = { x: e.clientX, y: e.clientY };
+            longPressTimerRef.current = window.setTimeout(() => {
+              longPressOpenedRef.current = true;
+              openActionMenu(target);
+              clearLongPressTimer();
+            }, LONG_PRESS_MS);
+          }}
+          onPointerMove={(e) => {
+            const start = longPressStartRef.current;
+            if (!start) return;
+            const moved =
+              Math.abs(e.clientX - start.x) > LONG_PRESS_MOVE_TOLERANCE_PX ||
+              Math.abs(e.clientY - start.y) > LONG_PRESS_MOVE_TOLERANCE_PX;
+            if (moved) clearLongPressTimer();
+          }}
+          onPointerUp={clearLongPressTimer}
+          onPointerCancel={clearLongPressTimer}
+          onPointerLeave={clearLongPressTimer}
+          onContextMenu={(e) => {
+            if (isEditingUser) return;
+            const pointerType =
+              "pointerType" in e.nativeEvent
+                ? e.nativeEvent.pointerType
+                : undefined;
+            if (pointerType === "mouse") return;
+            e.preventDefault();
+            openActionMenu(e.currentTarget);
+          }}
+          onClickCapture={(e) => {
+            if (!longPressOpenedRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            longPressOpenedRef.current = false;
+          }}
         >
           {isEditingUser ? (
             <textarea
@@ -146,6 +243,34 @@ export function UserMessageBubble({
               <Send size={msgIconSize} strokeWidth={msgIconStroke} />
             </button>
           </div>
+        )}
+        {actionMenuAnchor && !isEditingUser && (
+          <FloatingOptionsMenu
+            anchorRect={actionMenuAnchor}
+            minWidth={150}
+            onClose={closeActionMenu}
+          >
+            <button
+              type="button"
+              onClick={onMenuRetry}
+              disabled={isBusy}
+              className={messageActionMenuItem}
+              role="menuitem"
+            >
+              <RotateCcw size={14} />
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={onMenuEdit}
+              disabled={isBusy}
+              className={messageActionMenuItem}
+              role="menuitem"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+          </FloatingOptionsMenu>
         )}
       </div>
     </div>
