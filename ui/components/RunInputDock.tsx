@@ -11,7 +11,7 @@ export function RunInputDock({
   runPending,
   streamingStep,
   streamingSteps,
-  ollamaSendReady,
+  modelSendReady,
   onFooterHeightChange,
 }: {
   input: string;
@@ -21,14 +21,14 @@ export function RunInputDock({
   runPending: boolean;
   streamingStep: MessageStep | null;
   streamingSteps: MessageStep[];
-  ollamaSendReady: boolean;
+  modelSendReady: boolean;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
   const footerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
-  const canSend = ollamaSendReady && !isBusy;
+  const canSend = modelSendReady && !isBusy;
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;

@@ -43,7 +43,9 @@ export default defineConfig(({ mode }) => {
     ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
     3000,
   );
-  const apiTarget = `http://localhost:${backendPort}`;
+  // The API defaults to 127.0.0.1. Using localhost here can resolve to an
+  // unrelated IPv6 listener, leaving the UI to receive its 404 responses.
+  const apiTarget = `http://127.0.0.1:${backendPort}`;
 
   return {
     plugins: [react(), tailwindcss()],

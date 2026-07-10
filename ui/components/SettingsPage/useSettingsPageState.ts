@@ -1,14 +1,8 @@
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UserSettings } from "../../persist/userSettings";
 import type {
   ComfyUIConfigPayload,
-  OllamaModelOption,
+  ModelOption,
   SearXNGConfigPayload,
 } from "../../types";
 import { parseSize, sizeKey } from "./constants";
@@ -20,7 +14,7 @@ import type {
 } from "./types";
 
 type Args = {
-  ollamaModels: OllamaModelOption[];
+  ollamaModels: ModelOption[];
   currentSettings: UserSettings;
   ollamaHost: string;
   ollamaConnected: boolean | null;
@@ -265,53 +259,47 @@ export function useSettingsPageState({
     searxngHost,
   ]);
 
-  const handleSubmit = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      if (!isDirty) return;
-      setIsSaving(true);
-      setError(null);
-      try {
-        const { width, height } = parseSize(comfySize);
-        await onSave(
-          settings,
-          ollamaUri,
-          {
-            host: comfyUri,
-            defaultModel: comfyModel,
-            defaultWidth: width,
-            defaultHeight: height,
-            negativePrompt: comfyNegative,
-          },
-          {
-            host: searxngUri,
-          },
-        );
-        setTestState({ status: "idle" });
-        setComfyTestState({ status: "idle" });
-        setSearxngTestState({ status: "idle" });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to save settings",
-        );
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [
-      isDirty,
-      settings,
-      ollamaUri,
-      comfyUri,
-      comfyModel,
-      comfySize,
-      comfyNegative,
-      searxngUri,
-      onSave,
-    ],
-  );
+  const handleSubmit = useCallback(async () => {
+    if (!isDirty) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const { width, height } = parseSize(comfySize);
+      await onSave(
+        settings,
+        ollamaUri,
+        {
+          host: comfyUri,
+          defaultModel: comfyModel,
+          defaultWidth: width,
+          defaultHeight: height,
+          negativePrompt: comfyNegative,
+        },
+        {
+          host: searxngUri,
+        },
+      );
+      setTestState({ status: "idle" });
+      setComfyTestState({ status: "idle" });
+      setSearxngTestState({ status: "idle" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    isDirty,
+    settings,
+    ollamaUri,
+    comfyUri,
+    comfyModel,
+    comfySize,
+    comfyNegative,
+    searxngUri,
+    onSave,
+  ]);
 
-  const availableModels = ollamaModels.map((m) => m.name);
+  const availableModels = ollamaModels;
 
   const onOllamaUriInput = useCallback((v: string) => {
     setOllamaUri(v);

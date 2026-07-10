@@ -1,11 +1,16 @@
 import type { UserSettings } from "../../persist/userSettings";
 import type {
   ComfyUIConfigPayload,
-  OllamaModelOption,
+  ModelOption,
   SearXNGConfigPayload,
 } from "../../types";
 
-export type SettingsTab = "general" | "image-generation" | "web-search";
+export type SettingsTab =
+  | "general"
+  | "ollama"
+  | "openrouter"
+  | "image-generation"
+  | "web-search";
 
 export type ComfyUITestState =
   | { status: "idle" }
@@ -30,7 +35,7 @@ export type SearXNGTestState =
   | { status: "err"; message: string };
 
 export type SettingsPageProps = {
-  ollamaModels: OllamaModelOption[];
+  ollamaModels: ModelOption[];
   currentSettings: UserSettings;
   ollamaHost: string;
   ollamaConnected: boolean | null;
@@ -48,5 +53,6 @@ export type SettingsPageProps = {
     comfyui?: ComfyUIConfigPayload,
     searxng?: SearXNGConfigPayload,
   ) => Promise<void>;
+  onModelsChanged: () => Promise<void>;
   onBack: () => void;
 };

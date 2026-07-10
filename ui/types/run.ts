@@ -13,6 +13,7 @@ export interface MessageStep {
   args?: unknown;
   thinking?: string;
   metrics?: {
+    cost?: number;
     outputTokens?: number;
     outputDurationMs?: number;
     promptTokens?: number;

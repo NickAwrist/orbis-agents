@@ -26,7 +26,7 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
       id: String(s.id ?? ""),
       createdAt: Number(s.createdAt) || 0,
       updatedAt: Number(s.updatedAt) || 0,
-      preview: String(s.preview ?? "New run"),
+      preview: String(s.preview ?? "New chat"),
     }))
     .filter((s) => s.id.length > 0)
     .sort((a, b) => b.updatedAt - a.updatedAt);

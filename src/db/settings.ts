@@ -10,6 +10,7 @@ import {
   DEFAULT_COMFYUI_NEGATIVE_PROMPT,
   DEFAULT_RUN_AGENT_KEY,
   OLLAMA_HOST_KEY,
+  OPENROUTER_API_KEY_KEY,
   SEARXNG_HOST_KEY,
 } from "./constants";
 
@@ -110,4 +111,15 @@ export function setSearXNGHost(host: string): void {
     SEARXNG_HOST_KEY,
     trimmed === DEFAULT_SEARXNG_HOST ? "" : trimmed,
   );
+}
+
+export function getOpenRouterApiKey(): string {
+  const row = getDb()
+    .query("SELECT value FROM app_settings WHERE key = ?")
+    .get(OPENROUTER_API_KEY_KEY) as { value: string } | null;
+  return row === null ? envConfig.openrouterApiKey : row.value.trim();
+}
+
+export function setOpenRouterApiKey(key: string): void {
+  setAppSetting(OPENROUTER_API_KEY_KEY, key);
 }

@@ -4,6 +4,7 @@ import type { PromptContext } from "./prompts/render";
 export type StepStatus = "running" | "done" | "error";
 
 export type LlmMetrics = {
+  cost?: number;
   outputTokens?: number;
   outputDurationMs?: number;
   promptTokens?: number;

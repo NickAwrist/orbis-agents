@@ -11,7 +11,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readApiError } from "../lib/readApiError";
 import { cx, iconButton } from "../styles";
-import type { OllamaModelOption } from "../types";
+import type { ModelOption } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
 import { ModelSelectBar } from "./ModelSelectBar";
 
@@ -19,7 +19,7 @@ type RunAppHeaderProps = {
   activeSessionId: string | null;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
-  ollamaModels: OllamaModelOption[];
+  ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
   modelsLoadError: string | null;
   selectedModel: string;
@@ -228,7 +228,7 @@ export function RunAppHeader({
           type="button"
           onClick={onOpenSidebar}
           className={cx(iconButton, "shrink-0 min-[901px]:hidden")}
-          title="Open runs"
+          title="Open chats"
           aria-expanded={sidebarOpen}
           aria-controls="app-sidebar"
         >
@@ -275,8 +275,8 @@ export function RunAppHeader({
             type="button"
             onClick={() => void handleCopyRun()}
             className={cx(iconButton)}
-            title={runCopied ? "Copied" : "Copy entire run"}
-            aria-label={runCopied ? "Copied" : "Copy entire run"}
+            title={runCopied ? "Copied" : "Copy entire chat"}
+            aria-label={runCopied ? "Copied" : "Copy entire chat"}
           >
             {runCopied ? <Check size={18} /> : <Copy size={18} />}
           </button>

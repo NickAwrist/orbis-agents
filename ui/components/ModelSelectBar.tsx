@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import type { OllamaModelOption } from "../types";
+import type { ModelOption } from "../types";
 
 const selectClass =
   "max-w-[min(100%,18rem)] cursor-pointer appearance-none rounded-lg border border-transparent bg-transparent py-1.5 pl-2 pr-8 text-[0.8125rem] font-medium text-foreground outline-none transition-[border-color,background-color,color] duration-150 hover:bg-muted/60 focus-visible:border-border focus-visible:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-45";
@@ -12,14 +12,14 @@ export function ModelSelectBar({
   onModelChange,
   disabled,
 }: {
-  ollamaModels: OllamaModelOption[];
+  ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
   modelsLoadError: string | null;
   selectedModel: string;
   onModelChange: (model: string) => void;
   disabled: boolean;
 }) {
-  const modelNames = new Set(ollamaModels.map((m) => m.name));
+  const modelNames = new Set(ollamaModels.map((m) => m.id));
   const showSelectedNotListed = Boolean(
     selectedModel && ollamaModels.length > 0 && !modelNames.has(selectedModel),
   );
@@ -54,11 +54,33 @@ export function ModelSelectBar({
             {showSelectedNotListed && (
               <option value={selectedModel}>{selectedModel} (offline)</option>
             )}
-            {ollamaModels.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
-              </option>
-            ))}
+            {(["ollama", "openrouter"] as const).map((provider) => {
+              const options = ollamaModels.filter(
+                (model) => model.provider === provider,
+              );
+              if (options.length === 0) return null;
+              return (
+                <optgroup
+                  key={provider}
+                  label={
+                    provider === "ollama" ? "Ollama (local)" : "OpenRouter"
+                  }
+                >
+                  {options.map((model) => (
+                    <option
+                      key={model.id}
+                      value={model.id}
+                      disabled={
+                        model.provider === "openrouter" &&
+                        model.configured === false
+                      }
+                    >
+                      {model.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </>
         )}
       </select>

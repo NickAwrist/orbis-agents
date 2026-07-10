@@ -50,7 +50,7 @@ type Args = {
   stepsModalData: TraceModalSelection;
   setStepsModalData: Dispatch<SetStateAction<TraceModalSelection>>;
   selectedModel: string;
-  ollamaSendReady: boolean;
+  modelSendReady: boolean;
   refreshSessions: () => Promise<void>;
   fetchOllamaHealth: () => Promise<void>;
   bindStreamingReset: (fn: () => void) => void;
@@ -197,7 +197,7 @@ export function useRunStreaming(p: Args) {
       options: { rebuildModelMessages: boolean },
     ) => {
       if (!messageText.trim() || !turnSessionId) return;
-      if (!p.ollamaSendReady) return;
+      if (!p.modelSendReady) return;
 
       const msg = messageText.trim();
       const ephemeral = p.isEphemeralRef.current;
@@ -488,7 +488,7 @@ export function useRunStreaming(p: Args) {
       p.debugOpenRef,
       p.isEphemeralRef,
       p.modelMessagesRef,
-      p.ollamaSendReady,
+      p.modelSendReady,
       p.refreshSessions,
       p.selectedModel,
       p.selectedSessionAgentRef,
@@ -556,11 +556,11 @@ export function useRunStreaming(p: Args) {
       const sid = p.activeSessionId;
       if (!input.trim() || !sid) return;
       const msg = input.trim();
-      if (!p.ollamaSendReady) return;
+      if (!p.modelSendReady) return;
       setInput("");
       await runTurn(sid, p.messages, msg, { rebuildModelMessages: false });
     },
-    [input, p.activeSessionId, p.messages, p.ollamaSendReady, runTurn],
+    [input, p.activeSessionId, p.messages, p.modelSendReady, runTurn],
   );
 
   const confirmTruncateAndRetry = useCallback(async () => {

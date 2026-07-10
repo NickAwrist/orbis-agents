@@ -12,6 +12,7 @@ import {
   persistSessionMessages,
 } from "../db/index";
 import { sendApiError } from "../http/errors";
+import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { pickFolderNative } from "../nativeFolderPicker";
 
 const router = Router();
@@ -75,7 +76,9 @@ router.get("/:id", (req, res) => {
     updatedAt: row.updated_at,
     customTitle: row.title,
     history,
-    modelMessages: parseModelMessages(row.model_messages),
+    modelMessages: stripReasoningFromModelMessages(
+      parseModelMessages(row.model_messages),
+    ),
     model: row.model,
     sessionDirectory: row.session_directory ?? null,
   });

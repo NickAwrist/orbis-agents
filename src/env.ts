@@ -52,4 +52,8 @@ export const envConfig = {
   comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
   searxngHost: getFirstEnv(["AGENTS_SEARXNG_HOST", "SEARXNG_HOST"]),
   serveFrontend: getBoolean(["AGENTS_SERVE_FRONTEND"], true),
+  openrouterApiKey: getFirstEnv([
+    "OPENROUTER_API_KEY",
+    "AGENTS_OPENROUTER_API_KEY",
+  ]),
 };

@@ -23,7 +23,7 @@ import type {
   TraceModalSelection,
   TruncateConfirmState,
 } from "../../types";
-import type { OllamaModelOption } from "../../types";
+import type { ModelOption } from "../../types";
 import type { RunFlightApi } from "./runTypes";
 import {
   effectiveDefaultRunModel,
@@ -57,7 +57,7 @@ function replaceSessionUrl(id: string | null) {
 }
 
 type Args = {
-  ollamaModels: OllamaModelOption[];
+  ollamaModels: ModelOption[];
   serverDefaultModel: string;
   serverDefaultRunAgent: string;
   userSettingsRef: MutableRefObject<UserSettings>;
@@ -119,7 +119,7 @@ export function useSessionsAndNavigation(p: Args) {
   useEffect(() => {
     if (!activeSessionId) return;
     if (isEphemeral) {
-      const names = new Set(p.ollamaModels.map((m) => m.name));
+      const names = new Set(p.ollamaModels.map((m) => m.id));
       const pref = effectiveDefaultRunModel(
         p.userSettingsRef.current,
         p.serverDefaultModel,
@@ -128,7 +128,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (names.size > 0 && !names.has(next)) {
         next = names.has(p.serverDefaultModel)
           ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.name ?? next);
+          : (p.ollamaModels[0]?.id ?? next);
       }
       setSelectedModel(next);
       return;
@@ -143,12 +143,12 @@ export function useSessionsAndNavigation(p: Args) {
           p.userSettingsRef.current,
           p.serverDefaultModel,
         );
-      const names = new Set(p.ollamaModels.map((m) => m.name));
+      const names = new Set(p.ollamaModels.map((m) => m.id));
       let next = preference;
       if (names.size > 0 && !names.has(next)) {
         next = names.has(p.serverDefaultModel)
           ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.name ?? next);
+          : (p.ollamaModels[0]?.id ?? next);
       }
       setSelectedModel(next);
       const sd =
@@ -368,7 +368,7 @@ export function useSessionsAndNavigation(p: Args) {
       }
       setIsEphemeral(false);
       const agentForNewRun = p.serverDefaultRunAgent;
-      const names = new Set(p.ollamaModels.map((m) => m.name));
+      const names = new Set(p.ollamaModels.map((m) => m.id));
       let modelForNew = effectiveDefaultRunModel(
         p.userSettingsRef.current,
         p.serverDefaultModel,
@@ -376,7 +376,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (names.size > 0 && !names.has(modelForNew)) {
         modelForNew = names.has(p.serverDefaultModel)
           ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.name ?? modelForNew);
+          : (p.ollamaModels[0]?.id ?? modelForNew);
       }
       setSelectedSessionAgent(agentForNewRun);
       const { id } = await createSessionApi({

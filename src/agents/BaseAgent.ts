@@ -1,63 +1,17 @@
-import type { ChatResponse, ToolCall } from "ollama";
 import type { Plan } from "../Plan";
 import type { LlmMetrics, RunContext, Step } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
+import {
+  type LlmMessage,
+  type LlmToolCall,
+  streamModelChat,
+} from "../llm/index";
 import { logger } from "../logger";
-import { getOllamaClient } from "../ollamaClient";
 import { CORE_DIRECTIVES } from "../prompts/render";
 import type { BaseTool } from "../tools/BaseTool";
 import { toolErrorToString } from "../tools/errors";
 
 const log = logger.child({ component: "BaseAgent" });
-
-type AssistantHistoryMsg = {
-  role: string;
-  content: string;
-  tool_calls?: ToolCall[];
-};
-
-function finiteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
-}
-
-function nsToMs(value: number): number {
-  return value / 1_000_000;
-}
-
-function metricsFromOllamaChunk(chunk: ChatResponse): LlmMetrics | undefined {
-  const outputTokens = finiteNumber(chunk.eval_count);
-  const outputDurationNs = finiteNumber(chunk.eval_duration);
-  const promptTokens = finiteNumber(chunk.prompt_eval_count);
-  const promptDurationNs = finiteNumber(chunk.prompt_eval_duration);
-  const totalDurationNs = finiteNumber(chunk.total_duration);
-  const loadDurationNs = finiteNumber(chunk.load_duration);
-
-  const metrics: LlmMetrics = {};
-  if (outputTokens !== undefined) metrics.outputTokens = outputTokens;
-  if (outputDurationNs !== undefined) {
-    metrics.outputDurationMs = nsToMs(outputDurationNs);
-  }
-  if (promptTokens !== undefined) metrics.promptTokens = promptTokens;
-  if (promptDurationNs !== undefined) {
-    metrics.promptDurationMs = nsToMs(promptDurationNs);
-  }
-  if (totalDurationNs !== undefined) {
-    metrics.totalDurationMs = nsToMs(totalDurationNs);
-  }
-  if (loadDurationNs !== undefined)
-    metrics.loadDurationMs = nsToMs(loadDurationNs);
-  if (
-    outputTokens !== undefined &&
-    outputDurationNs !== undefined &&
-    outputDurationNs > 0
-  ) {
-    metrics.tokensPerSecond = outputTokens / (outputDurationNs / 1_000_000_000);
-  }
-
-  return Object.keys(metrics).length > 0 ? metrics : undefined;
-}
 
 export class BaseAgent {
   model: string;
@@ -65,7 +19,7 @@ export class BaseAgent {
   name: string;
   description: string;
   tools: BaseTool[];
-  history: Array<{ role: string; content: string }>;
+  history: LlmMessage[];
 
   TOOL_MAP: Record<string, BaseTool>;
 
@@ -108,7 +62,7 @@ export class BaseAgent {
   }
 
   private async executeToolCall(
-    toolCall: ToolCall,
+    toolCall: LlmToolCall,
     ctx?: RunContext,
     parentStep?: Step,
     turnIndex?: number,
@@ -181,7 +135,7 @@ export class BaseAgent {
     let userMessage = prompt;
     let fullContent = "";
     let fullThinking = "";
-    let toolCalls: ToolCall[] = [];
+    let toolCalls: LlmToolCall[] = [];
     let turnIndex = 0;
 
     do {
@@ -197,22 +151,16 @@ export class BaseAgent {
         messages.push({ role: "user", content: userMessage });
       }
 
-      const thinkOpt =
-        /gemma/i.test(this.model) || /qwen3/i.test(this.model)
-          ? ({ think: true as const } satisfies { think: true })
-          : {};
-
       fullContent = "";
       fullThinking = "";
       toolCalls = [];
+      const reasoningDetails: unknown[] = [];
       let llmMetrics: LlmMetrics | undefined;
 
-      const stream = await getOllamaClient().chat({
+      const stream = await streamModelChat({
         model: this.model,
         messages,
         tools: this.tools.map((tool) => tool.toTool()),
-        stream: true,
-        ...thinkOpt,
       });
 
       const onAbort = () => stream.abort();
@@ -226,8 +174,8 @@ export class BaseAgent {
         for await (const chunk of stream) {
           if (signal?.aborted) break;
 
-          const cDelta = chunk.message.content ?? "";
-          const tDelta = chunk.message.thinking ?? "";
+          const cDelta = chunk.contentDelta ?? "";
+          const tDelta = chunk.thinkingDelta ?? "";
 
           if (cDelta) fullContent += cDelta;
           if (tDelta) fullThinking += tDelta;
@@ -236,12 +184,13 @@ export class BaseAgent {
             ctx.streamDelta(cDelta, tDelta);
           }
 
-          if (chunk.message.tool_calls?.length) {
-            toolCalls = chunk.message.tool_calls;
+          if (chunk.toolCalls?.length) {
+            toolCalls = chunk.toolCalls;
           }
 
-          if (chunk.done) {
-            llmMetrics = metricsFromOllamaChunk(chunk);
+          if (chunk.metrics) llmMetrics = chunk.metrics;
+          if (chunk.reasoningDetails?.length) {
+            reasoningDetails.push(...chunk.reasoningDetails);
           }
         }
       } catch (e) {
@@ -291,12 +240,17 @@ export class BaseAgent {
         userMessage = "";
       }
 
-      const assistantMsg: AssistantHistoryMsg = {
+      const assistantMsg: LlmMessage = {
         role: "assistant",
         content: fullContent,
       };
       if (toolCalls.length > 0) {
         assistantMsg.tool_calls = toolCalls;
+      }
+      if (reasoningDetails.length > 0) {
+        assistantMsg.reasoning_details = reasoningDetails;
+      } else if (fullThinking) {
+        assistantMsg.reasoning = fullThinking;
       }
       this.history.push(assistantMsg);
 
@@ -321,13 +275,24 @@ export class BaseAgent {
           );
           ctx.endStep(toolStep, result);
 
-          this.history.push({ role: "tool", content: result });
+          this.history.push({
+            role: "tool",
+            content: result,
+            ...(toolCall.id ? { tool_call_id: toolCall.id } : {}),
+          });
         }
         if (signal?.aborted) break;
         userMessage = "";
         turnIndex++;
       }
     } while (toolCalls.length);
+
+    // OpenRouter reasoning blocks are needed for immediate tool continuation,
+    // but replaying them on later user turns adds large provider metadata to input.
+    this.history = this.history.map(
+      ({ reasoning: _reasoning, reasoning_details: _details, ...message }) =>
+        message,
+    );
 
     if (!signal?.aborted) {
       const completeStep = ctx.beginStep({ kind: "complete", turnIndex });

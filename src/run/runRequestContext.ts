@@ -1,9 +1,16 @@
 import type { Response } from "express";
 import { buildServerRunPromptContext } from "../agents/agentManager";
 import { DEFAULT_RUN_MODEL } from "../constants";
-import { type SessionRow, getAgentByName, getSessionById } from "../db/index";
+import {
+  type SessionRow,
+  getAgentByName,
+  getOpenRouterApiKey,
+  getOpenRouterModelByRoute,
+  getSessionById,
+} from "../db/index";
 import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
+import { resolveModelSelection } from "../llm/index";
 import type { PromptContext } from "../prompts/render";
 import { type RunBody, RunBodySchema } from "../schemas/run";
 import { resolveEffectiveToolSessionDir } from "../sessionDirectory";
@@ -62,11 +69,32 @@ export function buildTurnContext(
     persistedSession?.session_directory,
   );
 
+  const model = body.model?.trim() || DEFAULT_RUN_MODEL;
+  const resolvedModel = resolveModelSelection(model);
+  if (resolvedModel.provider === "openrouter") {
+    if (
+      !resolvedModel.model ||
+      !getOpenRouterModelByRoute(resolvedModel.model)
+    ) {
+      sendApiError(res, 400, "BAD_REQUEST", "Unknown OpenRouter model");
+      return null;
+    }
+    if (!getOpenRouterApiKey()) {
+      sendApiError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Configure an OpenRouter API key in Settings before using this model",
+      );
+      return null;
+    }
+  }
+
   return {
     body,
     ephemeral,
     sessionId,
-    model: body.model?.trim() || DEFAULT_RUN_MODEL,
+    model,
     agentName,
     toolSessionDir,
     promptContext: buildServerRunPromptContext({

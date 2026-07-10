@@ -1,31 +1,17 @@
 import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
-import {
-  ConnectionTestFeedback,
-  ollamaConnectionFeedback,
-} from "./ConnectionTestFeedback";
+import type { ModelOption } from "../../types";
 import { hintClass, inputClass, labelClass, selectClass } from "./constants";
-import type { OllamaTestState } from "./types";
 
 type Props = {
   settings: UserSettings;
   onFieldChange: (field: keyof UserSettings, value: string) => void;
-  ollamaUri: string;
-  onOllamaUriInput: (v: string) => void;
-  ollamaConnected: boolean | null;
-  testState: OllamaTestState;
-  onTestOllama: () => void;
-  availableModels: string[];
+  availableModels: ModelOption[];
 };
 
 export function GeneralSettingsTab({
   settings,
   onFieldChange,
-  ollamaUri,
-  onOllamaUriInput,
-  ollamaConnected,
-  testState,
-  onTestOllama,
   availableModels,
 }: Props) {
   return (
@@ -91,42 +77,11 @@ export function GeneralSettingsTab({
 
       <hr className="border-border-subtle" />
 
-      <div className="space-y-4">
-        <h2 className={cx(eyebrowText, "mb-4")}>Ollama</h2>
-        <div className="space-y-2">
-          <label htmlFor="ollamaUri" className={labelClass}>
-            Server URL
-          </label>
-          <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
-            <input
-              type="text"
-              id="ollamaUri"
-              name="ollamaUri"
-              value={ollamaUri}
-              onChange={(e) => onOllamaUriInput(e.target.value)}
-              placeholder="http://127.0.0.1:11434"
-              autoComplete="off"
-              className={cx(inputClass, "min-w-0 flex-1")}
-            />
-            <button
-              type="button"
-              onClick={() => void onTestOllama()}
-              disabled={testState.status === "loading"}
-              className="shrink-0 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-[0.875rem] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
-            >
-              {testState.status === "loading"
-                ? "Testing..."
-                : "Test connection"}
-            </button>
-          </div>
-          <p className={hintClass}>
-            Leave empty to use the default local Ollama address
-            (http://127.0.0.1:11434).
-          </p>
-          <ConnectionTestFeedback
-            {...ollamaConnectionFeedback(testState, ollamaConnected)}
-          />
-        </div>
+      <div className="space-y-2">
+        <h2 className={cx(eyebrowText, "mb-2")}>Chat Defaults</h2>
+        <p className={hintClass}>
+          Choose the model used when you start a new conversation.
+        </p>
         <div className="space-y-2">
           <label htmlFor="defaultModel" className={labelClass}>
             Default Model
@@ -138,11 +93,33 @@ export function GeneralSettingsTab({
             className={selectClass}
           >
             <option value="">Select a default model</option>
-            {availableModels.map((modelName) => (
-              <option key={modelName} value={modelName}>
-                {modelName}
-              </option>
-            ))}
+            {(["ollama", "openrouter"] as const).map((provider) => {
+              const models = availableModels.filter(
+                (model) => model.provider === provider,
+              );
+              if (models.length === 0) return null;
+              return (
+                <optgroup
+                  key={provider}
+                  label={
+                    provider === "ollama" ? "Ollama (local)" : "OpenRouter"
+                  }
+                >
+                  {models.map((model) => (
+                    <option
+                      key={model.id}
+                      value={model.id}
+                      disabled={
+                        model.provider === "openrouter" &&
+                        model.configured === false
+                      }
+                    >
+                      {model.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
           <p className={hintClass}>
             This model will be used for new conversations.

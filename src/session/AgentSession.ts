@@ -2,6 +2,8 @@ import { EventEmitter } from "node:events";
 import { RunContext } from "../RunContext";
 import type { BaseAgent } from "../agents/BaseAgent";
 import { agentManager } from "../agents/agentManager";
+import type { LlmMessage } from "../llm/index";
+import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { logger } from "../logger";
 import type { PromptContext } from "../prompts/render";
 
@@ -89,7 +91,7 @@ export class AgentSession extends EventEmitter {
     if (m) this.generalAgent.model = m;
   }
 
-  /** Rehydrate from the client request (history + optional Ollama message list). */
+  /** Rehydrate from the client request and provider-neutral model messages. */
   restoreFromPersistence(payload: {
     history: { role: string; content: string; steps?: HistoryWireStep[] }[];
     modelMessages?: Array<Record<string, unknown>> | null;
@@ -100,14 +102,24 @@ export class AgentSession extends EventEmitter {
       ...(h.steps != null ? { steps: h.steps } : {}),
     }));
     if (Array.isArray(payload.modelMessages)) {
-      type AgentHist = { role: string; content: string; tool_calls?: unknown };
-      this.generalAgent.history = payload.modelMessages.map((m) => {
-        const row: AgentHist = {
+      this.generalAgent.history = stripReasoningFromModelMessages(
+        payload.modelMessages,
+      )!.map((m) => {
+        const row: LlmMessage = {
           role: typeof m.role === "string" ? m.role : "user",
           content: typeof m.content === "string" ? m.content : "",
         };
-        if (m.tool_calls != null) row.tool_calls = m.tool_calls;
-        return row as { role: string; content: string };
+        if (Array.isArray(m.tool_calls)) {
+          row.tool_calls = m.tool_calls as LlmMessage["tool_calls"];
+        }
+        if (typeof m.tool_call_id === "string") {
+          row.tool_call_id = m.tool_call_id;
+        }
+        if (typeof m.reasoning === "string") row.reasoning = m.reasoning;
+        if (Array.isArray(m.reasoning_details)) {
+          row.reasoning_details = m.reasoning_details;
+        }
+        return row;
       });
     } else {
       this.generalAgent.history = payload.history.map((h) => ({
@@ -195,17 +207,20 @@ export class AgentSession extends EventEmitter {
     return result;
   }
 
-  /** Cumulative messages the agent keeps for the next Ollama call. */
+  /** Cumulative provider-neutral messages the agent keeps for the next call. */
   getModelMessages(): Array<Record<string, unknown>> {
-    return this.generalAgent.history.map(
-      (msg: { role: string; content?: string; tool_calls?: unknown }) => {
-        const row: Record<string, unknown> = {
-          role: msg.role,
-          content: msg.content ?? "",
-        };
-        if (msg.tool_calls != null) row.tool_calls = msg.tool_calls;
-        return row;
-      },
-    );
+    return this.generalAgent.history.map((msg: LlmMessage) => {
+      const row: Record<string, unknown> = {
+        role: msg.role,
+        content: msg.content ?? "",
+      };
+      if (msg.tool_calls != null) row.tool_calls = msg.tool_calls;
+      if (msg.tool_call_id != null) row.tool_call_id = msg.tool_call_id;
+      if (msg.reasoning != null) row.reasoning = msg.reasoning;
+      if (msg.reasoning_details != null) {
+        row.reasoning_details = msg.reasoning_details;
+      }
+      return row;
+    });
   }
 }

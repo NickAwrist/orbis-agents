@@ -2,7 +2,7 @@ import { type CSSProperties, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
 import { DebugModal } from "./components/DebugModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
-import { OllamaDisconnectedBanner } from "./components/OllamaDisconnectedBanner";
+import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { RenameSessionModal } from "./components/RenameSessionModal";
 import { RunAppHeader } from "./components/RunAppHeader";
 import { RunArea } from "./components/RunArea";
@@ -50,11 +50,15 @@ export default function App() {
 
   return (
     <>
-      {app.ollamaDisconnected && <OllamaDisconnectedBanner />}
+      {app.noProviderAvailable && (
+        <ProviderSetupBanner
+          onOpenSettings={() => setCurrentView("settings")}
+        />
+      )}
       <div
         className={cx(
           "h-screen overflow-hidden",
-          app.ollamaDisconnected && "pt-9",
+          app.noProviderAvailable && "pt-9",
         )}
       >
         <div
@@ -140,6 +144,7 @@ export default function App() {
                 searxngHost={app.searxngHost}
                 searxngConnected={app.searxngConnected}
                 onSave={app.saveUserSettings}
+                onModelsChanged={app.refreshModels}
                 onBack={() => setCurrentView("run")}
               />
             ) : (
@@ -233,7 +238,7 @@ export default function App() {
                     runPending={app.runPending}
                     streamingStep={app.streamingStep}
                     streamingSteps={app.streamingSteps}
-                    ollamaSendReady={app.ollamaSendReady}
+                    modelSendReady={app.modelSendReady}
                     onFooterHeightChange={setRunFooterInset}
                   />
                 )}
@@ -275,8 +280,8 @@ export default function App() {
         )}
         {app.pendingDeleteSessionId && (
           <TruncateConfirmModal
-            title="Delete this run?"
-            description="This run and all of its messages will be permanently deleted. This cannot be undone."
+            title="Delete this chat?"
+            description="This chat and all of its messages will be permanently deleted. This cannot be undone."
             confirmLabel="Delete"
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}

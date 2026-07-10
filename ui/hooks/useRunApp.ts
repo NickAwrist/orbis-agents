@@ -77,6 +77,21 @@ export function useRunApp() {
     runFlightRef,
   });
 
+  const selectedModelOption = ollama.ollamaModels.find(
+    (model) => model.id === sessions.selectedModel,
+  );
+  const modelSendReady =
+    selectedModelOption?.provider === "openrouter"
+      ? selectedModelOption.configured === true
+      : selectedModelOption?.provider === "ollama" && ollama.ollamaReady;
+  const openRouterReady = ollama.ollamaModels.some(
+    (model) => model.provider === "openrouter" && model.configured === true,
+  );
+  const noProviderAvailable =
+    ollama.catalogLoaded &&
+    ollama.ollamaConnected === false &&
+    !openRouterReady;
+
   const stream = useRunStreaming({
     messages,
     setMessages,
@@ -96,7 +111,7 @@ export function useRunApp() {
     stepsModalData,
     setStepsModalData,
     selectedModel: sessions.selectedModel,
-    ollamaSendReady: ollama.ollamaSendReady,
+    modelSendReady,
     refreshSessions: sessions.refreshSessions,
     fetchOllamaHealth: ollama.fetchOllamaHealth,
     bindStreamingReset,
@@ -155,9 +170,9 @@ export function useRunApp() {
     handleSessionAgentChange: sessions.handleSessionAgentChange,
     refreshAgentDefaults: agents.refreshAgentDefaults,
     ollamaConnected: ollama.ollamaConnected,
-    ollamaDisconnected: ollama.ollamaDisconnected,
+    noProviderAvailable,
     ollamaReady: ollama.ollamaReady,
-    ollamaSendReady: ollama.ollamaSendReady,
+    modelSendReady,
     handleModelChange: sessions.handleModelChange,
     isEphemeral: sessions.isEphemeral,
     userSettings: settings.userSettings,
@@ -171,6 +186,7 @@ export function useRunApp() {
     searxngHost: searxng.searxngHost,
     searxngConnected: searxng.searxngConnected,
     saveUserSettings: settings.saveUserSettings,
+    refreshModels: ollama.refreshOllamaModels,
     switchToSession: sessions.switchToSession,
     createSession: sessions.createSession,
     createEphemeralSession: sessions.createEphemeralSession,

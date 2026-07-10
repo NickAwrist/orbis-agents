@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { readApiError } from "../../lib/readApiError";
-import type { OllamaModelOption } from "../../types";
+import type { ModelOption } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
 
 export function useOllamaConnection() {
-  const [ollamaModels, setOllamaModels] = useState<OllamaModelOption[]>([]);
+  const [ollamaModels, setOllamaModels] = useState<ModelOption[]>([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [serverDefaultModel, setServerDefaultModel] = useState("gemma4:e4b");
   const [ollamaHost, setOllamaHost] = useState("");
@@ -36,8 +37,6 @@ export function useOllamaConnection() {
   }, [fetchOllamaHealth]);
 
   const ollamaReady = ollamaConnected === true;
-  const ollamaSendReady = ollamaReady && ollamaModels.length > 0;
-  const ollamaDisconnected = ollamaConnected === false;
 
   const refreshOllamaModels = useCallback(async () => {
     try {
@@ -45,6 +44,7 @@ export function useOllamaConnection() {
       if (!res.ok) {
         setModelsLoadError(await readApiError(res));
         setOllamaModels([]);
+        setCatalogLoaded(true);
         return;
       }
       const data = (await res.json()) as {
@@ -53,33 +53,49 @@ export function useOllamaConnection() {
       };
       setModelsLoadError(null);
       const raw = Array.isArray(data.models) ? data.models : [];
-      const list: OllamaModelOption[] = raw
+      const list: ModelOption[] = raw
         .filter(
           (m): m is Record<string, unknown> =>
             m != null && typeof m === "object",
         )
-        .map((m) => m.name)
-        .filter((n): n is string => typeof n === "string" && n.length > 0)
-        .map((name) => ({ name }));
+        .filter(
+          (
+            m,
+          ): m is Record<string, unknown> & {
+            id: string;
+            name: string;
+            provider: "ollama" | "openrouter";
+            lab: string;
+          } =>
+            typeof m.id === "string" &&
+            typeof m.name === "string" &&
+            (m.provider === "ollama" || m.provider === "openrouter") &&
+            typeof m.lab === "string",
+        )
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          provider: m.provider,
+          lab: m.lab,
+          ...(typeof m.route === "string" ? { route: m.route } : {}),
+          ...(typeof m.configured === "boolean"
+            ? { configured: m.configured }
+            : {}),
+        }));
       setOllamaModels(list);
+      setCatalogLoaded(true);
       if (typeof data.defaultModel === "string" && data.defaultModel.trim()) {
         setServerDefaultModel(data.defaultModel.trim());
       }
     } catch (e) {
       setModelsLoadError(e instanceof Error ? e.message : String(e));
       setOllamaModels([]);
+      setCatalogLoaded(true);
     }
   }, []);
 
   useEffect(() => {
-    if (ollamaConnected === true) {
-      void refreshOllamaModels();
-      return;
-    }
-    if (ollamaConnected === false) {
-      setOllamaModels([]);
-      setModelsLoadError(null);
-    }
+    void refreshOllamaModels();
   }, [ollamaConnected, refreshOllamaModels]);
 
   useEffect(() => {
@@ -101,6 +117,7 @@ export function useOllamaConnection() {
 
   return {
     ollamaModels,
+    catalogLoaded,
     modelsLoadError,
     serverDefaultModel,
     ollamaHost,
@@ -109,7 +126,5 @@ export function useOllamaConnection() {
     fetchOllamaHealth,
     refreshOllamaModels,
     ollamaReady,
-    ollamaSendReady,
-    ollamaDisconnected,
   };
 }

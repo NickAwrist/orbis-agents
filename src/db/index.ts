@@ -1,5 +1,5 @@
 export { DEFAULT_COMFYUI_NEGATIVE_PROMPT } from "./constants";
-export { getDb } from "./connection";
+export { getDb, resetDbConnection } from "./connection";
 export type { AgentRow, AgentWithTools } from "./agents/types";
 export {
   createAgentRow,
@@ -24,6 +24,7 @@ export type {
   SessionRow,
   SessionSummaryRow,
   WireMessage,
+  OpenRouterModel,
 } from "./types";
 export {
   getDefaultRunAgent,
@@ -33,6 +34,7 @@ export {
   getComfyUINegativePrompt,
   getOllamaHost,
   getSearXNGHost,
+  getOpenRouterApiKey,
   setComfyUIDefaultModel,
   setComfyUIHost,
   setComfyUIImageSize,
@@ -40,4 +42,12 @@ export {
   setDefaultRunAgent,
   setOllamaHost,
   setSearXNGHost,
+  setOpenRouterApiKey,
 } from "./settings";
+
+export {
+  listOpenRouterModels,
+  getOpenRouterModelByRoute,
+  createOpenRouterModel,
+  deleteOpenRouterModel,
+} from "./openrouter";

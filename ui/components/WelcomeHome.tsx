@@ -27,11 +27,11 @@ export function WelcomeHome({
           <Sparkles size={22} />
         </div>
         <h2 className="mb-2.5 text-[1.375rem] font-semibold leading-[1.25] tracking-[-0.02em] text-foreground">
-          Pick a run or start fresh
+          Pick a chat or start fresh
         </h2>
         <p className="m-0 max-w-[34ch] text-[0.9375rem] leading-[1.65] text-muted-foreground">
           Your conversations live in the sidebar. Open one to continue, or
-          create a new thread for a clean run.
+          create a new thread for a clean chat.
         </p>
         <div className="mt-[22px] flex items-center gap-2.5">
           <button
@@ -41,7 +41,7 @@ export function WelcomeHome({
             className={cx(primaryButton)}
           >
             <MessageSquarePlus size={16} />
-            New run
+            New chat
           </button>
           <button
             type="button"
@@ -67,7 +67,7 @@ export function WelcomeHome({
                   onClick={() => onOpenSession(s.id)}
                 >
                   <span className="min-w-0 truncate whitespace-nowrap font-medium text-foreground">
-                    {s.preview || "Run"}
+                    {s.preview || "Chat"}
                   </span>
                   <span className="shrink-0 text-[0.75rem] text-muted-foreground">
                     {new Date(s.updatedAt).toLocaleDateString()}

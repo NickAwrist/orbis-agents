@@ -21,3 +21,10 @@ export type SessionSummaryRow = {
   updated_at: number;
   preview: string;
 };
+
+export type OpenRouterModel = {
+  id: number;
+  name: string;
+  route: string;
+  ai_lab: string;
+};

@@ -51,7 +51,7 @@ export function RenameSessionModal({
         <div className="ui-animate-modal-panel grid rounded-xl border border-border-subtle bg-surface">
           <div className={modalHeader}>
             <div>
-              <div className={eyebrowText}>Run</div>
+              <div className={eyebrowText}>Chat</div>
               <h2
                 id="rename-session-title"
                 className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]"

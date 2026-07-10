@@ -5,6 +5,7 @@ import { seedDefaultAgents } from "./agents/seed";
 import { ensureDefaultRunAgentSetting } from "./bootstrap";
 import { DB_PATH } from "./constants";
 import { runMigrations } from "./migrations";
+import { seedDefaultOpenRouterModels } from "./openrouter";
 
 let dbSingleton: Database | null = null;
 
@@ -67,10 +68,27 @@ export function getDb(): Database {
     );
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS openrouter_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      route TEXT UNIQUE NOT NULL,
+      ai_lab TEXT NOT NULL
+    );
+  `);
+
   runMigrations(db);
   seedDefaultAgents(db);
   ensureDefaultRunAgentSetting(db);
+  seedDefaultOpenRouterModels(db);
 
   dbSingleton = db;
   return db;
+}
+
+export function resetDbConnection(): void {
+  if (dbSingleton) {
+    dbSingleton.close();
+    dbSingleton = null;
+  }
 }

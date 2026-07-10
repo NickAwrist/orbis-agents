@@ -8,7 +8,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useState } from "react";
-import { cx, eyebrowText, iconButton } from "../../styles";
+import { cx, iconButton } from "../../styles";
 import { SessionListItem } from "./SessionListItem";
 import type { SidebarProps } from "./types";
 
@@ -37,7 +37,6 @@ export function Sidebar({
         <div className="min-w-0">
           {!collapsed && (
             <div className="flex min-w-0 flex-col gap-0.5">
-              <span className={eyebrowText}>Runs</span>
               <span className="text-[0.9375rem] font-semibold text-foreground">
                 Recent
               </span>
@@ -70,12 +69,12 @@ export function Sidebar({
             ) : (
               <Plus size={16} />
             )}
-            {!collapsed && <span>New run</span>}
+            {!collapsed && <span>New chat</span>}
           </button>
           <button
             type="button"
             onClick={onNewEphemeralSession}
-            title="Ephemeral run - not saved"
+            title="Ephemeral chat - not saved"
             className={cx(
               "inline-flex items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[0.8125rem] font-semibold text-amber-400 transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-amber-500/35 hover:bg-amber-500/10 active:scale-[0.99] active:bg-amber-500/15",
               collapsed ? "w-full shrink-0" : "shrink-0",
@@ -118,7 +117,7 @@ export function Sidebar({
             {sessions.length === 0 && (
               <div className="mt-1 border-t border-border-subtle px-2.5 py-3 text-[0.8125rem] leading-[1.5] text-muted-foreground">
                 {!collapsed
-                  ? "No runs yet. Start one from the button above."
+                  ? "No chats yet. Start one from the button above."
                   : "Empty"}
               </div>
             )}

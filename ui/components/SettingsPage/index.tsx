@@ -2,6 +2,8 @@ import { ArrowLeft, Save } from "lucide-react";
 import { cx, primaryButton } from "../../styles";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
+import { OllamaSettingsTab } from "./OllamaSettingsTab";
+import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
 import { WebSearchTab } from "./WebSearchTab";
 import type { SettingsPageProps } from "./types";
 import type { SettingsTab } from "./types";
@@ -27,7 +29,7 @@ export function SettingsPage(props: SettingsPageProps) {
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft size={15} />
-          Back to run
+          Back to chat
         </button>
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">
@@ -35,13 +37,27 @@ export function SettingsPage(props: SettingsPageProps) {
         </h1>
       </header>
 
-      <div className="flex shrink-0 gap-1 border-b border-border-subtle px-5">
+      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border-subtle px-3 sm:px-5">
         <button
           type="button"
           className={tabButtonClass("general")}
           onClick={() => p.setTab("general")}
         >
           General
+        </button>
+        <button
+          type="button"
+          className={tabButtonClass("ollama")}
+          onClick={() => p.setTab("ollama")}
+        >
+          Ollama
+        </button>
+        <button
+          type="button"
+          className={tabButtonClass("openrouter")}
+          onClick={() => p.setTab("openrouter")}
+        >
+          OpenRouter
         </button>
         <button
           type="button"
@@ -59,8 +75,8 @@ export function SettingsPage(props: SettingsPageProps) {
         </button>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <form onSubmit={p.handleSubmit} className="mx-auto max-w-2xl space-y-6">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="mx-auto max-w-2xl space-y-6">
           {p.error && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
               {p.error}
@@ -71,12 +87,17 @@ export function SettingsPage(props: SettingsPageProps) {
             <GeneralSettingsTab
               settings={p.settings}
               onFieldChange={p.handleChange}
+              availableModels={p.availableModels}
+            />
+          )}
+
+          {p.tab === "ollama" && (
+            <OllamaSettingsTab
               ollamaUri={p.ollamaUri}
               onOllamaUriInput={p.onOllamaUriInput}
               ollamaConnected={props.ollamaConnected}
               testState={p.testState}
               onTestOllama={p.handleTestOllama}
-              availableModels={p.availableModels}
             />
           )}
 
@@ -97,6 +118,10 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           )}
 
+          {p.tab === "openrouter" && (
+            <OpenRouterSettingsTab onModelsChanged={props.onModelsChanged} />
+          )}
+
           {p.tab === "web-search" && (
             <WebSearchTab
               searxngConnected={props.searxngConnected}
@@ -107,21 +132,24 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           )}
 
-          <div className="flex justify-end border-t border-border-subtle pt-6">
-            <button
-              type="submit"
-              disabled={!p.isDirty || p.isSaving}
-              aria-busy={p.isSaving}
-              className={cx(
-                primaryButton,
-                (!p.isDirty || p.isSaving) && "opacity-60",
-              )}
-            >
-              <Save size={15} />
-              Save settings
-            </button>
-          </div>
-        </form>
+          {p.tab !== "openrouter" && (
+            <div className="flex justify-end border-t border-border-subtle pt-6">
+              <button
+                type="button"
+                disabled={!p.isDirty || p.isSaving}
+                aria-busy={p.isSaving}
+                onClick={() => void p.handleSubmit()}
+                className={cx(
+                  primaryButton,
+                  (!p.isDirty || p.isSaving) && "opacity-60",
+                )}
+              >
+                <Save size={15} />
+                Save settings
+              </button>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
