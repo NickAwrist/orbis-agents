@@ -259,8 +259,8 @@ export function useSettingsPageState({
     searxngHost,
   ]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!isDirty) return;
+  const handleSubmit = useCallback(async (): Promise<boolean> => {
+    if (!isDirty) return true;
     setIsSaving(true);
     setError(null);
     try {
@@ -282,8 +282,10 @@ export function useSettingsPageState({
       setTestState({ status: "idle" });
       setComfyTestState({ status: "idle" });
       setSearxngTestState({ status: "idle" });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
+      return false;
     } finally {
       setIsSaving(false);
     }

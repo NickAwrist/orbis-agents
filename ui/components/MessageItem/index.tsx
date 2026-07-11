@@ -7,6 +7,7 @@ import type { MessageItemProps } from "./types";
 export function MessageItem({
   message,
   messageIndex,
+  animateEntry = true,
   onViewSteps,
   animDelayMs = 0,
   isBusy,
@@ -68,6 +69,7 @@ export function MessageItem({
       <UserMessageBubble
         message={message}
         messageIndex={messageIndex}
+        animateEntry={animateEntry}
         enterStyle={enterStyle}
         bubbleRef={bubbleRef}
         bubbleEditStyle={bubbleEditStyle}
@@ -88,6 +90,7 @@ export function MessageItem({
   return (
     <AssistantMessageBubble
       message={message}
+      animateEntry={animateEntry}
       enterStyle={enterStyle}
       copied={copied}
       copyContent={copyContent}

@@ -3,6 +3,7 @@ import type { Message } from "../../types";
 export type MessageItemProps = {
   message: Message;
   messageIndex: number;
+  animateEntry?: boolean;
   onViewSteps?: () => void;
   animDelayMs?: number;
   isBusy: boolean;

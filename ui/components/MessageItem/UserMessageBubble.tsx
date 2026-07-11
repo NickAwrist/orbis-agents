@@ -17,6 +17,7 @@ const messageActionMenuItem =
 type Props = {
   message: Message;
   messageIndex: number;
+  animateEntry: boolean;
   enterStyle: CSSProperties | undefined;
   bubbleRef: RefObject<HTMLDivElement | null>;
   bubbleEditStyle: CSSProperties | undefined;
@@ -35,6 +36,7 @@ type Props = {
 export function UserMessageBubble({
   message,
   messageIndex,
+  animateEntry,
   enterStyle,
   bubbleRef,
   bubbleEditStyle,
@@ -104,7 +106,10 @@ export function UserMessageBubble({
   };
 
   return (
-    <div className="ui-animate-slide-up flex justify-end" style={enterStyle}>
+    <div
+      className={cx(animateEntry && "ui-animate-slide-up", "flex justify-end")}
+      style={enterStyle}
+    >
       <div className="group/msg flex w-full min-w-0 flex-col items-end">
         <div
           ref={bubbleRef}
