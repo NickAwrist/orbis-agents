@@ -1,4 +1,4 @@
-import { Check, KeyRound, Plus, Trash2, X } from "lucide-react";
+import { KeyRound, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readApiError } from "../../lib/readApiError";
 import {
@@ -10,6 +10,7 @@ import {
   primaryButton,
   secondaryButton,
 } from "../../styles";
+import { ConnectionTestFeedback } from "./ConnectionTestFeedback";
 import { hintClass, inputClass, labelClass } from "./constants";
 
 type RegistryModel = {
@@ -40,7 +41,6 @@ export function OpenRouterSettingsTab({
 }) {
   const [hasKey, setHasKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
-  const [keySaved, setKeySaved] = useState(false);
   const [models, setModels] = useState<RegistryModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState(false);
@@ -91,7 +91,6 @@ export function OpenRouterSettingsTab({
 
   const saveApiKey = async (nextKey: string) => {
     setSavingKey(true);
-    setKeySaved(false);
     setError(null);
     try {
       const res = await fetch("/api/settings/openrouter", {
@@ -103,7 +102,6 @@ export function OpenRouterSettingsTab({
       const data = (await res.json()) as { hasKey?: boolean };
       setHasKey(data.hasKey === true);
       setApiKey("");
-      setKeySaved(true);
       await onModelsChanged();
     } catch (cause) {
       setError(
@@ -192,20 +190,7 @@ export function OpenRouterSettingsTab({
       )}
 
       <section className="space-y-4">
-        <div className="relative">
-          <h2 className={cx(eyebrowText, "mb-4")}>OpenRouter</h2>
-          <span
-            className={cx(
-              "absolute right-0 top-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.6875rem] font-medium",
-              hasKey
-                ? "bg-emerald-500/10 text-emerald-400"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {hasKey && <Check size={12} />}
-            {hasKey ? "Configured" : "Add an API key"}
-          </span>
-        </div>
+        <h2 className={cx(eyebrowText, "mb-4")}>OpenRouter</h2>
         <div className="space-y-2">
           <label htmlFor="openrouterApiKey" className={labelClass}>
             OpenRouter API key
@@ -220,12 +205,9 @@ export function OpenRouterSettingsTab({
                 id="openrouterApiKey"
                 type="password"
                 value={apiKey}
-                onChange={(event) => {
-                  setApiKey(event.target.value);
-                  setKeySaved(false);
-                }}
+                onChange={(event) => setApiKey(event.target.value)}
                 placeholder={
-                  hasKey ? "Enter a replacement key" : "sk-or-v1-..."
+                  hasKey ? "••••••••••••••••••••••••" : "sk-or-v1-..."
                 }
                 autoComplete="new-password"
                 className={cx(inputClass, "min-w-0 flex-1 pl-9")}
@@ -250,9 +232,12 @@ export function OpenRouterSettingsTab({
               </button>
             )}
           </div>
-          {keySaved && (
+          {!loading && hasKey && (
+            <ConnectionTestFeedback variant="ok" okLabel="Configured" />
+          )}
+          {!loading && !hasKey && (
             <p className={hintClass}>
-              Key saved. OpenRouter models are ready to use.
+              Add an API key to use OpenRouter models.
             </p>
           )}
         </div>

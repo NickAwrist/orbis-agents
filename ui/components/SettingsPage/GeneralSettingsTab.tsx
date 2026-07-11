@@ -37,24 +37,8 @@ export function GeneralSettingsTab({
       <div>
         <h2 className={cx(eyebrowText, "mb-4")}>Browser Data UUID</h2>
         <div className="space-y-2">
-          <label htmlFor="currentUserUuid" className={labelClass}>
-            Current UUID
-          </label>
-          <input
-            type="text"
-            id="currentUserUuid"
-            value={currentUserId}
-            readOnly
-            className={cx(inputClass, "font-mono text-[0.8125rem]")}
-          />
-          <p className={hintClass}>
-            Chats and agents are only loaded for this browser UUID. Anyone with
-            the UUID can load the same data.
-          </p>
-        </div>
-        <div className="mt-4 space-y-2">
           <label htmlFor="userUuid" className={labelClass}>
-            Load another UUID
+            UUID
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
@@ -85,8 +69,8 @@ export function GeneralSettingsTab({
             </p>
           )}
           <p className={hintClass}>
-            Switching reloads the app with that UUID&apos;s chats and agents.
-            Connection settings stay global.
+            Chats and agents are loaded for this UUID. Change it and switch to
+            load another UUID&apos;s data.
           </p>
         </div>
       </div>
