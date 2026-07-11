@@ -26,6 +26,13 @@ type Lookup = {
   found: boolean;
 };
 
+function openRouterError(cause: unknown, fallback: string): string {
+  if (cause instanceof TypeError && cause.message === "Failed to fetch") {
+    return fallback;
+  }
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 export function OpenRouterSettingsTab({
   onModelsChanged,
 }: {
@@ -63,7 +70,12 @@ export function OpenRouterSettingsTab({
           : [],
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(
+        openRouterError(
+          cause,
+          "Could not load OpenRouter settings. Make sure the app server is running and try again.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -94,7 +106,9 @@ export function OpenRouterSettingsTab({
       setKeySaved(true);
       await onModelsChanged();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(
+        openRouterError(cause, "Could not save the OpenRouter API key."),
+      );
     } finally {
       setSavingKey(false);
     }
@@ -114,7 +128,7 @@ export function OpenRouterSettingsTab({
       if (!res.ok) throw new Error(await readApiError(res));
       setLookup((await res.json()) as Lookup);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(openRouterError(cause, "Could not look up that model route."));
     } finally {
       setAdding(false);
     }
@@ -140,7 +154,7 @@ export function OpenRouterSettingsTab({
       setLookup(null);
       await onModelsChanged();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(openRouterError(cause, "Could not add that OpenRouter model."));
     } finally {
       setAdding(false);
     }
@@ -156,7 +170,9 @@ export function OpenRouterSettingsTab({
       setModels((current) => current.filter((entry) => entry.id !== model.id));
       await onModelsChanged();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(
+        openRouterError(cause, "Could not remove that OpenRouter model."),
+      );
     }
   };
 
@@ -175,12 +191,12 @@ export function OpenRouterSettingsTab({
         </div>
       )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className={eyebrowText}>Connection</h2>
+      <section className="space-y-4">
+        <div className="relative">
+          <h2 className={cx(eyebrowText, "mb-4")}>OpenRouter</h2>
           <span
             className={cx(
-              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.6875rem] font-medium",
+              "absolute right-0 top-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.6875rem] font-medium",
               hasKey
                 ? "bg-emerald-500/10 text-emerald-400"
                 : "bg-muted text-muted-foreground",
@@ -190,52 +206,56 @@ export function OpenRouterSettingsTab({
             {hasKey ? "Configured" : "Add an API key"}
           </span>
         </div>
-        <label htmlFor="openrouterApiKey" className={labelClass}>
-          OpenRouter API key
-        </label>
-        <div className="flex flex-wrap gap-2 sm:flex-nowrap">
-          <div className="relative min-w-0 flex-1">
-            <KeyRound
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              id="openrouterApiKey"
-              type="password"
-              value={apiKey}
-              onChange={(event) => {
-                setApiKey(event.target.value);
-                setKeySaved(false);
-              }}
-              placeholder={hasKey ? "Enter a replacement key" : "sk-or-v1-..."}
-              autoComplete="new-password"
-              className={cx(inputClass, "pl-9")}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={savingKey || !apiKey.trim()}
-            onClick={() => void saveApiKey(apiKey.trim())}
-            className={primaryButton}
-          >
-            {savingKey ? "Saving..." : hasKey ? "Replace key" : "Save key"}
-          </button>
-          {hasKey && (
+        <div className="space-y-2">
+          <label htmlFor="openrouterApiKey" className={labelClass}>
+            OpenRouter API key
+          </label>
+          <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
+            <div className="relative min-w-0 flex-1">
+              <KeyRound
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                id="openrouterApiKey"
+                type="password"
+                value={apiKey}
+                onChange={(event) => {
+                  setApiKey(event.target.value);
+                  setKeySaved(false);
+                }}
+                placeholder={
+                  hasKey ? "Enter a replacement key" : "sk-or-v1-..."
+                }
+                autoComplete="new-password"
+                className={cx(inputClass, "min-w-0 flex-1 pl-9")}
+              />
+            </div>
             <button
               type="button"
-              disabled={savingKey}
-              onClick={() => void saveApiKey("")}
-              className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-red-500/30 hover:text-red-400 disabled:opacity-60"
+              disabled={savingKey || !apiKey.trim()}
+              onClick={() => void saveApiKey(apiKey.trim())}
+              className={primaryButton}
             >
-              Remove
+              {savingKey ? "Saving..." : hasKey ? "Replace key" : "Save key"}
             </button>
+            {hasKey && (
+              <button
+                type="button"
+                disabled={savingKey}
+                onClick={() => void saveApiKey("")}
+                className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-red-500/30 hover:text-red-400 disabled:opacity-60"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {keySaved && (
+            <p className={hintClass}>
+              Key saved. OpenRouter models are ready to use.
+            </p>
           )}
         </div>
-        <p className={hintClass}>
-          {keySaved
-            ? "Key saved. OpenRouter models are ready to use."
-            : "The key is stored by the local backend and is never returned to the browser after saving."}
-        </p>
       </section>
 
       <hr className="border-border-subtle" />
@@ -245,8 +265,7 @@ export function OpenRouterSettingsTab({
           <div>
             <h2 className={eyebrowText}>Model Registry</h2>
             <p className={cx(hintClass, "mt-2")}>
-              Add a route such as <code>anthropic/claude-sonnet-4.6</code>. We
-              fetch its display name and lab before adding it.
+              Add a route such as <code>anthropic/claude-sonnet-4.6</code>.
             </p>
           </div>
           <button

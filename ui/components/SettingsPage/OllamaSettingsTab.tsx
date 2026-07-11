@@ -21,12 +21,8 @@ export function OllamaSettingsTab({
 }) {
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className={cx(eyebrowText, "mb-2")}>Connection</h2>
-        <p className={hintClass}>
-          Use a local Ollama server for private, on-device models.
-        </p>
-      </div>
+      <h2 className={cx(eyebrowText, "mb-4")}>Ollama</h2>
+
       <div className="space-y-2">
         <label htmlFor="ollamaUri" className={labelClass}>
           Server URL
