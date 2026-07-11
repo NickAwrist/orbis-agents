@@ -59,7 +59,7 @@ export function SessionListItem({
           onSelectSession(session.id);
         }}
         className={cx(
-          "relative block w-full rounded-none rounded-l-md border-l-2 border-transparent bg-transparent px-2 py-2.5 pr-1 text-left transition-[color,background-color,border-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.995]",
+          "relative block w-full rounded-none border-l-2 border-transparent bg-transparent px-2 py-2.5 pr-1 text-left transition-[color,background-color,border-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.995]",
           active && "border-l-foreground/35 bg-muted/20 hover:bg-muted/35",
         )}
       >

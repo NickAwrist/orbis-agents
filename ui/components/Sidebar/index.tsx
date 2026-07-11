@@ -53,7 +53,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2">
+      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
         <div className={cx("flex gap-2", collapsed ? "flex-col" : "flex-row")}>
           <button
             type="button"
@@ -83,12 +83,6 @@ export function Sidebar({
             <EyeOff size={16} />
           </button>
         </div>
-
-        {!collapsed && (
-          <div className="px-1.5 text-[0.75rem] text-muted-foreground">
-            <span>{sessions.length} saved</span>
-          </div>
-        )}
 
         <div
           className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto border-t border-border-subtle pt-1"
