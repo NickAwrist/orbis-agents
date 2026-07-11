@@ -13,6 +13,7 @@ import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
   message: Message;
+  animateEntry: boolean;
   enterStyle: CSSProperties | undefined;
   copied: boolean;
   copyContent: () => void;
@@ -21,6 +22,7 @@ type Props = {
 
 export function AssistantMessageBubble({
   message,
+  animateEntry,
   enterStyle,
   copied,
   copyContent,
@@ -31,7 +33,10 @@ export function AssistantMessageBubble({
 
   return (
     <div
-      className="group/msg ui-animate-slide-up flex w-full min-w-0 flex-col"
+      className={cx(
+        "group/msg flex w-full min-w-0 flex-col",
+        animateEntry && "ui-animate-slide-up",
+      )}
       style={enterStyle}
     >
       <div

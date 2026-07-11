@@ -1,5 +1,5 @@
 import { Bot } from "lucide-react";
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { traceStepsForDisplay } from "../ExecutionTrace";
 import { MarkdownMessage } from "../MarkdownMessage";
@@ -27,6 +27,15 @@ export function RunArea({
     });
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
+  const hasRenderedHistoryRef = useRef(false);
+  const animateMessageEntries = hasRenderedHistoryRef.current;
+
+  useLayoutEffect(() => {
+    if (messages.length === 0 || hasRenderedHistoryRef.current) return;
+    const scrollElement = scrollRef.current;
+    if (scrollElement) scrollElement.scrollTop = scrollElement.scrollHeight;
+    hasRenderedHistoryRef.current = true;
+  }, [messages.length, scrollRef]);
 
   useLayoutEffect(() => {
     if (isAtBottom) {
@@ -60,6 +69,7 @@ export function RunArea({
               key={`${message.role}:${message.content.slice(0, 80)}:${message.steps?.length ?? 0}`}
               messageIndex={index}
               message={message}
+              animateEntry={animateMessageEntries}
               animDelayMs={Math.min(index, 10) * 32}
               onViewSteps={
                 message.steps && traceStepsForDisplay(message.steps).length > 0
@@ -86,13 +96,7 @@ export function RunArea({
 
           {streamingContent && (
             <div className="ui-animate-slide-up flex w-full min-w-0 flex-col">
-              <div
-                className="flex w-full justify-start pt-4 max-[640px]:pt-3.5"
-                aria-hidden
-              >
-                <div className="h-px w-9 max-[640px]:w-8 shrink-0 rounded-full bg-border-subtle/70" />
-              </div>
-              <div className="max-w-[min(100%,42rem)] min-w-0 pt-2">
+              <div className="max-w-[min(100%,42rem)] min-w-0 pt-4 max-[640px]:pt-3.5">
                 <MarkdownMessage className="text-foreground">
                   {streamingContent}
                 </MarkdownMessage>

@@ -1,9 +1,11 @@
 import { ArrowLeft, Save } from "lucide-react";
+import { useState } from "react";
 import { cx, primaryButton } from "../../styles";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
 import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
+import { UnsavedChangesModal } from "./UnsavedChangesModal";
 import { WebSearchTab } from "./WebSearchTab";
 import type { SettingsPageProps } from "./types";
 import type { SettingsTab } from "./types";
@@ -11,6 +13,19 @@ import { useSettingsPageState } from "./useSettingsPageState";
 
 export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false);
+
+  const handleBack = () => {
+    if (p.isDirty) {
+      setLeavePromptOpen(true);
+      return;
+    }
+    props.onBack();
+  };
+
+  const handleSaveAndLeave = async () => {
+    if (await p.handleSubmit()) props.onBack();
+  };
 
   const tabButtonClass = (t: SettingsTab) =>
     cx(
@@ -25,7 +40,7 @@ export function SettingsPage(props: SettingsPageProps) {
       <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-background px-5 py-3">
         <button
           type="button"
-          onClick={props.onBack}
+          onClick={handleBack}
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft size={15} />
@@ -151,6 +166,15 @@ export function SettingsPage(props: SettingsPageProps) {
           )}
         </div>
       </main>
+
+      {leavePromptOpen && (
+        <UnsavedChangesModal
+          saving={p.isSaving}
+          onStay={() => setLeavePromptOpen(false)}
+          onDiscard={props.onBack}
+          onSaveAndLeave={() => void handleSaveAndLeave()}
+        />
+      )}
     </div>
   );
 }
