@@ -72,15 +72,23 @@ export function migrateAgentsInlinePlaceholders(db: Database) {
   const cols = db.query("PRAGMA table_info(agents)").all() as {
     name: string;
   }[];
+  const columnNames = new Set(cols.map((column) => column.name));
   const hasAny =
-    cols.some((c) => c.name === "include_personalization") ||
-    cols.some((c) => c.name === "include_session_directory") ||
-    cols.some((c) => c.name === "include_os_info");
+    columnNames.has("include_personalization") ||
+    columnNames.has("include_session_directory") ||
+    columnNames.has("include_os_info");
   if (!hasAny) return;
+
+  const legacyFlag = (name: string) =>
+    columnNames.has(name) ? name : `0 AS ${name}`;
 
   const rows = db
     .query(
-      "SELECT id, system_prompt, include_personalization, include_session_directory, include_os_info FROM agents",
+      `SELECT id, system_prompt,
+        ${legacyFlag("include_personalization")},
+        ${legacyFlag("include_session_directory")},
+        ${legacyFlag("include_os_info")}
+      FROM agents`,
     )
     .all() as Array<{
     id: string;
@@ -111,13 +119,13 @@ export function migrateAgentsInlinePlaceholders(db: Database) {
   });
   tx();
 
-  if (cols.some((c) => c.name === "include_personalization")) {
+  if (columnNames.has("include_personalization")) {
     db.run("ALTER TABLE agents DROP COLUMN include_personalization");
   }
-  if (cols.some((c) => c.name === "include_session_directory")) {
+  if (columnNames.has("include_session_directory")) {
     db.run("ALTER TABLE agents DROP COLUMN include_session_directory");
   }
-  if (cols.some((c) => c.name === "include_os_info")) {
+  if (columnNames.has("include_os_info")) {
     db.run("ALTER TABLE agents DROP COLUMN include_os_info");
   }
 }

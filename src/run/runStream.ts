@@ -53,6 +53,7 @@ export function openRunStream(
   res.on("close", () => {
     if (res.writableFinished) return;
     clientDisconnected = true;
+    clearInterval(pingInterval);
     if (gen) {
       sse.removeClient(gen, res);
     } else {

@@ -6,6 +6,7 @@ import {
   setOllamaHost,
   setOpenRouterApiKey,
 } from "../../src/db";
+import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 const runBody = (model: string) => ({
@@ -156,6 +157,71 @@ describe("OpenRouter API integration", () => {
       expect(stream).toContain("Hello from OpenRouter.");
       expect(stream).toContain('"type":"run_done"');
       expect(getOpenRouterApiKey()).toBe("sk-or-run-test");
+    } finally {
+      await close();
+    }
+  });
+
+  test("finishes and persists a run after its app connection closes", async () => {
+    const model = "openrouter:openai/gpt-5.6-terra";
+    const { url, close } = await startTestServer();
+    try {
+      setOpenRouterApiKey("sk-or-background-run-test");
+      setOpenRouterScenario("delayed-stream");
+
+      const created = await fetch(`${url}/api/sessions`, {
+        method: "POST",
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ model }),
+      });
+      expect(created.status).toBe(201);
+      const { id: sessionId } = (await created.json()) as { id: string };
+
+      const response = await fetch(`${url}/api/runs`, {
+        method: "POST",
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          message: "Keep going in the background",
+          history: [],
+          model,
+          agentName: "general_agent",
+          sessionId,
+        }),
+      });
+      expect(response.status).toBe(200);
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
+      await reader?.read();
+      await reader?.cancel();
+
+      const deadline = Date.now() + 2_000;
+      let history: Array<{
+        role: string;
+        content: string;
+        steps?: Array<Record<string, unknown>>;
+      }> = [];
+      while (Date.now() < deadline) {
+        const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
+          headers: userHeaders(),
+        });
+        history = ((await stored.json()) as { history: typeof history })
+          .history;
+        if (history.some((message) => message.role === "assistant")) break;
+        await Bun.sleep(20);
+      }
+
+      expect(history).toEqual([
+        { role: "user", content: "Keep going in the background" },
+        {
+          role: "assistant",
+          content: "Hello after closing the app.",
+          steps: expect.any(Array),
+        },
+      ]);
     } finally {
       await close();
     }

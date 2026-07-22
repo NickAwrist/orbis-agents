@@ -3,6 +3,7 @@ export type OpenRouterScenario =
   | "reasoning"
   | "thinking-tags"
   | "tool-loop"
+  | "delayed-stream"
   | "unauthorized"
   | "rate-limit"
   | "corrupted-stream";
@@ -91,6 +92,30 @@ export async function handleOpenRouterRequest(
           );
           controller.enqueue(encoder.encode("data: {not-json}\n\n"));
           controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+  }
+  if (scenario === "delayed-stream") {
+    const encoder = new TextEncoder();
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify(chunk({ content: "Hello" }))}\n\n`,
+            ),
+          );
+          setTimeout(() => {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify(chunk({ content: " after closing the app." }, "stop"))}\n\n`,
+              ),
+            );
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          }, 75);
         },
       }),
       { headers: { "Content-Type": "text/event-stream" } },

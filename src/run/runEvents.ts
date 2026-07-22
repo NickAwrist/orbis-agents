@@ -41,7 +41,6 @@ export type ActiveGeneration = {
   abortController: AbortController;
   eventBuffer: RunEvent[];
   clients: Set<Response>;
-  orphanTimer: ReturnType<typeof setTimeout> | null;
 };
 
 export function writeSse(res: Response, payload: RunEvent): void {

@@ -275,6 +275,15 @@ export function useSessionsAndNavigation(p: Args) {
         };
         if (status.active && status.requestId) {
           p.runFlightRef.current?.reconnectToStream(id, status.requestId);
+        } else {
+          // The run may have completed between the first session read and the
+          // active-run check. Read once more after the server has confirmed
+          // there is no live job so reopening the app cannot show stale,
+          // user-message-only history.
+          const completed = await fetchSession(id);
+          if (gen !== loadGenRef.current) return;
+          if (completed?.history?.length) p.setMessages(completed.history);
+          p.modelMessagesRef.current = completed?.modelMessages ?? null;
         }
       } catch {
         /* no active generation - normal case */

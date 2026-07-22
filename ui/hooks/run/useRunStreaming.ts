@@ -119,6 +119,7 @@ export function useRunStreaming(p: Args) {
     activeRequestIdRef,
     inFlightSessionId,
     setInFlightSessionId,
+    reconnectToStream,
   } = flight;
 
   const resolveAgentTemplate = useCallback(
@@ -275,6 +276,10 @@ export function useRunStreaming(p: Args) {
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      let reconnectAfterCleanup: {
+        sessionId: string;
+        requestId: string;
+      } | null = null;
 
       try {
         let res: Response;
@@ -462,9 +467,39 @@ export function useRunStreaming(p: Args) {
         } catch (err) {
           if (controller.signal.aborted) return;
           console.error(err);
-          await failWithAssistantError(
-            err instanceof Error ? err.message : String(err),
-          );
+          if (ephemeral) {
+            await failWithAssistantError(
+              err instanceof Error ? err.message : String(err),
+            );
+          } else {
+            // Losing the SSE connection only detaches this viewer. The server
+            // owns the run and keeps it alive; reconnect when possible instead
+            // of overwriting its persisted history with a network error.
+            try {
+              const statusRes = await userScopedFetch(
+                `/api/runs/active/${encodeURIComponent(turnSessionId)}`,
+              );
+              const status = (await statusRes.json()) as {
+                active?: boolean;
+                requestId?: string;
+              };
+              if (status.active && status.requestId) {
+                reconnectAfterCleanup = {
+                  sessionId: turnSessionId,
+                  requestId: status.requestId,
+                };
+              } else {
+                const completed = await fetchSession(turnSessionId);
+                if (viewingThisTurn() && completed?.history?.length) {
+                  p.setMessages(completed.history);
+                  p.modelMessagesRef.current = completed.modelMessages ?? null;
+                }
+                await p.refreshSessions();
+              }
+            } catch (reconnectError) {
+              console.error("run stream detached", reconnectError);
+            }
+          }
         }
       } finally {
         abortControllerRef.current = null;
@@ -482,6 +517,12 @@ export function useRunStreaming(p: Args) {
         setInFlightSessionId(null);
         setRunPending(false);
       }
+      if (reconnectAfterCleanup) {
+        reconnectToStream(
+          reconnectAfterCleanup.sessionId,
+          reconnectAfterCleanup.requestId,
+        );
+      }
     },
     [
       fetchDebugData,
@@ -495,6 +536,7 @@ export function useRunStreaming(p: Args) {
       p.selectedSessionAgentRef,
       p.sessionDirectoryRef,
       p.setMessages,
+      reconnectToStream,
       renderCurrentSystemPrompt,
     ],
   );

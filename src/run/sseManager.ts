@@ -8,12 +8,13 @@ import {
 } from "./runEvents";
 
 const log = logger.child({ component: "sseManager" });
-const ORPHAN_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * Owns active-generation bookkeeping for the run endpoint: per-request
- * abort controllers, per-session generation state, SSE client sets, and
- * orphan timers that abort silent generations when every viewer disconnects.
+ * abort controllers, per-session generation state, and SSE client sets.
+ * A generation belongs to the server, not to an SSE connection: disconnecting
+ * every viewer leaves the work running so an installed app can be closed and
+ * later reconnect to it.
  */
 export class SseManager {
   private readonly activeRequests = new Map<
@@ -61,7 +62,6 @@ export class SseManager {
     const prev = this.activeBySession.get(init.sessionId);
     if (prev) {
       prev.abortController.abort();
-      this.clearOrphanTimer(prev);
       for (const c of prev.clients) {
         try {
           c.end();
@@ -78,7 +78,6 @@ export class SseManager {
       abortController: init.abortController,
       eventBuffer: [],
       clients: new Set([init.initialClient]),
-      orphanTimer: null,
     };
     this.activeBySession.set(init.sessionId, gen);
     return gen;
@@ -87,12 +86,10 @@ export class SseManager {
   /** Attach a late-joining SSE client to an existing generation. */
   attachClient(gen: ActiveGeneration, res: Response): void {
     gen.clients.add(res);
-    this.clearOrphanTimer(gen);
   }
 
   removeClient(gen: ActiveGeneration, res: Response): void {
     gen.clients.delete(res);
-    if (gen.clients.size === 0) this.startOrphanTimer(gen);
   }
 
   /** Send an event to every SSE client subscribed to a session generation. */
@@ -105,9 +102,8 @@ export class SseManager {
     writeSse(res, event);
   }
 
-  /** End the generation: close all clients, clear timers, drop bookkeeping. */
+  /** End the generation: close all clients and drop its live bookkeeping. */
   closeSessionGeneration(gen: ActiveGeneration): void {
-    this.clearOrphanTimer(gen);
     if (this.activeBySession.get(gen.sessionId) === gen) {
       this.activeBySession.delete(gen.sessionId);
     }
@@ -117,20 +113,6 @@ export class SseManager {
       } catch (err) {
         log.debug({ err }, "sse end client");
       }
-    }
-  }
-
-  private startOrphanTimer(gen: ActiveGeneration): void {
-    this.clearOrphanTimer(gen);
-    gen.orphanTimer = setTimeout(() => {
-      gen.abortController.abort();
-    }, ORPHAN_TIMEOUT_MS);
-  }
-
-  private clearOrphanTimer(gen: ActiveGeneration): void {
-    if (gen.orphanTimer) {
-      clearTimeout(gen.orphanTimer);
-      gen.orphanTimer = null;
     }
   }
 }
