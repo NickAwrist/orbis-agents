@@ -41,6 +41,9 @@ export function useRunFlight(
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
+  const reconnectToStreamRef = useRef<
+    (sessionId: string, requestId: string) => void
+  >(() => {});
   const [inFlightSessionId, setInFlightSessionId] = useState<string | null>(
     null,
   );
@@ -74,6 +77,8 @@ export function useRunFlight(
       const viewing = () => d.activeSessionIdRef.current === sessionId;
 
       void (async () => {
+        let terminalEventReceived = false;
+        let retryRequestId: string | null = null;
         try {
           const res = await userScopedFetch(
             `/api/runs/stream/${encodeURIComponent(sessionId)}`,
@@ -100,6 +105,21 @@ export function useRunFlight(
               console.error(e);
             }
             await d.refreshSessions();
+          };
+          const recoverDetachedStream = async () => {
+            const statusRes = await userScopedFetch(
+              `/api/runs/active/${encodeURIComponent(sessionId)}`,
+            );
+            if (!statusRes.ok) return;
+            const status = (await statusRes.json()) as {
+              active?: boolean;
+              requestId?: string;
+            };
+            if (status.active && status.requestId) {
+              retryRequestId = status.requestId;
+            } else {
+              await finalizeReconnect();
+            }
           };
 
           await readSseBlocks(reader, async (data) => {
@@ -145,8 +165,10 @@ export function useRunFlight(
               data.type === "run_done" ||
               data.type === "run_aborted"
             ) {
+              terminalEventReceived = true;
               await finalizeReconnect();
             } else if (data.type === "run_error") {
+              terminalEventReceived = true;
               if (viewing()) {
                 d.setStreamingStep(null);
                 d.setStreamingSteps([]);
@@ -155,9 +177,37 @@ export function useRunFlight(
               }
             }
           });
+          if (!terminalEventReceived && !controller.signal.aborted) {
+            await recoverDetachedStream();
+          }
         } catch (err) {
           if (controller.signal.aborted) return;
           console.error("reconnect stream error", err);
+          try {
+            const statusRes = await userScopedFetch(
+              `/api/runs/active/${encodeURIComponent(sessionId)}`,
+            );
+            if (statusRes.ok) {
+              const status = (await statusRes.json()) as {
+                active?: boolean;
+                requestId?: string;
+              };
+              if (status.active && status.requestId) {
+                retryRequestId = status.requestId;
+              } else {
+                const completed = await fetchSession(sessionId);
+                if (viewing()) {
+                  if (completed?.history?.length) {
+                    d.setMessages(completed.history);
+                  }
+                  d.modelMessagesRef.current = completed?.modelMessages ?? null;
+                }
+                await d.refreshSessions();
+              }
+            }
+          } catch (recoveryError) {
+            console.error("reconnect recovery error", recoveryError);
+          }
         } finally {
           abortControllerRef.current = null;
           activeRequestIdRef.current = null;
@@ -173,6 +223,15 @@ export function useRunFlight(
           turnMessagesSnapshotRef.current = null;
           setInFlightSessionId(null);
           depsRef.current.setRunPending(false);
+          if (viewing()) {
+            depsRef.current.setStreamingStep(null);
+            depsRef.current.setStreamingSteps([]);
+            depsRef.current.setStreamingContent("");
+            depsRef.current.setStreamingThinking("");
+          }
+        }
+        if (retryRequestId) {
+          reconnectToStreamRef.current(sessionId, retryRequestId);
         }
       })();
     },
@@ -183,6 +242,7 @@ export function useRunFlight(
       turnMessagesSnapshotRef,
     ],
   );
+  reconnectToStreamRef.current = reconnectToStream;
 
   useLayoutEffect(() => {
     runFlightRef.current = {

@@ -4,6 +4,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -29,6 +30,7 @@ import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
+import { reconcilePersistentRun } from "./reconcilePersistentRun";
 import { useRunFlight } from "./useRunFlight";
 import { useTurnBuffer } from "./useTurnBuffer";
 
@@ -73,6 +75,7 @@ export function useRunStreaming(p: Args) {
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
+  const resumeReconcilePendingRef = useRef(false);
 
   const {
     streamBufferRef,
@@ -83,15 +86,19 @@ export function useRunStreaming(p: Args) {
 
   p.debugOpenRef.current = p.debugOpen;
 
+  const clearStreamingUi = useCallback(() => {
+    setStreamingStep(null);
+    setStreamingSteps([]);
+    setStreamingContent("");
+    setStreamingThinking("");
+  }, []);
+
   useLayoutEffect(() => {
     p.bindStreamingReset(() => {
-      setStreamingStep(null);
-      setStreamingSteps([]);
-      setStreamingContent("");
-      setStreamingThinking("");
+      clearStreamingUi();
       resetStreamBuffers();
     });
-  }, [p.bindStreamingReset, resetStreamBuffers]);
+  }, [p.bindStreamingReset, clearStreamingUi, resetStreamBuffers]);
 
   const flight = useRunFlight(
     {
@@ -121,6 +128,91 @@ export function useRunStreaming(p: Args) {
     setInFlightSessionId,
     reconnectToStream,
   } = flight;
+
+  useEffect(() => {
+    const reconcileVisibleSession = async () => {
+      if (
+        document.visibilityState === "hidden" ||
+        resumeReconcilePendingRef.current
+      ) {
+        return;
+      }
+      const sessionId = p.activeSessionIdRef.current;
+      if (!sessionId || p.isEphemeralRef.current) return;
+
+      resumeReconcilePendingRef.current = true;
+      try {
+        await reconcilePersistentRun({
+          sessionId,
+          isCurrentSession: () => p.activeSessionIdRef.current === sessionId,
+          isLocallyPending: () => rawRunPendingRef.current,
+          fetchStatus: async () => {
+            const statusRes = await userScopedFetch(
+              `/api/runs/active/${encodeURIComponent(sessionId)}`,
+            );
+            if (!statusRes.ok) {
+              throw new Error(await readApiError(statusRes));
+            }
+            const status = (await statusRes.json()) as {
+              active?: boolean;
+              requestId?: string;
+            };
+            return {
+              active: status.active === true,
+              ...(status.requestId ? { requestId: status.requestId } : {}),
+            };
+          },
+          fetchStoredSession: () => fetchSession(sessionId),
+          onReconnect: (requestId) => reconnectToStream(sessionId, requestId),
+          onCompleted: async (completed) => {
+            if (completed?.history?.length) {
+              p.setMessages(completed.history);
+            }
+            p.modelMessagesRef.current = completed?.modelMessages ?? null;
+            clearStreamingUi();
+            await p.refreshSessions();
+
+            if (inFlightSessionIdRef.current === sessionId) {
+              // The server has already finished. End any suspended client
+              // reader so its local flight cleanup cannot remain stuck.
+              abortControllerRef.current?.abort();
+            }
+          },
+        });
+      } catch (err) {
+        console.error("failed to reconcile resumed run", err);
+      } finally {
+        resumeReconcilePendingRef.current = false;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void reconcileVisibleSession();
+      }
+    };
+    const onPageShow = () => void reconcileVisibleSession();
+    const onFocus = () => void reconcileVisibleSession();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [
+    abortControllerRef,
+    clearStreamingUi,
+    inFlightSessionIdRef,
+    p.activeSessionIdRef,
+    p.isEphemeralRef,
+    p.modelMessagesRef,
+    p.refreshSessions,
+    p.setMessages,
+    reconnectToStream,
+  ]);
 
   const resolveAgentTemplate = useCallback(
     async (name: string): Promise<string> => {
@@ -276,10 +368,10 @@ export function useRunStreaming(p: Args) {
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      let reconnectAfterCleanup: {
-        sessionId: string;
-        requestId: string;
-      } | null = null;
+      const reconnectAfterCleanup: {
+        current: { sessionId: string; requestId: string } | null;
+      } = { current: null };
+      let terminalEventReceived = false;
 
       try {
         let res: Response;
@@ -331,6 +423,31 @@ export function useRunStreaming(p: Args) {
           return;
         }
 
+        const recoverPersistentStream = async () => {
+          const statusRes = await userScopedFetch(
+            `/api/runs/active/${encodeURIComponent(turnSessionId)}`,
+          );
+          if (!statusRes.ok) throw new Error(await readApiError(statusRes));
+          const status = (await statusRes.json()) as {
+            active?: boolean;
+            requestId?: string;
+          };
+          if (status.active && status.requestId) {
+            reconnectAfterCleanup.current = {
+              sessionId: turnSessionId,
+              requestId: status.requestId,
+            };
+            return;
+          }
+
+          const completed = await fetchSession(turnSessionId);
+          if (viewingThisTurn() && completed?.history?.length) {
+            p.setMessages(completed.history);
+            p.modelMessagesRef.current = completed.modelMessages ?? null;
+          }
+          await p.refreshSessions();
+        };
+
         try {
           await readSseBlocks(reader, async (data) => {
             if (data.type === "run_started") {
@@ -379,6 +496,7 @@ export function useRunStreaming(p: Args) {
               if (Array.isArray(data.steps))
                 setStreamingSteps(data.steps as MessageStep[]);
             } else if (data.type === "run_done") {
+              terminalEventReceived = true;
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -430,6 +548,7 @@ export function useRunStreaming(p: Args) {
               if (p.debugOpenRef.current && viewingThisTurn())
                 void fetchDebugData(turnSessionId);
             } else if (data.type === "run_aborted") {
+              terminalEventReceived = true;
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -453,6 +572,7 @@ export function useRunStreaming(p: Args) {
                 await p.refreshSessions();
               }
             } else if (data.type === "run_error") {
+              terminalEventReceived = true;
               if (viewingThisTurn()) {
                 setStreamingStep(null);
                 setStreamingSteps([]);
@@ -464,6 +584,13 @@ export function useRunStreaming(p: Args) {
               await failWithAssistantError(errText);
             }
           });
+          if (
+            !terminalEventReceived &&
+            !ephemeral &&
+            !controller.signal.aborted
+          ) {
+            await recoverPersistentStream();
+          }
         } catch (err) {
           if (controller.signal.aborted) return;
           console.error(err);
@@ -476,26 +603,7 @@ export function useRunStreaming(p: Args) {
             // owns the run and keeps it alive; reconnect when possible instead
             // of overwriting its persisted history with a network error.
             try {
-              const statusRes = await userScopedFetch(
-                `/api/runs/active/${encodeURIComponent(turnSessionId)}`,
-              );
-              const status = (await statusRes.json()) as {
-                active?: boolean;
-                requestId?: string;
-              };
-              if (status.active && status.requestId) {
-                reconnectAfterCleanup = {
-                  sessionId: turnSessionId,
-                  requestId: status.requestId,
-                };
-              } else {
-                const completed = await fetchSession(turnSessionId);
-                if (viewingThisTurn() && completed?.history?.length) {
-                  p.setMessages(completed.history);
-                  p.modelMessagesRef.current = completed.modelMessages ?? null;
-                }
-                await p.refreshSessions();
-              }
+              await recoverPersistentStream();
             } catch (reconnectError) {
               console.error("run stream detached", reconnectError);
             }
@@ -516,16 +624,18 @@ export function useRunStreaming(p: Args) {
         turnMessagesSnapshotRef.current = null;
         setInFlightSessionId(null);
         setRunPending(false);
+        if (viewingThisTurn()) clearStreamingUi();
       }
-      if (reconnectAfterCleanup) {
+      if (reconnectAfterCleanup.current) {
         reconnectToStream(
-          reconnectAfterCleanup.sessionId,
-          reconnectAfterCleanup.requestId,
+          reconnectAfterCleanup.current.sessionId,
+          reconnectAfterCleanup.current.requestId,
         );
       }
     },
     [
       fetchDebugData,
+      clearStreamingUi,
       p.activeSessionIdRef,
       p.debugOpenRef,
       p.isEphemeralRef,
