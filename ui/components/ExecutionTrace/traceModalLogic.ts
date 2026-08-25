@@ -21,7 +21,7 @@ export function formatTraceResultsForCopy(steps: MessageStep[]): string {
 }
 
 /** Steps fed into the trace modal while SSE is active. */
-export function coalesceLiveTraceSteps(
+function coalesceLiveTraceSteps(
   streamingSteps: MessageStep[],
   streamingStep: MessageStep | null,
 ): MessageStep[] {

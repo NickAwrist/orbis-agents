@@ -1,5 +1,5 @@
-export const USER_ID_STORAGE_KEY = "orbis:userUuid";
-export const USER_ID_HEADER = "X-Orbis-User-ID";
+const USER_ID_STORAGE_KEY = "orbis:userUuid";
+const USER_ID_HEADER = "X-Orbis-User-ID";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

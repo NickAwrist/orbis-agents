@@ -4,41 +4,28 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import {
-  ImageMimeTypeSchema,
-  MAX_IMAGES_PER_MESSAGE,
-  MAX_IMAGE_BYTES,
-  type MessageAttachment,
-} from "../../../src/attachments/types";
-import {
-  CORE_DIRECTIVES,
-  type PromptContext,
-  renderSystemPrompt,
-} from "../../../src/prompts/render";
+import type { MessageAttachment } from "../../../src/attachments/types";
+import type { AgentData } from "../../persist/agents";
+import { patchSessionApi } from "../../persist/sessions";
+import { userScopedFetch } from "../../persist/userIdentity";
+import type { UserSettings } from "../../persist/userSettings";
 import type {
   DebugData,
   Message,
   MessageStep,
-  TraceModalSelection,
   TruncateConfirmState,
 } from "../../types";
+import { executeRunTurn } from "./executeRunTurn";
 import type { RunFlightApi } from "./runTypes";
-export type { RunFlightApi };
-import { getClientOs } from "../../lib/clientOs";
-import { readApiError } from "../../lib/readApiError";
-import { readSseBlocks } from "../../lib/readSseBlocks";
-import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
-import { uploadImageAttachment } from "../../persist/attachments";
-import { fetchSession, patchSessionApi } from "../../persist/sessions";
-import { createBrowserUuid, userScopedFetch } from "../../persist/userIdentity";
-import type { UserSettings } from "../../persist/userSettings";
-import { reconcilePersistentRun } from "./reconcilePersistentRun";
+import { createEmptyStreamBuffer } from "./streamBuffer";
+import { usePendingImages } from "./usePendingImages";
+import { useRunDebug } from "./useRunDebug";
 import { useRunFlight } from "./useRunFlight";
+import { useRunResume } from "./useRunResume";
 import { useTurnBuffer } from "./useTurnBuffer";
 
 type Args = {
@@ -55,28 +42,18 @@ type Args = {
   debugOpenRef: MutableRefObject<boolean>;
   debugOpen: boolean;
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
-  debugData: DebugData | null;
   setDebugData: Dispatch<SetStateAction<DebugData | null>>;
-  stepsModalData: TraceModalSelection;
-  setStepsModalData: Dispatch<SetStateAction<TraceModalSelection>>;
   selectedModel: string;
   modelSendReady: boolean;
   refreshSessions: () => Promise<void>;
   fetchOllamaHealth: () => Promise<void>;
   bindStreamingReset: (fn: () => void) => void;
-  editingUserIndex: number | null;
   setEditingUserIndex: Dispatch<SetStateAction<number | null>>;
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
   runFlightRef: MutableRefObject<RunFlightApi | null>;
   supportsImageInput: boolean;
   isEphemeral: boolean;
-};
-
-export type PendingImage = {
-  id: string;
-  file: File;
-  previewUrl: string;
 };
 
 export function useRunStreaming(p: Args) {
@@ -86,16 +63,10 @@ export function useRunStreaming(p: Args) {
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingThinking, setStreamingThinking] = useState("");
   const [runPending, setRunPending] = useState(false);
-  const [imageUploadPending, setImageUploadPending] = useState(false);
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const pendingImagesRef = useRef<PendingImage[]>([]);
 
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
-  const resumeReconcilePendingRef = useRef(false);
-
   const {
     streamBufferRef,
     turnMessagesSnapshotRef,
@@ -104,83 +75,6 @@ export function useRunStreaming(p: Args) {
   } = useTurnBuffer();
 
   p.debugOpenRef.current = p.debugOpen;
-  pendingImagesRef.current = pendingImages;
-
-  const clearPendingImages = useCallback(() => {
-    for (const image of pendingImagesRef.current) {
-      URL.revokeObjectURL(image.previewUrl);
-    }
-    pendingImagesRef.current = [];
-    setPendingImages([]);
-    setImageError(null);
-  }, []);
-
-  useEffect(() => clearPendingImages, [clearPendingImages]);
-
-  useEffect(() => {
-    clearPendingImages();
-  }, [p.activeSessionId, clearPendingImages]);
-
-  useEffect(() => {
-    if (pendingImages.length === 0) return;
-    if (!p.supportsImageInput) {
-      setImageError("The selected model does not accept images.");
-    } else if (p.isEphemeral) {
-      setImageError("Images are not available in temporary sessions.");
-    }
-  }, [p.isEphemeral, p.supportsImageInput, pendingImages.length]);
-
-  const addPendingImages = useCallback(
-    (files: File[]) => {
-      if (!p.supportsImageInput) {
-        setImageError("The selected model does not accept images.");
-        return;
-      }
-      if (p.isEphemeral) {
-        setImageError("Images are not available in temporary sessions.");
-        return;
-      }
-      const accepted: PendingImage[] = [];
-      for (const file of files) {
-        if (!ImageMimeTypeSchema.safeParse(file.type).success) {
-          setImageError("Use a PNG, JPEG, WebP, or GIF image.");
-          continue;
-        }
-        if (file.size > MAX_IMAGE_BYTES) {
-          setImageError("Each image must be 8 MB or smaller.");
-          continue;
-        }
-        if (
-          pendingImagesRef.current.length + accepted.length >=
-          MAX_IMAGES_PER_MESSAGE
-        ) {
-          setImageError(
-            `You can attach up to ${MAX_IMAGES_PER_MESSAGE} images.`,
-          );
-          break;
-        }
-        accepted.push({
-          id: createBrowserUuid(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-        });
-      }
-      if (accepted.length > 0) {
-        setPendingImages((current) => [...current, ...accepted]);
-        if (accepted.length === files.length) setImageError(null);
-      }
-    },
-    [p.isEphemeral, p.supportsImageInput],
-  );
-
-  const removePendingImage = useCallback((id: string) => {
-    setPendingImages((current) => {
-      const removed = current.find((image) => image.id === id);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
-      return current.filter((image) => image.id !== id);
-    });
-    setImageError(null);
-  }, []);
 
   const clearStreamingUi = useCallback(() => {
     setStreamingStep(null);
@@ -196,7 +90,13 @@ export function useRunStreaming(p: Args) {
     });
   }, [p.bindStreamingReset, clearStreamingUi, resetStreamBuffers]);
 
-  const flight = useRunFlight(
+  const {
+    abortControllerRef,
+    activeRequestIdRef,
+    inFlightSessionId,
+    setInFlightSessionId,
+    reconnectToStream,
+  } = useRunFlight(
     {
       activeSessionIdRef: p.activeSessionIdRef,
       modelMessagesRef: p.modelMessagesRef,
@@ -217,564 +117,90 @@ export function useRunStreaming(p: Args) {
     turnMessagesSnapshotRef,
   );
 
-  const {
+  useRunResume({
     abortControllerRef,
-    activeRequestIdRef,
-    inFlightSessionId,
-    setInFlightSessionId,
-    reconnectToStream,
-  } = flight;
-
-  useEffect(() => {
-    const reconcileVisibleSession = async () => {
-      if (
-        document.visibilityState === "hidden" ||
-        resumeReconcilePendingRef.current
-      ) {
-        return;
-      }
-      const sessionId = p.activeSessionIdRef.current;
-      if (!sessionId || p.isEphemeralRef.current) return;
-
-      resumeReconcilePendingRef.current = true;
-      try {
-        await reconcilePersistentRun({
-          sessionId,
-          isCurrentSession: () => p.activeSessionIdRef.current === sessionId,
-          isLocallyPending: () => rawRunPendingRef.current,
-          fetchStatus: async () => {
-            const statusRes = await userScopedFetch(
-              `/api/runs/active/${encodeURIComponent(sessionId)}`,
-            );
-            if (!statusRes.ok) {
-              throw new Error(await readApiError(statusRes));
-            }
-            const status = (await statusRes.json()) as {
-              active?: boolean;
-              requestId?: string;
-            };
-            return {
-              active: status.active === true,
-              ...(status.requestId ? { requestId: status.requestId } : {}),
-            };
-          },
-          fetchStoredSession: () => fetchSession(sessionId),
-          onReconnect: (requestId) => reconnectToStream(sessionId, requestId),
-          onCompleted: async (completed) => {
-            if (completed?.history?.length) {
-              p.setMessages(completed.history);
-            }
-            p.modelMessagesRef.current = completed?.modelMessages ?? null;
-            clearStreamingUi();
-            await p.refreshSessions();
-
-            if (inFlightSessionIdRef.current === sessionId) {
-              // The server has already finished. End any suspended client
-              // reader so its local flight cleanup cannot remain stuck.
-              abortControllerRef.current?.abort();
-            }
-          },
-        });
-      } catch (err) {
-        console.error("failed to reconcile resumed run", err);
-      } finally {
-        resumeReconcilePendingRef.current = false;
-      }
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void reconcileVisibleSession();
-      }
-    };
-    const onPageShow = () => void reconcileVisibleSession();
-    const onFocus = () => void reconcileVisibleSession();
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [
-    abortControllerRef,
-    clearStreamingUi,
+    activeSessionIdRef: p.activeSessionIdRef,
+    isEphemeralRef: p.isEphemeralRef,
+    modelMessagesRef: p.modelMessagesRef,
+    rawRunPendingRef,
     inFlightSessionIdRef,
-    p.activeSessionIdRef,
-    p.isEphemeralRef,
-    p.modelMessagesRef,
-    p.refreshSessions,
-    p.setMessages,
     reconnectToStream,
-  ]);
+    setMessages: p.setMessages,
+    clearStreamingUi,
+    refreshSessions: p.refreshSessions,
+  });
 
-  const resolveAgentTemplate = useCallback(
-    async (name: string): Promise<string> => {
-      const cached = p.agentMapRef.current.get(name);
-      if (cached) return cached.system_prompt;
-      try {
-        const list = await fetchAgents();
-        p.agentMapRef.current = new Map(list.map((a) => [a.name, a]));
-        const hit = p.agentMapRef.current.get(name);
-        if (hit) return hit.system_prompt;
-        const direct = list.find((a) => a.name === name);
-        if (direct) return direct.system_prompt;
-      } catch {
-        /* fall through */
-      }
-      try {
-        const list = await fetchAgents();
-        const byName = list.find((a) => a.name === name);
-        if (byName) return byName.system_prompt;
-        const first = list[0];
-        if (first) return (await fetchAgent(first.id)).system_prompt;
-      } catch {
-        /* ignore */
-      }
-      return "";
-    },
-    [p.agentMapRef],
-  );
+  const fetchDebugData = useRunDebug({
+    agentMapRef: p.agentMapRef,
+    selectedSessionAgentRef: p.selectedSessionAgentRef,
+    sessionDirectoryRef: p.sessionDirectoryRef,
+    userSettingsRef: p.userSettingsRef,
+    isEphemeralRef: p.isEphemeralRef,
+    setDebugData: p.setDebugData,
+  });
 
-  const buildPromptContext = useCallback((): PromptContext => {
-    const u = p.userSettingsRef.current;
-    return {
-      personalization: {
-        name: u.name,
-        location: u.location,
-        preferredFormats: u.preferredFormats,
+  const images = usePendingImages({
+    activeSessionId: p.activeSessionId,
+    supportsImageInput: p.supportsImageInput,
+    isEphemeral: p.isEphemeral,
+  });
+
+  const runTurn = (
+    sessionId: string,
+    priorMessages: Message[],
+    message: string,
+    attachments: MessageAttachment[],
+    options: { rebuildModelMessages: boolean },
+  ) =>
+    executeRunTurn(
+      {
+        activeSessionIdRef: p.activeSessionIdRef,
+        isEphemeralRef: p.isEphemeralRef,
+        selectedSessionAgentRef: p.selectedSessionAgentRef,
+        sessionDirectoryRef: p.sessionDirectoryRef,
+        userSettingsRef: p.userSettingsRef,
+        modelMessagesRef: p.modelMessagesRef,
+        debugOpenRef: p.debugOpenRef,
+        modelSendReady: p.modelSendReady,
+        selectedModel: p.selectedModel,
+        setMessages: p.setMessages,
+        refreshSessions: p.refreshSessions,
       },
-      sessionDirectory: p.sessionDirectoryRef.current.trim() || undefined,
-      os: getClientOs(),
-    };
-  }, [p.sessionDirectoryRef, p.userSettingsRef]);
-
-  const renderCurrentSystemPrompt = useCallback(async (): Promise<string> => {
-    const template = await resolveAgentTemplate(
-      p.selectedSessionAgentRef.current,
+      {
+        abortControllerRef,
+        activeRequestIdRef,
+        inFlightSessionIdRef,
+        inFlightEphemeralRef,
+        rawRunPendingRef,
+        turnRootAgentNameRef,
+        streamBufferRef,
+        turnMessagesSnapshotRef,
+        setInFlightSessionId,
+        setRunPending,
+        setStreamingStep,
+        setStreamingSteps,
+        setStreamingContent,
+        setStreamingThinking,
+        clearStreamingUi,
+        reconnectToStream,
+        fetchDebugData,
+      },
+      sessionId,
+      priorMessages,
+      message,
+      attachments,
+      options,
     );
-    return renderSystemPrompt(template, buildPromptContext());
-  }, [buildPromptContext, p.selectedSessionAgentRef, resolveAgentTemplate]);
 
-  const fetchDebugData = useCallback(
-    async (id: string) => {
-      try {
-        const rendered = await renderCurrentSystemPrompt();
-        const systemPrompt = rendered
-          ? `${rendered}\n\n${CORE_DIRECTIVES}`
-          : CORE_DIRECTIVES;
-        const stored = p.isEphemeralRef.current ? null : await fetchSession(id);
-        p.setDebugData({
-          systemPrompt,
-          history: stored?.history ?? [],
-          customTitle: stored?.customTitle ?? null,
-          modelMessages: stored?.modelMessages,
-        });
-      } catch (e) {
-        console.error("Failed to load debug data", e);
-      }
-    },
-    [p.isEphemeralRef, p.setDebugData, renderCurrentSystemPrompt],
-  );
-
-  const runTurn = useCallback(
-    async (
-      turnSessionId: string,
-      priorMessages: Message[],
-      messageText: string,
-      attachments: MessageAttachment[],
-      options: { rebuildModelMessages: boolean },
-    ) => {
-      if (!messageText.trim() || !turnSessionId) return;
-      if (!p.modelSendReady) return;
-
-      const msg = messageText.trim();
-      const ephemeral = p.isEphemeralRef.current;
-      inFlightSessionIdRef.current = turnSessionId;
-      inFlightEphemeralRef.current = ephemeral;
-      turnRootAgentNameRef.current = p.selectedSessionAgentRef.current;
-      streamBufferRef.current = {
-        content: "",
-        thinking: "",
-        step: null,
-        steps: [],
-      };
-      turnMessagesSnapshotRef.current = [
-        ...priorMessages,
-        {
-          role: "user" as const,
-          content: msg,
-          ...(attachments.length > 0 ? { attachments } : {}),
-        },
-      ];
-      rawRunPendingRef.current = true;
-      setInFlightSessionId(turnSessionId);
-      setRunPending(true);
-      setStreamingStep(null);
-      setStreamingSteps([]);
-      setStreamingContent("");
-      setStreamingThinking("");
-
-      const viewingThisTurn = () =>
-        p.activeSessionIdRef.current === turnSessionId;
-
-      const nextHistory: Message[] = [
-        ...priorMessages,
-        {
-          role: "user" as const,
-          content: msg,
-          ...(attachments.length > 0 ? { attachments } : {}),
-        },
-      ];
-      if (viewingThisTurn()) {
-        p.setMessages(nextHistory);
-      }
-
-      const failWithAssistantError = async (errText: string) => {
-        const failedHistory: Message[] = [
-          ...priorMessages,
-          {
-            role: "user",
-            content: msg,
-            ...(attachments.length > 0 ? { attachments } : {}),
-          },
-          { role: "assistant", content: `Error: ${errText}` },
-        ];
-        if (viewingThisTurn()) {
-          p.setMessages(failedHistory);
-        }
-        if (!ephemeral) {
-          let mm = options.rebuildModelMessages
-            ? null
-            : p.modelMessagesRef.current;
-          if (!viewingThisTurn()) {
-            try {
-              const cur = await fetchSession(turnSessionId);
-              mm = options.rebuildModelMessages
-                ? null
-                : (cur?.modelMessages ?? null);
-            } catch {
-              mm = options.rebuildModelMessages ? null : null;
-            }
-          }
-          try {
-            await patchSessionApi(turnSessionId, {
-              history: failedHistory,
-              modelMessages: mm,
-            });
-          } catch (e) {
-            console.error(e);
-          }
-          await p.refreshSessions();
-        }
-      };
-
-      const modelMessagesPayload = options.rebuildModelMessages
-        ? null
-        : p.modelMessagesRef.current;
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-      const reconnectAfterCleanup: {
-        current: { sessionId: string; requestId: string } | null;
-      } = { current: null };
-      let terminalEventReceived = false;
-
-      try {
-        let res: Response;
-        try {
-          const u = p.userSettingsRef.current;
-          const metadata: Record<string, string> = {};
-          if (u.name?.trim()) metadata.name = u.name.trim();
-          if (u.location?.trim()) metadata.location = u.location.trim();
-          if (u.preferredFormats?.trim())
-            metadata.preferredFormats = u.preferredFormats.trim();
-          const runBody: Record<string, unknown> = {
-            message: msg,
-            history: priorMessages,
-            model: p.selectedModel,
-            modelMessages: modelMessagesPayload,
-            agentName: p.selectedSessionAgentRef.current,
-            ...(attachments.length > 0
-              ? {
-                  attachmentIds: attachments.map((attachment) => attachment.id),
-                }
-              : {}),
-            ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-          };
-          if (ephemeral) {
-            runBody.ephemeral = true;
-          } else {
-            runBody.sessionId = turnSessionId;
-          }
-          runBody.sessionDirectory =
-            p.sessionDirectoryRef.current.trim() || undefined;
-          res = await userScopedFetch("/api/runs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(runBody),
-            signal: controller.signal,
-          });
-        } catch (err) {
-          if (controller.signal.aborted) return;
-          console.error(err);
-          await failWithAssistantError(
-            err instanceof Error ? err.message : "Network error",
-          );
-          return;
-        }
-
-        if (!res.ok) {
-          await failWithAssistantError(await readApiError(res));
-          return;
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) {
-          await failWithAssistantError("No response body");
-          return;
-        }
-
-        const recoverPersistentStream = async () => {
-          const statusRes = await userScopedFetch(
-            `/api/runs/active/${encodeURIComponent(turnSessionId)}`,
-          );
-          if (!statusRes.ok) throw new Error(await readApiError(statusRes));
-          const status = (await statusRes.json()) as {
-            active?: boolean;
-            requestId?: string;
-          };
-          if (status.active && status.requestId) {
-            reconnectAfterCleanup.current = {
-              sessionId: turnSessionId,
-              requestId: status.requestId,
-            };
-            return;
-          }
-
-          const completed = await fetchSession(turnSessionId);
-          if (viewingThisTurn() && completed?.history?.length) {
-            p.setMessages(completed.history);
-            p.modelMessagesRef.current = completed.modelMessages ?? null;
-          }
-          await p.refreshSessions();
-        };
-
-        try {
-          await readSseBlocks(reader, async (data) => {
-            if (data.type === "run_started") {
-              if (typeof data.requestId === "string") {
-                activeRequestIdRef.current = data.requestId;
-              }
-            } else if (data.type === "run_delta") {
-              const cd =
-                typeof data.contentDelta === "string" ? data.contentDelta : "";
-              const td =
-                typeof data.thinkingDelta === "string"
-                  ? data.thinkingDelta
-                  : "";
-              const agent =
-                typeof data.agentName === "string" ? data.agentName : "";
-              const buf = streamBufferRef.current;
-              if (td) buf.thinking += td;
-              if (cd && agent === turnRootAgentNameRef.current) {
-                buf.content += cd;
-              }
-              if (!viewingThisTurn()) return;
-              if (cd && agent === turnRootAgentNameRef.current) {
-                setStreamingContent((prev) => prev + cd);
-              }
-              if (td) setStreamingThinking((prev) => prev + td);
-            } else if (data.type === "run_step") {
-              const step = data.step as MessageStep;
-              const buf = streamBufferRef.current;
-              if (step.status === "running") {
-                buf.thinking = "";
-                if (step.kind !== "complete") {
-                  buf.content = "";
-                }
-              }
-              buf.step = step;
-              if (Array.isArray(data.steps))
-                buf.steps = data.steps as MessageStep[];
-              if (!viewingThisTurn()) return;
-              if (step.status === "running") {
-                setStreamingThinking("");
-                if (step.kind !== "complete") {
-                  setStreamingContent("");
-                }
-              }
-              setStreamingStep(step);
-              if (Array.isArray(data.steps))
-                setStreamingSteps(data.steps as MessageStep[]);
-            } else if (data.type === "run_done") {
-              terminalEventReceived = true;
-              if (viewingThisTurn()) {
-                setStreamingStep(null);
-                setStreamingSteps([]);
-                setStreamingContent("");
-                setStreamingThinking("");
-              }
-              if (ephemeral) {
-                const assistantContent =
-                  typeof data.result === "string" ? data.result : "";
-                const steps = (
-                  Array.isArray(data.steps) ? data.steps : []
-                ) as MessageStep[];
-                if (viewingThisTurn()) {
-                  p.setMessages([
-                    ...priorMessages,
-                    { role: "user", content: msg },
-                    { role: "assistant", content: assistantContent, steps },
-                  ]);
-                  if (Array.isArray(data.modelMessages)) {
-                    p.modelMessagesRef.current = data.modelMessages as Array<
-                      Record<string, unknown>
-                    >;
-                  }
-                }
-              } else {
-                try {
-                  const s = await fetchSession(turnSessionId);
-                  if (viewingThisTurn()) {
-                    if (s?.history?.length) p.setMessages(s.history);
-                    p.modelMessagesRef.current = s?.modelMessages ?? null;
-                  }
-                } catch (e) {
-                  console.error(e);
-                  const assistantContent =
-                    typeof data.result === "string" ? data.result : "";
-                  const steps = (
-                    Array.isArray(data.steps) ? data.steps : []
-                  ) as MessageStep[];
-                  if (viewingThisTurn()) {
-                    p.setMessages([
-                      ...priorMessages,
-                      { role: "user", content: msg },
-                      { role: "assistant", content: assistantContent, steps },
-                    ]);
-                  }
-                }
-                await p.refreshSessions();
-              }
-              if (p.debugOpenRef.current && viewingThisTurn())
-                void fetchDebugData(turnSessionId);
-            } else if (data.type === "run_aborted") {
-              terminalEventReceived = true;
-              if (viewingThisTurn()) {
-                setStreamingStep(null);
-                setStreamingSteps([]);
-                setStreamingContent("");
-                setStreamingThinking("");
-              }
-              const hist = Array.isArray(data.history)
-                ? (data.history as Message[])
-                : [];
-              if (hist.length && viewingThisTurn()) p.setMessages(hist);
-              if (!ephemeral) {
-                try {
-                  const s = await fetchSession(turnSessionId);
-                  if (viewingThisTurn()) {
-                    if (s?.history?.length) p.setMessages(s.history);
-                    p.modelMessagesRef.current = s?.modelMessages ?? null;
-                  }
-                } catch (e) {
-                  console.error(e);
-                }
-                await p.refreshSessions();
-              }
-            } else if (data.type === "run_error") {
-              terminalEventReceived = true;
-              if (viewingThisTurn()) {
-                setStreamingStep(null);
-                setStreamingSteps([]);
-                setStreamingContent("");
-                setStreamingThinking("");
-              }
-              const errText =
-                typeof data.error === "string" ? data.error : "Unknown error";
-              await failWithAssistantError(errText);
-            }
-          });
-          if (
-            !terminalEventReceived &&
-            !ephemeral &&
-            !controller.signal.aborted
-          ) {
-            await recoverPersistentStream();
-          }
-        } catch (err) {
-          if (controller.signal.aborted) return;
-          console.error(err);
-          if (ephemeral) {
-            await failWithAssistantError(
-              err instanceof Error ? err.message : String(err),
-            );
-          } else {
-            // Losing the SSE connection only detaches this viewer. The server
-            // owns the run and keeps it alive; reconnect when possible instead
-            // of overwriting its persisted history with a network error.
-            try {
-              await recoverPersistentStream();
-            } catch (reconnectError) {
-              console.error("run stream detached", reconnectError);
-            }
-          }
-        }
-      } finally {
-        abortControllerRef.current = null;
-        activeRequestIdRef.current = null;
-        inFlightSessionIdRef.current = null;
-        inFlightEphemeralRef.current = false;
-        rawRunPendingRef.current = false;
-        streamBufferRef.current = {
-          content: "",
-          thinking: "",
-          step: null,
-          steps: [],
-        };
-        turnMessagesSnapshotRef.current = null;
-        setInFlightSessionId(null);
-        setRunPending(false);
-        if (viewingThisTurn()) clearStreamingUi();
-      }
-      if (reconnectAfterCleanup.current) {
-        reconnectToStream(
-          reconnectAfterCleanup.current.sessionId,
-          reconnectAfterCleanup.current.requestId,
-        );
-      }
-    },
-    [
-      fetchDebugData,
-      clearStreamingUi,
-      p.activeSessionIdRef,
-      p.debugOpenRef,
-      p.isEphemeralRef,
-      p.modelMessagesRef,
-      p.modelSendReady,
-      p.refreshSessions,
-      p.selectedModel,
-      p.selectedSessionAgentRef,
-      p.sessionDirectoryRef,
-      p.setMessages,
-      reconnectToStream,
-      renderCurrentSystemPrompt,
-    ],
-  );
-
-  const stopGeneration = useCallback(() => {
-    const requestId = activeRequestIdRef.current;
+  const stopGeneration = () => {
     const controller = abortControllerRef.current;
     if (!controller) return;
 
-    const turnSid = inFlightSessionIdRef.current;
-    const turnEphemeral = inFlightEphemeralRef.current;
-
+    const requestId = activeRequestIdRef.current;
+    const sessionId = inFlightSessionIdRef.current;
+    const ephemeral = inFlightEphemeralRef.current;
     if (requestId) {
-      userScopedFetch("/api/runs/abort", {
+      void userScopedFetch("/api/runs/abort", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),
@@ -784,134 +210,87 @@ export function useRunStreaming(p: Args) {
     controller.abort();
     abortControllerRef.current = null;
     activeRequestIdRef.current = null;
-
-    setStreamingStep(null);
-    setStreamingSteps([]);
-    setStreamingContent("");
-    setStreamingThinking("");
-    setRunPending(false);
-    setInFlightSessionId(null);
     inFlightSessionIdRef.current = null;
     inFlightEphemeralRef.current = false;
     rawRunPendingRef.current = false;
-    streamBufferRef.current = {
-      content: "",
-      thinking: "",
-      step: null,
-      steps: [],
-    };
+    streamBufferRef.current = createEmptyStreamBuffer();
     turnMessagesSnapshotRef.current = null;
+    setInFlightSessionId(null);
+    setRunPending(false);
+    clearStreamingUi();
 
-    p.setMessages((prev) => {
-      if (!turnSid || p.activeSessionIdRef.current !== turnSid) return prev;
+    p.setMessages((current) => {
+      if (!sessionId || p.activeSessionIdRef.current !== sessionId) {
+        return current;
+      }
       const halted: Message[] = [
-        ...prev,
-        { role: "assistant" as const, content: "*Response halted by user.*" },
+        ...current,
+        { role: "assistant", content: "*Response halted by user.*" },
       ];
-      if (!turnEphemeral) {
-        void patchSessionApi(turnSid, { history: halted }).catch((e) =>
-          console.error(e),
+      if (!ephemeral) {
+        void patchSessionApi(sessionId, { history: halted }).catch((error) =>
+          console.error(error),
         );
       }
       return halted;
     });
-  }, [p.activeSessionIdRef, p.setMessages]);
+  };
 
-  const sendMessage = useCallback(
-    async (e?: FormEvent) => {
-      if (e) e.preventDefault();
-      const sid = p.activeSessionId;
-      if (!input.trim() || !sid) return;
-      const msg = input.trim();
-      if (!p.modelSendReady) return;
-      if (
-        pendingImages.length > 0 &&
-        (!p.supportsImageInput || p.isEphemeral)
-      ) {
-        setImageError(
-          !p.supportsImageInput
-            ? "The selected model does not accept images."
-            : "Images are not available in temporary sessions.",
-        );
-        return;
-      }
-      setImageUploadPending(true);
-      let attachments: MessageAttachment[] = [];
-      try {
-        attachments = await Promise.all(
-          pendingImages.map((image) => uploadImageAttachment(sid, image.file)),
-        );
-      } catch (error) {
-        setImageError(
-          error instanceof Error ? error.message : "Could not upload image.",
-        );
-        setImageUploadPending(false);
-        return;
-      }
-      setImageUploadPending(false);
-      setInput("");
-      clearPendingImages();
-      await runTurn(sid, p.messages, msg, attachments, {
-        rebuildModelMessages: false,
-      });
-    },
-    [
-      clearPendingImages,
-      input,
-      p.activeSessionId,
-      p.messages,
-      p.modelSendReady,
-      p.isEphemeral,
-      p.supportsImageInput,
-      pendingImages,
-      runTurn,
-    ],
-  );
+  const sendMessage = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const sessionId = p.activeSessionId;
+    const message = input.trim();
+    if (!message || !sessionId || !p.modelSendReady) return;
+    if (images.pendingImages.length > 0 && !images.canAttachImages) {
+      images.setImageError(
+        !p.supportsImageInput
+          ? "The selected model does not accept images."
+          : "Images are not available in temporary sessions.",
+      );
+      return;
+    }
 
-  const confirmTruncateAndRetry = useCallback(async () => {
-    const tc = p.truncateConfirm;
+    const attachments = await images.uploadPendingImages(sessionId);
+    if (!attachments) return;
+    setInput("");
+    images.clearPendingImages();
+    await runTurn(sessionId, p.messages, message, attachments, {
+      rebuildModelMessages: false,
+    });
+  };
+
+  const confirmTruncateAndRetry = async () => {
+    const confirmation = p.truncateConfirm;
     p.setTruncateConfirm(null);
     p.setEditingUserIndex(null);
-    const sid = p.activeSessionId;
-    if (!tc || !sid) return;
-    const row = p.messages[tc.userIndex];
+    const sessionId = p.activeSessionId;
+    if (!confirmation || !sessionId) return;
+    const row = p.messages[confirmation.userIndex];
     if (!row || row.role !== "user") return;
-    const text = tc.kind === "edit" ? tc.text : row.content;
-    if (!text.trim()) return;
+    const message =
+      confirmation.kind === "edit" ? confirmation.text : row.content;
+    if (!message.trim()) return;
     await runTurn(
-      sid,
-      p.messages.slice(0, tc.userIndex),
-      text,
+      sessionId,
+      p.messages.slice(0, confirmation.userIndex),
+      message,
       row.attachments ?? [],
       { rebuildModelMessages: true },
     );
-  }, [
-    p.activeSessionId,
-    p.messages,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
-    p.truncateConfirm,
-    runTurn,
-  ]);
+  };
 
-  const toggleDebug = useCallback(() => {
+  const toggleDebug = () => {
     if (!p.debugOpen && p.activeSessionId) {
       void p.fetchOllamaHealth();
       void fetchDebugData(p.activeSessionId);
     }
-    p.setDebugOpen((v) => !v);
-  }, [
-    fetchDebugData,
-    p.activeSessionId,
-    p.debugOpen,
-    p.fetchOllamaHealth,
-    p.setDebugOpen,
-  ]);
+    p.setDebugOpen((open) => !open);
+  };
 
   const sessionRunBusy =
-    imageUploadPending ||
+    images.uploadPending ||
     ((runPending || streamingStep !== null || streamingSteps.length > 0) &&
-      inFlightSessionId != null &&
+      inFlightSessionId !== null &&
       inFlightSessionId === p.activeSessionId);
 
   return {
@@ -921,35 +300,17 @@ export function useRunStreaming(p: Args) {
     streamingSteps,
     streamingContent,
     streamingThinking,
-    setDebugOpen: p.setDebugOpen,
-    setDebugData: p.setDebugData,
-    setStepsModalData: p.setStepsModalData,
-    stepsModalData: p.stepsModalData,
-    debugOpen: p.debugOpen,
-    debugData: p.debugData,
-    editingUserIndex: p.editingUserIndex,
-    setEditingUserIndex: p.setEditingUserIndex,
-    truncateConfirm: p.truncateConfirm,
-    setTruncateConfirm: p.setTruncateConfirm,
     runPending: sessionRunBusy,
-    runTurn,
     stopGeneration,
     sendMessage,
     confirmTruncateAndRetry,
     toggleDebug,
-    fetchDebugData,
-    headerRunBusy: sessionRunBusy,
-    pendingImages,
-    imageError,
-    addPendingImages,
-    removePendingImage,
-    canAttachImages: p.supportsImageInput && !p.isEphemeral,
-    attachmentsSendReady:
-      pendingImages.length === 0 || (p.supportsImageInput && !p.isEphemeral),
-    attachImageDisabledReason: !p.supportsImageInput
-      ? "The selected model does not accept images"
-      : p.isEphemeral
-        ? "Images are not available in temporary sessions"
-        : undefined,
+    pendingImages: images.pendingImages,
+    imageError: images.imageError,
+    addPendingImages: images.addPendingImages,
+    removePendingImage: images.removePendingImage,
+    canAttachImages: images.canAttachImages,
+    attachmentsSendReady: images.attachmentsSendReady,
+    attachImageDisabledReason: images.attachImageDisabledReason,
   };
 }

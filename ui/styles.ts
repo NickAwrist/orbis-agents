@@ -11,9 +11,6 @@ export const primaryButton =
 export const secondaryButton =
   "inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-transparent px-3 py-2 text-[0.8125rem] text-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted active:scale-[0.99] active:bg-muted/80";
 
-export const secondaryButtonSmall =
-  "inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[5px] text-[0.75rem] text-muted-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted active:scale-[0.99] active:bg-muted/80";
-
 export const iconButton =
   "inline-flex size-9 items-center justify-center rounded-lg border border-border-subtle bg-transparent text-muted-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted hover:text-foreground active:scale-[0.96] active:bg-muted/70";
 

@@ -31,7 +31,7 @@ export function loadUserSettings(): UserSettings {
   }
 }
 
-export function saveUserSettings(settings: UserSettings): void {
+function saveUserSettings(settings: UserSettings): void {
   try {
     const toSave = {
       name: settings.name || "",

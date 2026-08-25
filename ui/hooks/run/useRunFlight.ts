@@ -12,7 +12,7 @@ import { fetchSession } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { Message, MessageStep } from "../../types";
 import type { RunFlightApi } from "./runTypes";
-import type { StreamBuffer } from "./useTurnBuffer";
+import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 
 type FlightDeps = {
   activeSessionIdRef: MutableRefObject<string | null>;
@@ -59,12 +59,7 @@ export function useRunFlight(
       inFlightSessionIdRef.current = sessionId;
       inFlightEphemeralRef.current = false;
       rawRunPendingRef.current = true;
-      d.streamBufferRef.current = {
-        content: "",
-        thinking: "",
-        step: null,
-        steps: [],
-      };
+      d.streamBufferRef.current = createEmptyStreamBuffer();
 
       setInFlightSessionId(sessionId);
       d.setRunPending(true);
@@ -214,12 +209,7 @@ export function useRunFlight(
           inFlightSessionIdRef.current = null;
           inFlightEphemeralRef.current = false;
           rawRunPendingRef.current = false;
-          depsRef.current.streamBufferRef.current = {
-            content: "",
-            thinking: "",
-            step: null,
-            steps: [],
-          };
+          depsRef.current.streamBufferRef.current = createEmptyStreamBuffer();
           turnMessagesSnapshotRef.current = null;
           setInFlightSessionId(null);
           depsRef.current.setRunPending(false);

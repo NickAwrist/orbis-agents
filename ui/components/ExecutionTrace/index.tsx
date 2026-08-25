@@ -2,7 +2,6 @@ import type { MessageStep } from "../../types";
 import { TraceStepBody } from "./TraceNodes";
 import { traceStepsForDisplay } from "./normalizeTrace";
 import {
-  coalesceLiveTraceSteps,
   formatTraceResultsForCopy,
   shouldShowStepsModal,
   traceStepsForModal,
@@ -11,7 +10,6 @@ import {
 export {
   traceStepsForDisplay,
   formatTraceResultsForCopy,
-  coalesceLiveTraceSteps,
   traceStepsForModal,
   shouldShowStepsModal,
 };

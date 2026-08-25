@@ -23,11 +23,6 @@ import {
   summarizeTraceMetrics,
 } from "./ExecutionTrace/traceMetrics";
 
-export {
-  traceStepsForDisplay,
-  formatTraceResultsForCopy,
-} from "./ExecutionTrace";
-
 export function StepsModal({
   steps,
   streamingThinking,

@@ -45,7 +45,7 @@ export default function App() {
     setSidebarOpen: app.setSidebarOpen,
     setSidebarCollapsed: app.setSidebarCollapsed,
     goToHome: app.goToHome,
-    headerRunBusy: app.headerRunBusy,
+    headerRunBusy: app.runPending,
   });
 
   return (
@@ -161,7 +161,7 @@ export default function App() {
                   runAgents={app.runAgents}
                   selectedSessionAgent={app.selectedSessionAgent}
                   onSessionAgentChange={app.handleSessionAgentChange}
-                  headerRunBusy={app.headerRunBusy}
+                  headerRunBusy={app.runPending}
                   debugOpen={app.debugOpen}
                   onToggleDebug={app.toggleDebug}
                   onCopyEntireRun={

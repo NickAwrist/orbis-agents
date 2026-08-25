@@ -4,7 +4,7 @@ type UADataLowEntropy = { platform?: string };
  * Best-effort client OS label. Uses the modern User-Agent Client Hints
  * API when available and falls back to a compact regex over `userAgent`.
  */
-export function detectClientOs(): string {
+function detectClientOs(): string {
   if (typeof navigator === "undefined") return "";
 
   const nav = navigator as Navigator & { userAgentData?: UADataLowEntropy };

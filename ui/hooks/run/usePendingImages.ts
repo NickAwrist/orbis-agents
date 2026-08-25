@@ -1,0 +1,152 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ImageMimeTypeSchema,
+  MAX_IMAGES_PER_MESSAGE,
+  MAX_IMAGE_BYTES,
+  type MessageAttachment,
+} from "../../../src/attachments/types";
+import { uploadImageAttachment } from "../../persist/attachments";
+import { createBrowserUuid } from "../../persist/userIdentity";
+
+type PendingImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+type Args = {
+  activeSessionId: string | null;
+  supportsImageInput: boolean;
+  isEphemeral: boolean;
+};
+
+export function usePendingImages({
+  activeSessionId,
+  supportsImageInput,
+  isEphemeral,
+}: Args) {
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [uploadPending, setUploadPending] = useState(false);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
+  pendingImagesRef.current = pendingImages;
+
+  const clearPendingImages = useCallback(() => {
+    for (const image of pendingImagesRef.current) {
+      URL.revokeObjectURL(image.previewUrl);
+    }
+    pendingImagesRef.current = [];
+    setPendingImages([]);
+    setImageError(null);
+  }, []);
+
+  useEffect(() => clearPendingImages, [clearPendingImages]);
+
+  useEffect(() => {
+    clearPendingImages();
+  }, [activeSessionId, clearPendingImages]);
+
+  useEffect(() => {
+    if (pendingImages.length === 0) return;
+    if (!supportsImageInput) {
+      setImageError("The selected model does not accept images.");
+    } else if (isEphemeral) {
+      setImageError("Images are not available in temporary sessions.");
+    }
+  }, [isEphemeral, supportsImageInput, pendingImages.length]);
+
+  const addPendingImages = useCallback(
+    (files: File[]) => {
+      if (!supportsImageInput) {
+        setImageError("The selected model does not accept images.");
+        return;
+      }
+      if (isEphemeral) {
+        setImageError("Images are not available in temporary sessions.");
+        return;
+      }
+
+      const accepted: PendingImage[] = [];
+      for (const file of files) {
+        if (!ImageMimeTypeSchema.safeParse(file.type).success) {
+          setImageError("Use a PNG, JPEG, WebP, or GIF image.");
+          continue;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          setImageError("Each image must be 8 MB or smaller.");
+          continue;
+        }
+        if (
+          pendingImagesRef.current.length + accepted.length >=
+          MAX_IMAGES_PER_MESSAGE
+        ) {
+          setImageError(
+            `You can attach up to ${MAX_IMAGES_PER_MESSAGE} images.`,
+          );
+          break;
+        }
+        accepted.push({
+          id: createBrowserUuid(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+        });
+      }
+
+      if (accepted.length > 0) {
+        setPendingImages((current) => [...current, ...accepted]);
+        if (accepted.length === files.length) setImageError(null);
+      }
+    },
+    [isEphemeral, supportsImageInput],
+  );
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((current) => {
+      const removed = current.find((image) => image.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((image) => image.id !== id);
+    });
+    setImageError(null);
+  }, []);
+
+  const uploadPendingImages = useCallback(
+    async (sessionId: string): Promise<MessageAttachment[] | null> => {
+      setUploadPending(true);
+      try {
+        return await Promise.all(
+          pendingImages.map((image) =>
+            uploadImageAttachment(sessionId, image.file),
+          ),
+        );
+      } catch (error) {
+        setImageError(
+          error instanceof Error ? error.message : "Could not upload image.",
+        );
+        return null;
+      } finally {
+        setUploadPending(false);
+      }
+    },
+    [pendingImages],
+  );
+
+  const canAttachImages = supportsImageInput && !isEphemeral;
+
+  return {
+    pendingImages,
+    imageError,
+    setImageError,
+    uploadPending,
+    addPendingImages,
+    removePendingImage,
+    clearPendingImages,
+    uploadPendingImages,
+    canAttachImages,
+    attachmentsSendReady: pendingImages.length === 0 || canAttachImages,
+    attachImageDisabledReason: !supportsImageInput
+      ? "The selected model does not accept images"
+      : isEphemeral
+        ? "Images are not available in temporary sessions"
+        : undefined,
+  };
+}

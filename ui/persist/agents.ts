@@ -27,13 +27,6 @@ export async function fetchAgents(): Promise<AgentData[]> {
   return data.agents;
 }
 
-export async function fetchAgent(id: string): Promise<AgentData> {
-  const res = await userScopedFetch(`/api/agents/${id}`);
-  if (!res.ok)
-    throw new Error(await readApiError(res, "Failed to fetch agent"));
-  return res.json();
-}
-
 export async function createAgentApi(body: AgentWriteBody): Promise<AgentData> {
   const res = await userScopedFetch("/api/agents", {
     method: "POST",

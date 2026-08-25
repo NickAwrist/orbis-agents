@@ -1,6 +1,6 @@
 import type { StoredRunSession } from "../../persist/sessions";
 
-export type PersistentRunStatus = {
+type PersistentRunStatus = {
   active: boolean;
   requestId?: string;
 };

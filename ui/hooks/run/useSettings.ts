@@ -92,7 +92,6 @@ export function useSettings(
 
   return {
     userSettings,
-    setUserSettings,
     userSettingsRef,
     saveUserSettings,
   };
