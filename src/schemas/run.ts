@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  MAX_IMAGES_PER_MESSAGE,
+  MessageAttachmentSchema,
+} from "../attachments/types";
 
 export const WireStepSchema = z.record(z.string(), z.unknown());
 
@@ -6,6 +10,7 @@ export const WireMessageSchema = z.object({
   role: z.string(),
   content: z.string(),
   steps: z.array(WireStepSchema).optional(),
+  attachments: z.array(MessageAttachmentSchema).optional(),
 });
 
 export type WireMessageInput = z.infer<typeof WireMessageSchema>;
@@ -28,6 +33,7 @@ export const RunBodySchema = z.object({
   agentName: z.string().min(1),
   metadata: RunMetadataSchema.optional(),
   sessionDirectory: z.string().optional(),
+  attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).optional(),
 });
 
 export type RunBody = z.infer<typeof RunBodySchema>;

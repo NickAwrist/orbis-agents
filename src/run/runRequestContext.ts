@@ -1,11 +1,13 @@
 import type { Response } from "express";
 import { buildServerRunPromptContext } from "../agents/agentManager";
 import { DEFAULT_RUN_MODEL } from "../constants";
+import type { AttachmentRow } from "../db/index";
 import {
   type SessionRow,
   getAgentByName,
   getOpenRouterApiKey,
   getOpenRouterModelByRoute,
+  getSessionAttachments,
   getSessionById,
 } from "../db/index";
 import { sendApiError } from "../http/errors";
@@ -26,6 +28,7 @@ export type RunTurnContext = {
   promptContext: PromptContext;
   persistedSession: SessionRow | null;
   ownerUuid: string;
+  attachments: AttachmentRow[];
 };
 
 /**
@@ -92,6 +95,26 @@ export function buildTurnContext(
     }
   }
 
+  const attachmentIds = body.attachmentIds ?? [];
+  if (ephemeral && attachmentIds.length > 0) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      "Images are not available in temporary sessions",
+    );
+    return null;
+  }
+  const attachments = getSessionAttachments(
+    ownerUuid,
+    sessionId,
+    attachmentIds,
+  );
+  if (attachments.length !== attachmentIds.length) {
+    sendApiError(res, 400, "BAD_REQUEST", "Invalid image attachment");
+    return null;
+  }
+
   return {
     body,
     ephemeral,
@@ -105,5 +128,6 @@ export function buildTurnContext(
     }),
     persistedSession,
     ownerUuid,
+    attachments,
   };
 }

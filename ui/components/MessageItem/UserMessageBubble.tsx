@@ -6,6 +6,7 @@ import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 import { MarkdownMessage } from "../MarkdownMessage";
+import { AttachmentImage } from "./AttachmentImage";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 const LONG_PRESS_MS = 520;
@@ -163,6 +164,13 @@ export function UserMessageBubble({
             longPressOpenedRef.current = false;
           }}
         >
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap justify-end gap-2">
+              {message.attachments.map((attachment) => (
+                <AttachmentImage key={attachment.id} attachment={attachment} />
+              ))}
+            </div>
+          )}
           {isEditingUser ? (
             <textarea
               ref={editRef}

@@ -2,6 +2,7 @@ import type { Plan } from "../Plan";
 import type { LlmMetrics, RunContext, Step } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
 import {
+  type LlmImage,
   type LlmMessage,
   type LlmToolCall,
   streamModelChat,
@@ -122,7 +123,11 @@ export class BaseAgent {
     return {};
   }
 
-  async run(prompt: string, ctx?: RunContext): Promise<string> {
+  async run(
+    prompt: string,
+    ctx?: RunContext,
+    images: LlmImage[] = [],
+  ): Promise<string> {
     if (!ctx) {
       throw new Error("RunContext is required to run the agent");
     }
@@ -133,6 +138,7 @@ export class BaseAgent {
       : undefined;
 
     let userMessage = prompt;
+    let userImages = images;
     let fullContent = "";
     let fullThinking = "";
     let toolCalls: LlmToolCall[] = [];
@@ -148,7 +154,11 @@ export class BaseAgent {
         ...this.history,
       ];
       if (userMessage) {
-        messages.push({ role: "user", content: userMessage });
+        messages.push({
+          role: "user",
+          content: userMessage,
+          ...(userImages.length > 0 ? { images: userImages } : {}),
+        });
       }
 
       fullContent = "";
@@ -236,8 +246,13 @@ export class BaseAgent {
       }
 
       if (userMessage) {
-        this.history.push({ role: "user", content: userMessage });
+        this.history.push({
+          role: "user",
+          content: userMessage,
+          ...(userImages.length > 0 ? { images: userImages } : {}),
+        });
         userMessage = "";
+        userImages = [];
       }
 
       const assistantMsg: LlmMessage = {

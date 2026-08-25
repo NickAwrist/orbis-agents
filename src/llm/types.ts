@@ -1,5 +1,6 @@
 import type { Tool } from "ollama";
 import type { LlmMetrics } from "../RunContext";
+import type { MessageAttachment } from "../attachments/types";
 
 export type LlmToolCall = {
   id?: string;
@@ -17,6 +18,11 @@ export type LlmMessage = {
   tool_call_id?: string;
   reasoning?: string;
   reasoning_details?: unknown[];
+  images?: LlmImage[];
+};
+
+export type LlmImage = MessageAttachment & {
+  data: string;
 };
 
 export type LlmChatRequest = {

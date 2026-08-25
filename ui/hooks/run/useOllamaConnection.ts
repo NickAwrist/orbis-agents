@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { parseInputCapabilities } from "../../../src/modelCapabilities";
 import { readApiError } from "../../lib/readApiError";
 import type { ModelOption } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
@@ -81,6 +82,7 @@ export function useOllamaConnection() {
           ...(typeof m.configured === "boolean"
             ? { configured: m.configured }
             : {}),
+          inputCapabilities: parseInputCapabilities(m.inputCapabilities),
         }));
       setOllamaModels(list);
       setCatalogLoaded(true);

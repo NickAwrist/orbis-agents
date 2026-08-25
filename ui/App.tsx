@@ -239,6 +239,13 @@ export default function App() {
                     streamingStep={app.streamingStep}
                     streamingSteps={app.streamingSteps}
                     modelSendReady={app.modelSendReady}
+                    pendingImages={app.pendingImages}
+                    imageError={app.imageError}
+                    addPendingImages={app.addPendingImages}
+                    removePendingImage={app.removePendingImage}
+                    canAttachImages={app.canAttachImages}
+                    attachImageDisabledReason={app.attachImageDisabledReason}
+                    attachmentsSendReady={app.attachmentsSendReady}
                     onFooterHeightChange={setRunFooterInset}
                   />
                 )}

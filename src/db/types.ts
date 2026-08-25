@@ -1,7 +1,10 @@
+import type { MessageAttachment } from "../attachments/types";
+
 export type WireMessage = {
   role: string;
   content: string;
   steps?: unknown;
+  attachments?: MessageAttachment[];
 };
 
 export type SessionRow = {

@@ -27,6 +27,16 @@ export function migrateSessionsOwnerColumn(db: Database) {
   }
 }
 
+export function migrateMessagesAttachmentsColumn(db: Database) {
+  const cols = db.query("PRAGMA table_info(messages)").all() as {
+    name: string;
+  }[];
+  if (cols.length === 0) return;
+  if (!cols.some((c) => c.name === "attachments")) {
+    db.run("ALTER TABLE messages ADD COLUMN attachments TEXT");
+  }
+}
+
 export function migrateAgentsOwnerColumn(db: Database) {
   const cols = db.query("PRAGMA table_info(agents)").all() as {
     name: string;
@@ -136,4 +146,5 @@ export function runMigrations(db: Database) {
   migrateAgentsInlinePlaceholders(db);
   migrateSessionsOwnerColumn(db);
   migrateAgentsOwnerColumn(db);
+  migrateMessagesAttachmentsColumn(db);
 }

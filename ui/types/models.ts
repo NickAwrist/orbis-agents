@@ -1,3 +1,5 @@
+import type { InputCapability } from "../../src/modelCapabilities";
+
 /** Normalized entry from GET /api/models. */
 export interface ModelOption {
   id: string;
@@ -9,4 +11,5 @@ export interface ModelOption {
   size?: number;
   modified_at?: string;
   digest?: string;
+  inputCapabilities: InputCapability[];
 }

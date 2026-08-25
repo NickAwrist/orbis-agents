@@ -56,6 +56,9 @@ function toOllamaMessages(messages: LlmMessage[]): Message[] {
   return messages.map((message) => ({
     role: message.role,
     content: message.content,
+    ...(message.images?.length
+      ? { images: message.images.map((image) => image.data) }
+      : {}),
     ...(message.tool_calls
       ? { tool_calls: message.tool_calls as ToolCall[] }
       : {}),

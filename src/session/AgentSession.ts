@@ -2,7 +2,12 @@ import { EventEmitter } from "node:events";
 import { RunContext } from "../RunContext";
 import type { BaseAgent } from "../agents/BaseAgent";
 import { agentManager } from "../agents/agentManager";
-import type { LlmMessage } from "../llm/index";
+import {
+  type MessageAttachment,
+  MessageAttachmentSchema,
+} from "../attachments/types";
+import { type AttachmentRow, getAttachment } from "../db/index";
+import type { LlmImage, LlmMessage } from "../llm/index";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { logger } from "../logger";
 import type { PromptContext } from "../prompts/render";
@@ -15,6 +20,7 @@ export type SessionMessage = {
   role: string;
   content: string;
   steps?: HistoryWireStep[];
+  attachments?: MessageAttachment[];
 };
 
 export type SessionStepEvent = {
@@ -50,6 +56,7 @@ export type AgentSessionOptions = {
   promptContext?: PromptContext;
   toolSessionDir?: string;
   ownerUuid: string;
+  attachmentSessionId?: string;
 };
 
 export class AgentSession extends EventEmitter {
@@ -59,6 +66,7 @@ export class AgentSession extends EventEmitter {
   private readonly toolSessionDir?: string;
   private readonly promptContext?: PromptContext;
   private readonly ownerUuid: string;
+  private readonly attachmentSessionId?: string;
 
   override on<K extends keyof SessionEvents>(
     event: K,
@@ -84,6 +92,7 @@ export class AgentSession extends EventEmitter {
     this.toolSessionDir = options?.toolSessionDir;
     this.promptContext = options?.promptContext;
     this.ownerUuid = options?.ownerUuid ?? "";
+    this.attachmentSessionId = options?.attachmentSessionId;
     const agentName = options?.agentName?.trim() || "general_agent";
     this.generalAgent = agentManager.createAgent(agentName, {
       systemPrompt: options?.systemPrompt,
@@ -97,13 +106,19 @@ export class AgentSession extends EventEmitter {
 
   /** Rehydrate from the client request and provider-neutral model messages. */
   restoreFromPersistence(payload: {
-    history: { role: string; content: string; steps?: HistoryWireStep[] }[];
+    history: {
+      role: string;
+      content: string;
+      steps?: HistoryWireStep[];
+      attachments?: MessageAttachment[];
+    }[];
     modelMessages?: Array<Record<string, unknown>> | null;
   }) {
     this.history = payload.history.map((h) => ({
       role: h.role,
       content: h.content,
       ...(h.steps != null ? { steps: h.steps } : {}),
+      ...(h.attachments?.length ? { attachments: h.attachments } : {}),
     }));
     if (Array.isArray(payload.modelMessages)) {
       this.generalAgent.history = stripReasoningFromModelMessages(
@@ -123,18 +138,65 @@ export class AgentSession extends EventEmitter {
         if (Array.isArray(m.reasoning_details)) {
           row.reasoning_details = m.reasoning_details;
         }
+        const images = this.hydrateImages(m.images);
+        if (images.length > 0) row.images = images;
         return row;
       });
     } else {
-      this.generalAgent.history = payload.history.map((h) => ({
-        role: typeof h.role === "string" ? h.role : "user",
-        content: typeof h.content === "string" ? h.content : "",
-      }));
+      this.generalAgent.history = payload.history.map((h) => {
+        const images = this.hydrateImages(h.attachments);
+        return {
+          role: typeof h.role === "string" ? h.role : "user",
+          content: typeof h.content === "string" ? h.content : "",
+          ...(images.length > 0 ? { images } : {}),
+        };
+      });
     }
   }
 
-  public async sendRun(prompt: string, signal?: AbortSignal): Promise<string> {
-    this.history.push({ role: "user", content: prompt });
+  private hydrateImages(value: unknown): LlmImage[] {
+    if (!Array.isArray(value) || !this.attachmentSessionId) return [];
+    return value.flatMap((candidate) => {
+      const parsed = MessageAttachmentSchema.safeParse(candidate);
+      if (!parsed.success) return [];
+      const stored = getAttachment(this.ownerUuid, parsed.data.id);
+      if (!stored || stored.sessionId !== this.attachmentSessionId) return [];
+      return [
+        {
+          ...parsed.data,
+          data: Buffer.from(stored.data).toString("base64"),
+        },
+      ];
+    });
+  }
+
+  public async sendRun(
+    prompt: string,
+    attachments: AttachmentRow[] = [],
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const attachmentRefs = attachments.map(
+      ({
+        data: _data,
+        ownerUuid: _owner,
+        sessionId: _session,
+        createdAt: _at,
+        ...attachment
+      }) => attachment,
+    );
+    const images: LlmImage[] = attachments.map((attachment) => ({
+      id: attachment.id,
+      kind: attachment.kind,
+      name: attachment.name,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+      data: Buffer.from(attachment.data).toString("base64"),
+    }));
+    this.history.push({
+      role: "user",
+      content: prompt,
+      ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
+    });
 
     const turnStartedAt = Date.now();
     let aborted = false;
@@ -165,7 +227,7 @@ export class AgentSession extends EventEmitter {
 
     let result = "Error running agent.";
     try {
-      const response = await this.generalAgent.run(prompt, ctx);
+      const response = await this.generalAgent.run(prompt, ctx, images);
       if (signal?.aborted) {
         aborted = true;
         result = response || "";
@@ -224,6 +286,11 @@ export class AgentSession extends EventEmitter {
       if (msg.reasoning != null) row.reasoning = msg.reasoning;
       if (msg.reasoning_details != null) {
         row.reasoning_details = msg.reasoning_details;
+      }
+      if (msg.images?.length) {
+        row.images = msg.images.map(
+          ({ data: _data, ...attachment }) => attachment,
+        );
       }
       return row;
     });

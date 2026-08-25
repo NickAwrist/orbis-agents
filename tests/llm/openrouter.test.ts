@@ -47,6 +47,47 @@ describe("OpenRouter provider", () => {
     expect(JSON.stringify(request.body)).not.toContain("sk-or-secret-test");
   });
 
+  test("converts typed images to OpenRouter content parts", async () => {
+    setOpenRouterApiKey("sk-or-image-test");
+    const stream = await streamOpenRouterChat({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: "Describe this image",
+          images: [
+            {
+              id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              kind: "image",
+              name: "sample.png",
+              mimeType: "image/png",
+              size: 3,
+              data: "YWJj",
+            },
+          ],
+        },
+      ],
+      tools: [],
+    });
+    for await (const _chunk of stream) {
+      // Consume the response so the request is captured.
+    }
+
+    const messages = getOpenRouterRequests()[0]!.body.messages;
+    expect(messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Describe this image" },
+          {
+            type: "image_url",
+            image_url: { url: "data:image/png;base64,YWJj" },
+          },
+        ],
+      },
+    ]);
+  });
+
   test("normalizes reasoning fields and split thinking tags", async () => {
     setOpenRouterApiKey("sk-or-test");
     setOpenRouterScenario("reasoning");

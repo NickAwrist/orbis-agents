@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import type {
   DebugData,
@@ -87,6 +88,9 @@ export function useRunApp() {
   const openRouterReady = ollama.ollamaModels.some(
     (model) => model.provider === "openrouter" && model.configured === true,
   );
+  const supportsImageInput =
+    selectedModelOption?.inputCapabilities.includes(InputCapability.Image) ===
+    true;
   const noProviderAvailable =
     ollama.catalogLoaded &&
     ollama.ollamaConnected === false &&
@@ -120,6 +124,8 @@ export function useRunApp() {
     truncateConfirm,
     setTruncateConfirm,
     runFlightRef,
+    supportsImageInput,
+    isEphemeral: sessions.isEphemeral,
   });
 
   const modalSteps = traceStepsForModal(
@@ -201,6 +207,13 @@ export function useRunApp() {
     modalSteps,
     renameTarget: sessions.renameTarget,
     headerRunBusy: stream.headerRunBusy,
+    pendingImages: stream.pendingImages,
+    imageError: stream.imageError,
+    addPendingImages: stream.addPendingImages,
+    removePendingImage: stream.removePendingImage,
+    canAttachImages: stream.canAttachImages,
+    attachImageDisabledReason: stream.attachImageDisabledReason,
+    attachmentsSendReady: stream.attachmentsSendReady,
     sidebarCols: sessions.sidebarCols,
   };
 }

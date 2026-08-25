@@ -14,4 +14,4 @@ export async function streamModelChat(
 }
 
 export { openRouterModelId, resolveModelSelection } from "./modelSelection";
-export type { LlmMessage, LlmToolCall } from "./types";
+export type { LlmImage, LlmMessage, LlmToolCall } from "./types";

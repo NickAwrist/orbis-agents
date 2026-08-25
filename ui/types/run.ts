@@ -31,6 +31,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   steps?: MessageStep[];
+  attachments?: MessageAttachment[];
 }
 
 /** Confirm truncate + retry/edit from run UI */
@@ -53,3 +54,4 @@ export interface DebugData {
   /** Cumulative Ollama `messages` (excludes system); next turn prepends system and appends the new user message. */
   modelMessages?: Array<Record<string, unknown>> | null;
 }
+import type { MessageAttachment } from "../../src/attachments/types";

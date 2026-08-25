@@ -1,3 +1,4 @@
+import { MessageAttachmentSchema } from "../attachments/types";
 import { getDb } from "./connection";
 import type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 
@@ -70,12 +71,13 @@ export function getMessagesForSession(
   if (!getSessionById(ownerUuid, sessionId)) return [];
   const rows = getDb()
     .query(
-      "SELECT role, content, steps FROM messages WHERE session_id = ? ORDER BY position ASC",
+      "SELECT role, content, steps, attachments FROM messages WHERE session_id = ? ORDER BY position ASC",
     )
     .all(sessionId) as Array<{
     role: string;
     content: string;
     steps: string | null;
+    attachments: string | null;
   }>;
 
   return rows.map((r) => {
@@ -83,6 +85,20 @@ export function getMessagesForSession(
     if (r.steps != null && r.steps !== "") {
       try {
         msg.steps = JSON.parse(r.steps) as unknown;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (r.attachments) {
+      try {
+        const parsed = JSON.parse(r.attachments) as unknown;
+        if (Array.isArray(parsed)) {
+          const attachments = parsed.flatMap((value) => {
+            const result = MessageAttachmentSchema.safeParse(value);
+            return result.success ? [result.data] : [];
+          });
+          if (attachments.length > 0) msg.attachments = attachments;
+        }
       } catch {
         /* ignore */
       }
@@ -215,7 +231,7 @@ export function persistSessionMessages(
     }
 
     const insert = db.prepare(
-      "INSERT INTO messages (session_id, role, content, steps, position) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO messages (session_id, role, content, steps, attachments, position) VALUES (?, ?, ?, ?, ?, ?)",
     );
     for (let i = n; i < messages.length; i++) {
       const m = messages[i]!;
@@ -223,7 +239,10 @@ export function persistSessionMessages(
         m.steps !== undefined && m.steps != null
           ? JSON.stringify(m.steps)
           : null;
-      insert.run(sessionId, m.role, m.content, stepsJson, i);
+      const attachmentsJson = m.attachments?.length
+        ? JSON.stringify(m.attachments)
+        : null;
+      insert.run(sessionId, m.role, m.content, stepsJson, attachmentsJson, i);
     }
 
     if (messages.length > 0 && n === messages.length) {
@@ -232,9 +251,18 @@ export function persistSessionMessages(
         last.steps !== undefined && last.steps != null
           ? JSON.stringify(last.steps)
           : null;
+      const attachmentsJson = last.attachments?.length
+        ? JSON.stringify(last.attachments)
+        : null;
       db.run(
-        "UPDATE messages SET content = ?, steps = ? WHERE session_id = ? AND position = ?",
-        [last.content, stepsJson, sessionId, messages.length - 1],
+        "UPDATE messages SET content = ?, steps = ?, attachments = ? WHERE session_id = ? AND position = ?",
+        [
+          last.content,
+          stepsJson,
+          attachmentsJson,
+          sessionId,
+          messages.length - 1,
+        ],
       );
     }
 

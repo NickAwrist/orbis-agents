@@ -38,6 +38,22 @@ export function getDb(): Database {
   db.run(
     "CREATE INDEX IF NOT EXISTS idx_messages_session_position ON messages(session_id, position);",
   );
+  db.run(`
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      owner_uuid TEXT NOT NULL,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      data BLOB NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+  `);
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_attachments_owner_session ON attachments(owner_uuid, session_id);",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS agents (

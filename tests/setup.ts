@@ -60,6 +60,12 @@ const originalFetch = globalThis.fetch;
       );
     }
 
+    if (pathname.endsWith("/api/show")) {
+      return Response.json({
+        capabilities: ["completion", "vision"],
+      });
+    }
+
     if (pathname.endsWith("/api/chat")) {
       return new Response(
         JSON.stringify({
@@ -191,6 +197,13 @@ const originalFetch = globalThis.fetch;
             {
               id: "openai/gpt-5.4-mini",
               name: "OpenAI: GPT-5.4 Mini",
+            },
+            {
+              id: "openai/gpt-5.6-terra",
+              name: "OpenAI: GPT-5.6 Terra",
+              architecture: {
+                input_modalities: ["text", "image", "future-input"],
+              },
             },
           ],
         }),

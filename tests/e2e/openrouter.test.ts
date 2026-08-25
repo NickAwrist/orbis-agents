@@ -30,6 +30,7 @@ describe("OpenRouter API integration", () => {
           id: string;
           provider: string;
           configured?: boolean;
+          inputCapabilities?: string[];
         }>;
       };
       expect(
@@ -40,6 +41,11 @@ describe("OpenRouter API integration", () => {
       );
       expect(remote?.id.startsWith("openrouter:")).toBeTrue();
       expect(remote?.configured).toBeFalse();
+      expect(
+        body.models.find(
+          (model) => model.id === "openrouter:openai/gpt-5.6-terra",
+        )?.inputCapabilities,
+      ).toEqual(["text", "image"]);
 
       await fetch(`${url}/api/settings/openrouter`, {
         method: "PUT",

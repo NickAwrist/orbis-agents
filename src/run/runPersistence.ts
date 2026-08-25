@@ -1,3 +1,4 @@
+import type { MessageAttachment } from "../attachments/types";
 import { type WireMessage, persistSessionMessages } from "../db/index";
 
 /**
@@ -8,6 +9,7 @@ export type RunPersistence = {
   saveInitial(
     history: WireMessage[],
     userMessage: string,
+    attachments: MessageAttachment[],
     modelMessages: Array<Record<string, unknown>> | null,
   ): void;
   saveFinal(
@@ -39,8 +41,18 @@ export function createRunPersistence(opts: {
     );
   };
   return {
-    saveInitial(history, userMessage, modelMessages) {
-      save([...history, { role: "user", content: userMessage }], modelMessages);
+    saveInitial(history, userMessage, attachments, modelMessages) {
+      save(
+        [
+          ...history,
+          {
+            role: "user",
+            content: userMessage,
+            ...(attachments.length > 0 ? { attachments } : {}),
+          },
+        ],
+        modelMessages,
+      );
     },
     saveFinal(history, modelMessages) {
       save(history, modelMessages);

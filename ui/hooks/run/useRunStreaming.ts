@@ -10,6 +10,12 @@ import {
   useState,
 } from "react";
 import {
+  ImageMimeTypeSchema,
+  MAX_IMAGES_PER_MESSAGE,
+  MAX_IMAGE_BYTES,
+  type MessageAttachment,
+} from "../../../src/attachments/types";
+import {
   CORE_DIRECTIVES,
   type PromptContext,
   renderSystemPrompt,
@@ -27,8 +33,9 @@ import { getClientOs } from "../../lib/clientOs";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { type AgentData, fetchAgent, fetchAgents } from "../../persist/agents";
+import { uploadImageAttachment } from "../../persist/attachments";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
-import { userScopedFetch } from "../../persist/userIdentity";
+import { createBrowserUuid, userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
 import { reconcilePersistentRun } from "./reconcilePersistentRun";
 import { useRunFlight } from "./useRunFlight";
@@ -62,6 +69,14 @@ type Args = {
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
   runFlightRef: MutableRefObject<RunFlightApi | null>;
+  supportsImageInput: boolean;
+  isEphemeral: boolean;
+};
+
+export type PendingImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
 };
 
 export function useRunStreaming(p: Args) {
@@ -71,6 +86,10 @@ export function useRunStreaming(p: Args) {
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingThinking, setStreamingThinking] = useState("");
   const [runPending, setRunPending] = useState(false);
+  const [imageUploadPending, setImageUploadPending] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const pendingImagesRef = useRef<PendingImage[]>([]);
 
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
@@ -85,6 +104,83 @@ export function useRunStreaming(p: Args) {
   } = useTurnBuffer();
 
   p.debugOpenRef.current = p.debugOpen;
+  pendingImagesRef.current = pendingImages;
+
+  const clearPendingImages = useCallback(() => {
+    for (const image of pendingImagesRef.current) {
+      URL.revokeObjectURL(image.previewUrl);
+    }
+    pendingImagesRef.current = [];
+    setPendingImages([]);
+    setImageError(null);
+  }, []);
+
+  useEffect(() => clearPendingImages, [clearPendingImages]);
+
+  useEffect(() => {
+    clearPendingImages();
+  }, [p.activeSessionId, clearPendingImages]);
+
+  useEffect(() => {
+    if (pendingImages.length === 0) return;
+    if (!p.supportsImageInput) {
+      setImageError("The selected model does not accept images.");
+    } else if (p.isEphemeral) {
+      setImageError("Images are not available in temporary sessions.");
+    }
+  }, [p.isEphemeral, p.supportsImageInput, pendingImages.length]);
+
+  const addPendingImages = useCallback(
+    (files: File[]) => {
+      if (!p.supportsImageInput) {
+        setImageError("The selected model does not accept images.");
+        return;
+      }
+      if (p.isEphemeral) {
+        setImageError("Images are not available in temporary sessions.");
+        return;
+      }
+      const accepted: PendingImage[] = [];
+      for (const file of files) {
+        if (!ImageMimeTypeSchema.safeParse(file.type).success) {
+          setImageError("Use a PNG, JPEG, WebP, or GIF image.");
+          continue;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          setImageError("Each image must be 8 MB or smaller.");
+          continue;
+        }
+        if (
+          pendingImagesRef.current.length + accepted.length >=
+          MAX_IMAGES_PER_MESSAGE
+        ) {
+          setImageError(
+            `You can attach up to ${MAX_IMAGES_PER_MESSAGE} images.`,
+          );
+          break;
+        }
+        accepted.push({
+          id: createBrowserUuid(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+        });
+      }
+      if (accepted.length > 0) {
+        setPendingImages((current) => [...current, ...accepted]);
+        if (accepted.length === files.length) setImageError(null);
+      }
+    },
+    [p.isEphemeral, p.supportsImageInput],
+  );
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((current) => {
+      const removed = current.find((image) => image.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((image) => image.id !== id);
+    });
+    setImageError(null);
+  }, []);
 
   const clearStreamingUi = useCallback(() => {
     setStreamingStep(null);
@@ -288,6 +384,7 @@ export function useRunStreaming(p: Args) {
       turnSessionId: string,
       priorMessages: Message[],
       messageText: string,
+      attachments: MessageAttachment[],
       options: { rebuildModelMessages: boolean },
     ) => {
       if (!messageText.trim() || !turnSessionId) return;
@@ -306,7 +403,11 @@ export function useRunStreaming(p: Args) {
       };
       turnMessagesSnapshotRef.current = [
         ...priorMessages,
-        { role: "user" as const, content: msg },
+        {
+          role: "user" as const,
+          content: msg,
+          ...(attachments.length > 0 ? { attachments } : {}),
+        },
       ];
       rawRunPendingRef.current = true;
       setInFlightSessionId(turnSessionId);
@@ -321,7 +422,11 @@ export function useRunStreaming(p: Args) {
 
       const nextHistory: Message[] = [
         ...priorMessages,
-        { role: "user" as const, content: msg },
+        {
+          role: "user" as const,
+          content: msg,
+          ...(attachments.length > 0 ? { attachments } : {}),
+        },
       ];
       if (viewingThisTurn()) {
         p.setMessages(nextHistory);
@@ -330,7 +435,11 @@ export function useRunStreaming(p: Args) {
       const failWithAssistantError = async (errText: string) => {
         const failedHistory: Message[] = [
           ...priorMessages,
-          { role: "user", content: msg },
+          {
+            role: "user",
+            content: msg,
+            ...(attachments.length > 0 ? { attachments } : {}),
+          },
           { role: "assistant", content: `Error: ${errText}` },
         ];
         if (viewingThisTurn()) {
@@ -388,6 +497,11 @@ export function useRunStreaming(p: Args) {
             model: p.selectedModel,
             modelMessages: modelMessagesPayload,
             agentName: p.selectedSessionAgentRef.current,
+            ...(attachments.length > 0
+              ? {
+                  attachmentIds: attachments.map((attachment) => attachment.id),
+                }
+              : {}),
             ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
           };
           if (ephemeral) {
@@ -710,10 +824,48 @@ export function useRunStreaming(p: Args) {
       if (!input.trim() || !sid) return;
       const msg = input.trim();
       if (!p.modelSendReady) return;
+      if (
+        pendingImages.length > 0 &&
+        (!p.supportsImageInput || p.isEphemeral)
+      ) {
+        setImageError(
+          !p.supportsImageInput
+            ? "The selected model does not accept images."
+            : "Images are not available in temporary sessions.",
+        );
+        return;
+      }
+      setImageUploadPending(true);
+      let attachments: MessageAttachment[] = [];
+      try {
+        attachments = await Promise.all(
+          pendingImages.map((image) => uploadImageAttachment(sid, image.file)),
+        );
+      } catch (error) {
+        setImageError(
+          error instanceof Error ? error.message : "Could not upload image.",
+        );
+        setImageUploadPending(false);
+        return;
+      }
+      setImageUploadPending(false);
       setInput("");
-      await runTurn(sid, p.messages, msg, { rebuildModelMessages: false });
+      clearPendingImages();
+      await runTurn(sid, p.messages, msg, attachments, {
+        rebuildModelMessages: false,
+      });
     },
-    [input, p.activeSessionId, p.messages, p.modelSendReady, runTurn],
+    [
+      clearPendingImages,
+      input,
+      p.activeSessionId,
+      p.messages,
+      p.modelSendReady,
+      p.isEphemeral,
+      p.supportsImageInput,
+      pendingImages,
+      runTurn,
+    ],
   );
 
   const confirmTruncateAndRetry = useCallback(async () => {
@@ -726,9 +878,13 @@ export function useRunStreaming(p: Args) {
     if (!row || row.role !== "user") return;
     const text = tc.kind === "edit" ? tc.text : row.content;
     if (!text.trim()) return;
-    await runTurn(sid, p.messages.slice(0, tc.userIndex), text, {
-      rebuildModelMessages: true,
-    });
+    await runTurn(
+      sid,
+      p.messages.slice(0, tc.userIndex),
+      text,
+      row.attachments ?? [],
+      { rebuildModelMessages: true },
+    );
   }, [
     p.activeSessionId,
     p.messages,
@@ -753,9 +909,10 @@ export function useRunStreaming(p: Args) {
   ]);
 
   const sessionRunBusy =
-    (runPending || streamingStep !== null || streamingSteps.length > 0) &&
-    inFlightSessionId != null &&
-    inFlightSessionId === p.activeSessionId;
+    imageUploadPending ||
+    ((runPending || streamingStep !== null || streamingSteps.length > 0) &&
+      inFlightSessionId != null &&
+      inFlightSessionId === p.activeSessionId);
 
   return {
     input,
@@ -782,5 +939,17 @@ export function useRunStreaming(p: Args) {
     toggleDebug,
     fetchDebugData,
     headerRunBusy: sessionRunBusy,
+    pendingImages,
+    imageError,
+    addPendingImages,
+    removePendingImage,
+    canAttachImages: p.supportsImageInput && !p.isEphemeral,
+    attachmentsSendReady:
+      pendingImages.length === 0 || (p.supportsImageInput && !p.isEphemeral),
+    attachImageDisabledReason: !p.supportsImageInput
+      ? "The selected model does not accept images"
+      : p.isEphemeral
+        ? "Images are not available in temporary sessions"
+        : undefined,
   };
 }

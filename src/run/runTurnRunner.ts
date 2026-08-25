@@ -57,12 +57,17 @@ export async function runTurn(
   persistence.saveInitial(
     ctx.body.history as WireMessage[],
     ctx.body.message,
+    ctx.attachments,
     ctx.body.modelMessages ?? null,
   );
   stream.emit({ type: "run_started", requestId: stream.requestId });
 
   try {
-    const result = await session.sendRun(ctx.body.message, stream.signal);
+    const result = await session.sendRun(
+      ctx.body.message,
+      ctx.attachments,
+      stream.signal,
+    );
     if (stream.signal.aborted) return;
     const stepsSnapshot =
       (session.history[session.history.length - 1]?.steps as
@@ -97,6 +102,7 @@ function buildSession(ctx: RunTurnContext): AgentSession {
     promptContext: ctx.promptContext,
     toolSessionDir: ctx.toolSessionDir,
     ownerUuid: ctx.ownerUuid,
+    attachmentSessionId: ctx.sessionId,
   });
   session.restoreFromPersistence({
     history: ctx.body.history as SessionMessage[],

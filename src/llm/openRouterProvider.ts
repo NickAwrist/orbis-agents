@@ -9,6 +9,27 @@ import type {
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+function toOpenRouterMessages(messages: LlmChatRequest["messages"]) {
+  return messages.map(({ images, ...message }) => ({
+    ...message,
+    ...(images?.length
+      ? {
+          content: [
+            ...(message.content
+              ? [{ type: "text" as const, text: message.content }]
+              : []),
+            ...images.map((image) => ({
+              type: "image_url" as const,
+              image_url: {
+                url: `data:${image.mimeType};base64,${image.data}`,
+              },
+            })),
+          ],
+        }
+      : {}),
+  }));
+}
+
 type OpenRouterToolDelta = {
   index?: number;
   id?: string;
@@ -279,7 +300,7 @@ export async function streamOpenRouterChat(
     },
     body: JSON.stringify({
       model: request.model,
-      messages: request.messages,
+      messages: toOpenRouterMessages(request.messages),
       tools: request.tools,
       stream: true,
       stream_options: { include_usage: true },

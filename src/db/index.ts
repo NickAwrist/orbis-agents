@@ -52,3 +52,10 @@ export {
   createOpenRouterModel,
   deleteOpenRouterModel,
 } from "./openrouter";
+export {
+  createImageAttachment,
+  deleteAttachment,
+  getAttachment,
+  getSessionAttachments,
+} from "./attachments";
+export type { AttachmentRow } from "./attachments";

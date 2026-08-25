@@ -1,3 +1,9 @@
+import {
+  InputCapability,
+  type InputCapability as InputCapabilityValue,
+  parseInputCapabilities,
+} from "./modelCapabilities";
+
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
 export type OpenRouterModelDetails = {
@@ -5,11 +11,23 @@ export type OpenRouterModelDetails = {
   name: string;
   ai_lab: string;
   found: boolean;
+  inputCapabilities: InputCapabilityValue[];
+};
+
+type OpenRouterCatalogModel = {
+  id?: unknown;
+  name?: unknown;
+  architecture?: { input_modalities?: unknown };
 };
 
 type OpenRouterModelsResponse = {
-  data?: Array<{ id?: unknown; name?: unknown }>;
+  data?: OpenRouterCatalogModel[];
 };
+
+function inputCapabilities(value: unknown): InputCapabilityValue[] {
+  const parsed = parseInputCapabilities(value);
+  return parsed.length > 0 ? parsed : [InputCapability.Text];
+}
 
 const LAB_NAMES: Record<string, string> = {
   "aion-labs": "AionLabs",
@@ -52,6 +70,7 @@ export function parseOpenRouterRoute(route: string): OpenRouterModelDetails {
     name: titleCase(rawModel),
     ai_lab: LAB_NAMES[rawLab.toLowerCase()] ?? titleCase(rawLab),
     found: false,
+    inputCapabilities: [InputCapability.Text],
   };
 }
 
@@ -76,8 +95,47 @@ export async function lookupOpenRouterModel(
       name: name || match.name.trim(),
       ai_lab: lab || fallback.ai_lab,
       found: true,
+      inputCapabilities: inputCapabilities(
+        match.architecture?.input_modalities,
+      ),
     };
   } catch {
     return fallback;
   }
+}
+
+export async function lookupOpenRouterModels(
+  routes: string[],
+): Promise<Map<string, OpenRouterModelDetails>> {
+  const fallbacks = new Map(
+    routes.map((route) => [route, parseOpenRouterRoute(route)]),
+  );
+  try {
+    const response = await fetch(OPENROUTER_MODELS_URL);
+    if (!response.ok) return fallbacks;
+    const payload = (await response.json()) as OpenRouterModelsResponse;
+    const byId = new Map(
+      (payload.data ?? [])
+        .filter(
+          (model): model is OpenRouterCatalogModel & { id: string } =>
+            typeof model.id === "string",
+        )
+        .map((model) => [model.id, model]),
+    );
+    for (const route of routes) {
+      const match = byId.get(route);
+      if (!match) continue;
+      const fallback = fallbacks.get(route)!;
+      fallbacks.set(route, {
+        ...fallback,
+        found: true,
+        inputCapabilities: inputCapabilities(
+          match.architecture?.input_modalities,
+        ),
+      });
+    }
+  } catch {
+    // Keep text-only fallbacks when the remote catalog is unavailable.
+  }
+  return fallbacks;
 }
