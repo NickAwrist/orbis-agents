@@ -1,4 +1,4 @@
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
 import { DebugModal } from "./components/DebugModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
@@ -30,6 +30,12 @@ export default function App() {
     app.streamingSteps,
     app.streamingStep,
   );
+
+  useEffect(() => {
+    if (!stepsModalOpen && app.stepsModalData != null) {
+      app.setStepsModalData(null);
+    }
+  }, [app.stepsModalData, app.setStepsModalData, stepsModalOpen]);
 
   useAppKeybinds({
     blockShortcuts:
