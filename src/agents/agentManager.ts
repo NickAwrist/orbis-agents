@@ -1,12 +1,13 @@
 import os from "node:os";
 import type { RunContext } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
-import { getAgentByName } from "../db/index";
+import { getAgentByName, listSkills } from "../db/index";
 import {
   type PersonalizationFields,
   type PromptContext,
   renderSystemPrompt,
 } from "../prompts/render";
+import { renderSkillsPrompt } from "../skills/runtime";
 import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
 import { BashTool } from "../tools/bash";
@@ -15,6 +16,7 @@ import { DeleteFileTool } from "../tools/delete_file";
 import { GenerateImageTool } from "../tools/generate_image";
 import { GrepTool } from "../tools/grep";
 import { ListFilesTool } from "../tools/list_files";
+import { LoadSkillTool } from "../tools/load_skill";
 import { ModifyPlan } from "../tools/modify_plan";
 import { ReadFileTool } from "../tools/read_file";
 import { RunTscTool } from "../tools/run_tsc";
@@ -46,6 +48,8 @@ export type CreateAgentOptions = {
   toolSessionDir?: string;
   /** Values to fill `{{PLACEHOLDERS}}` when `systemPrompt` is not provided. */
   promptContext?: PromptContext;
+  /** Current user task, used to activate explicit `$skill-name` references. */
+  userPrompt?: string;
 };
 
 function serverPromptContext(
@@ -86,11 +90,16 @@ export function buildServerRunPromptContext(opts: {
 
 export const agentManager = {
   /** Build a subagent that inherits the parent run's prompt context + session dir. */
-  createAgentForContext(agentName: string, ctx?: RunContext): BaseAgent {
+  createAgentForContext(
+    agentName: string,
+    ctx?: RunContext,
+    userPrompt?: string,
+  ): BaseAgent {
     const agent = this.createAgent(agentName, {
       ownerUuid: ctx?.ownerUuid ?? "",
       toolSessionDir: ctx?.sessionDir,
       promptContext: ctx?.promptContext,
+      userPrompt,
     });
     const parentModel = ctx?.agentInstance?.model;
     if (typeof parentModel === "string" && parentModel.length > 0) {
@@ -109,13 +118,18 @@ export const agentManager = {
       );
     }
 
-    const finalPrompt =
+    const renderedAgentPrompt =
       typeof opts?.systemPrompt === "string" && opts.systemPrompt.length > 0
         ? opts.systemPrompt
         : renderSystemPrompt(
             config.system_prompt,
             serverPromptContext(opts?.promptContext, opts?.toolSessionDir),
           );
+    const skills = listSkills(opts?.ownerUuid ?? "");
+    const skillsPrompt = renderSkillsPrompt(skills, opts?.userPrompt ?? "");
+    const finalPrompt = [renderedAgentPrompt, skillsPrompt]
+      .filter((part) => part.length > 0)
+      .join("\n\n");
 
     const agent = new BaseAgent(
       config.name,
@@ -130,6 +144,10 @@ export const agentManager = {
         .filter((t: string) => this.isToolEnabled(t))
         .map((t: string) => this.getToolInstance(t, opts?.ownerUuid ?? ""));
       agent.addTools(tools);
+    }
+
+    if (skills.length > 0) {
+      agent.addTool(new LoadSkillTool(opts?.ownerUuid ?? ""));
     }
 
     return agent;

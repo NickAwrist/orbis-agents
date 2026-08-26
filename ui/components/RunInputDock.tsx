@@ -1,7 +1,15 @@
-import { ArrowUp, ImagePlus, Square, Upload, X } from "lucide-react";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { ArrowUp, BookOpen, ImagePlus, Square, Upload, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep } from "../types";
+import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
   input,
@@ -45,9 +53,59 @@ export function RunInputDock({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const [isFileDragActive, setIsFileDragActive] = useState(false);
+  const [skills, setSkills] = useState<SkillData[]>([]);
+  const [caretIndex, setCaretIndex] = useState(input.length);
+  const [selectedSkillIndex, setSelectedSkillIndex] = useState(0);
+  const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
   const canSend = modelSendReady && attachmentsSendReady && !isBusy;
+  const activeSkillToken = skillPickerDismissed
+    ? null
+    : findActiveSkillToken(input, caretIndex);
+  const matchingSkills = activeSkillToken
+    ? skills
+        .filter((skill) => skill.name.startsWith(activeSkillToken.query))
+        .slice(0, 8)
+    : [];
+  const skillPickerOpen = !isBusy && matchingSkills.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSkills()
+      .then((availableSkills) => {
+        if (!cancelled) setSkills(availableSkills);
+      })
+      .catch(() => {
+        if (!cancelled) setSkills([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedSkillIndex(0);
+  }, [activeSkillToken?.query]);
+
+  useEffect(() => {
+    if (selectedSkillIndex < matchingSkills.length) return;
+    setSelectedSkillIndex(Math.max(0, matchingSkills.length - 1));
+  }, [matchingSkills.length, selectedSkillIndex]);
+
+  const selectSkill = (skill: SkillData) => {
+    if (!activeSkillToken) return;
+    const completed = completeSkillToken(input, activeSkillToken, skill.name);
+    setInput(completed.value);
+    setCaretIndex(completed.caret);
+    setSkillPickerDismissed(true);
+    queueMicrotask(() => {
+      const textarea = inputRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(completed.caret, completed.caret);
+    });
+  };
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -122,6 +180,43 @@ export function RunInputDock({
             : "border-border-subtle",
         )}
       >
+        {skillPickerOpen && (
+          <div
+            id="skill-picker"
+            className="ui-animate-slide-up absolute inset-x-0 bottom-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-[0_14px_36px_rgba(0,0,0,0.42)]"
+            aria-label="Available skills"
+          >
+            <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              <BookOpen size={13} />
+              Skills
+            </div>
+            <div className="max-h-64 overflow-y-auto p-1.5">
+              {matchingSkills.map((skill, index) => (
+                <button
+                  key={skill.id}
+                  type="button"
+                  aria-current={index === selectedSkillIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setSelectedSkillIndex(index)}
+                  onClick={() => selectSkill(skill)}
+                  className={cx(
+                    "flex w-full min-w-0 items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
+                    index === selectedSkillIndex
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  )}
+                >
+                  <span className="shrink-0 font-mono text-[0.8125rem] font-medium text-foreground">
+                    ${skill.name}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[0.75rem] leading-[1.45]">
+                    {skill.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div
           aria-hidden={!isFileDragActive}
           className={cx(
@@ -198,7 +293,16 @@ export function RunInputDock({
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setCaretIndex(e.currentTarget.selectionStart);
+              setSkillPickerDismissed(false);
+            }}
+            onClick={(e) => {
+              setCaretIndex(e.currentTarget.selectionStart);
+              setSkillPickerDismissed(false);
+            }}
+            onSelect={(e) => setCaretIndex(e.currentTarget.selectionStart)}
             onPaste={(e) => {
               const files = Array.from(e.clipboardData.files);
               if (files.length > 0) {
@@ -207,6 +311,35 @@ export function RunInputDock({
               }
             }}
             onKeyDown={(e) => {
+              if (skillPickerOpen) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedSkillIndex(
+                    (current) => (current + 1) % matchingSkills.length,
+                  );
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedSkillIndex(
+                    (current) =>
+                      (current - 1 + matchingSkills.length) %
+                      matchingSkills.length,
+                  );
+                  return;
+                }
+                if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+                  e.preventDefault();
+                  const skill = matchingSkills[selectedSkillIndex];
+                  if (skill) selectSkill(skill);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setSkillPickerDismissed(true);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (canSend) onSendMessage(e);
@@ -214,6 +347,9 @@ export function RunInputDock({
             }}
             disabled={isBusy}
             placeholder="Send a message..."
+            aria-autocomplete="list"
+            aria-controls={skillPickerOpen ? "skill-picker" : undefined}
+            aria-expanded={skillPickerOpen}
             className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
             rows={1}
           />

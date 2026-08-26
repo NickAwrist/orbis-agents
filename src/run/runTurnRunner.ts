@@ -103,6 +103,7 @@ function buildSession(ctx: RunTurnContext): AgentSession {
     toolSessionDir: ctx.toolSessionDir,
     ownerUuid: ctx.ownerUuid,
     attachmentSessionId: ctx.sessionId,
+    userPrompt: ctx.body.message,
   });
   session.restoreFromPersistence({
     history: ctx.body.history as SessionMessage[],

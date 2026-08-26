@@ -9,6 +9,15 @@ export {
   listAgents,
   updateAgentRow,
 } from "./agents/queries";
+export type { SkillRow } from "./skills/types";
+export {
+  createSkillRow,
+  deleteSkillRow,
+  getSkillById,
+  getSkillByName,
+  listSkills,
+  updateSkillRow,
+} from "./skills/queries";
 export {
   createSessionRow,
   deleteSessionRow,

@@ -1,11 +1,11 @@
 import {
-  Bot,
   ChevronLeft,
   ChevronRight,
   EyeOff,
   Loader2,
   Plus,
   Settings,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 import { cx, iconButton } from "../../styles";
@@ -23,7 +23,7 @@ export function Sidebar({
   isLoading,
   collapsed,
   onToggleCollapsed,
-  onManageAgents,
+  onCustomization,
   onSettings,
 }: SidebarProps) {
   const [openMenu, setOpenMenu] = useState<{
@@ -122,11 +122,11 @@ export function Sidebar({
       <div className="space-y-1 border-t border-border-subtle pt-2">
         <button
           type="button"
-          onClick={onManageAgents}
+          onClick={onCustomization}
           className="flex w-full items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
         >
-          <Bot size={15} />
-          {!collapsed && <span>Manage Agents</span>}
+          <SlidersHorizontal size={15} />
+          {!collapsed && <span>Customization</span>}
         </button>
         <button
           type="button"

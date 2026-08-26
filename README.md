@@ -4,6 +4,12 @@ A local-first agent runtime with a run UI, powered by [Ollama](https://ollama.co
 
 Build custom agents directly from the UI. Each agent can have its own system prompt and a configurable set of tools, letting you tailor behavior to specific tasks without touching code.
 
+Custom skills live under **Customization > Skills**. A skill follows the
+`SKILL.md` shape: a lowercase hyphenated name, a description that tells agents
+when to use it, and Markdown instructions. Agents receive only the skill
+metadata until they load a matching skill. Type `$skill-name` in a message to
+invoke one directly.
+
 ## Requirements
 
 - [Bun](https://bun.sh/)

@@ -47,7 +47,7 @@ export class AgentTool extends BaseTool {
     if (!ctx || !parentToolStep) {
       return "Error: missing context for sub-agent invocation";
     }
-    const agent = agentManager.createAgentForContext(this.name, ctx);
+    const agent = agentManager.createAgentForContext(this.name, ctx, task);
     const childCtx = ctx.createChild(agent, task, parentToolStep);
     return agent.run(task, childCtx);
   }

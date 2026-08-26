@@ -14,6 +14,7 @@ import runRoutes from "./routes/runs";
 import searxngRoutes from "./routes/searxng";
 import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
+import skillsRoutes from "./routes/skills";
 import toolsRoutes from "./routes/tools";
 
 getDb();
@@ -38,6 +39,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use("/api/tools", toolsRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/agents", agentsRoutes);
+app.use("/api/skills", skillsRoutes);
 app.use("/api/attachments", attachmentsRoutes);
 app.use("/api/comfyui", comfyuiRoutes);
 app.use("/api/ollama", ollamaRoutes);

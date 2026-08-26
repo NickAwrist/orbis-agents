@@ -11,6 +11,6 @@ export type SidebarProps = {
   isLoading: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  onManageAgents: () => void;
+  onCustomization: () => void;
   onSettings: () => void;
 };

@@ -57,6 +57,8 @@ export type AgentSessionOptions = {
   toolSessionDir?: string;
   ownerUuid: string;
   attachmentSessionId?: string;
+  /** Current task, used to activate explicit `$skill-name` references. */
+  userPrompt?: string;
 };
 
 export class AgentSession extends EventEmitter {
@@ -99,6 +101,7 @@ export class AgentSession extends EventEmitter {
       toolSessionDir: options?.toolSessionDir,
       promptContext: options?.promptContext,
       ownerUuid: this.ownerUuid,
+      userPrompt: options?.userPrompt,
     });
     const m = options?.model?.trim();
     if (m) this.generalAgent.model = m;

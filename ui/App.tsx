@@ -103,7 +103,7 @@ export default function App() {
               onToggleCollapsed={() =>
                 app.setSidebarCollapsed((value) => !value)
               }
-              onManageAgents={() => {
+              onCustomization={() => {
                 app.setSidebarOpen(false);
                 setCurrentView("agents");
               }}
