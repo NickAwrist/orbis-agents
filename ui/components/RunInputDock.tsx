@@ -16,6 +16,7 @@ export function RunInputDock({
   imageError,
   addPendingImages,
   removePendingImage,
+  supportsImageInput,
   canAttachImages,
   attachImageDisabledReason,
   attachmentsSendReady,
@@ -33,6 +34,7 @@ export function RunInputDock({
   imageError: string | null;
   addPendingImages: (files: File[]) => void;
   removePendingImage: (id: string) => void;
+  supportsImageInput: boolean;
   canAttachImages: boolean;
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
@@ -165,30 +167,34 @@ export function RunInputDock({
           </p>
         )}
         <div className="flex w-full items-end gap-1">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              addPendingImages(Array.from(e.target.files ?? []));
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isBusy || !canAttachImages}
-            className={cx(
-              iconButton,
-              "mb-0.5 size-9 shrink-0 border-transparent p-0",
-            )}
-            title={attachImageDisabledReason ?? "Add images"}
-            aria-label={attachImageDisabledReason ?? "Add images"}
-          >
-            <ImagePlus size={17} />
-          </button>
+          {supportsImageInput && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  addPendingImages(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy || !canAttachImages}
+                className={cx(
+                  iconButton,
+                  "mb-0.5 size-9 shrink-0 border-transparent p-0",
+                )}
+                title={attachImageDisabledReason ?? "Add images"}
+                aria-label={attachImageDisabledReason ?? "Add images"}
+              >
+                <ImagePlus size={17} />
+              </button>
+            </>
+          )}
           <textarea
             ref={inputRef}
             value={input}

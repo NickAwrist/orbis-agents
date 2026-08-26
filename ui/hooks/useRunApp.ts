@@ -174,6 +174,7 @@ export function useRunApp() {
     ollamaConnected: ollama.ollamaConnected,
     noProviderAvailable,
     modelSendReady,
+    supportsImageInput,
     handleModelChange: sessions.handleModelChange,
     isEphemeral: sessions.isEphemeral,
     userSettings: settings.userSettings,
