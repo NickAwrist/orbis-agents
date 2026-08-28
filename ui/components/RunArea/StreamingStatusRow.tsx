@@ -5,6 +5,7 @@ type Props = {
   streamingStep: MessageStep | null;
   streamingSteps: MessageStep[];
   streamingContent: string;
+  streamingThinking: string;
   onViewSteps: (payload: TraceModalOpenPayload) => void;
 };
 
@@ -12,12 +13,14 @@ export function StreamingStatusRow({
   streamingStep,
   streamingSteps,
   streamingContent,
+  streamingThinking,
   onViewSteps,
 }: Props) {
   const liveMeta = getLiveStepMeta(
     streamingStep,
     streamingSteps.length,
     streamingContent,
+    streamingThinking,
   );
 
   return (

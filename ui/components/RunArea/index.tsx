@@ -12,6 +12,7 @@ export function RunArea({
   streamingSteps,
   streamingStep,
   streamingContent,
+  streamingThinking,
   runPending,
   footerInset,
   onViewSteps,
@@ -90,6 +91,7 @@ export function RunArea({
               streamingStep={streamingStep}
               streamingSteps={streamingSteps}
               streamingContent={streamingContent}
+              streamingThinking={streamingThinking}
               onViewSteps={onViewSteps}
             />
           )}

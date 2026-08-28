@@ -5,6 +5,7 @@ export type RunAreaProps = {
   streamingSteps: MessageStep[];
   streamingStep: MessageStep | null;
   streamingContent: string;
+  streamingThinking: string;
   runPending: boolean;
   footerInset: number;
   onViewSteps: (payload: TraceModalOpenPayload) => void;

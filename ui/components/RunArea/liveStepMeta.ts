@@ -19,8 +19,10 @@ export function getLiveStepMeta(
   step: MessageStep | null,
   count: number,
   streamingContent: string,
+  streamingThinking: string,
 ) {
-  const isResponding = streamingContent.trim().length > 0;
+  const isResponding = streamingContent.length > 0;
+  const isThinking = streamingThinking.length > 0;
 
   if (!step) {
     return {
@@ -74,7 +76,11 @@ export function getLiveStepMeta(
   }
 
   return {
-    label: isResponding ? "Responding" : "Thinking",
+    label: isResponding
+      ? "Responding"
+      : isThinking
+        ? "Thinking"
+        : "Initializing",
     detail: agentName && step.agentName !== "general_agent" ? agentName : null,
   };
 }

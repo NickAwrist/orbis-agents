@@ -204,6 +204,7 @@ export default function App() {
                         streamingSteps={app.streamingSteps}
                         streamingStep={app.streamingStep}
                         streamingContent={app.streamingContent}
+                        streamingThinking={app.streamingThinking}
                         runPending={app.runPending}
                         footerInset={runFooterInset}
                         onViewSteps={app.setStepsModalData}
@@ -264,7 +265,6 @@ export default function App() {
         {app.debugOpen && (
           <DebugModal
             data={app.debugData}
-            ollamaConnected={app.ollamaConnected}
             onClose={() => app.setDebugOpen(false)}
           />
         )}

@@ -9,7 +9,7 @@ export type PersonalizationFields = {
   name?: string;
   location?: string;
   preferredFormats?: string;
-  /** Optional override; defaults to `new Date()` at render time. */
+  /** Optional date override; defaults to the current date at render time. */
   now?: Date;
 };
 
@@ -53,8 +53,7 @@ export const PROMPT_PLACEHOLDER_LIST: Array<{
   {
     key: "PERSONALIZATION",
     token: PROMPT_PLACEHOLDERS.PERSONALIZATION,
-    description:
-      "User name, location, preferred response format, and current date/time.",
+    description: "User name, location, preferred response format, and date.",
   },
   {
     key: "SESSION_DIRECTORY",
@@ -85,12 +84,7 @@ function formatPersonalizationBlock(fields: PersonalizationFields): string {
     month: "long",
     day: "numeric",
   });
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-  lines.push(`Current date and time: ${dateStr}, ${timeStr}`);
+  lines.push(`Current date: ${dateStr}`);
 
   return ["--- User personalization ---", ...lines].join("\n");
 }

@@ -19,36 +19,11 @@ function nextCallPayload(data: DebugData): string {
 
 export function DebugModal({
   data,
-  ollamaConnected,
   onClose,
 }: {
   data: DebugData | null;
-  ollamaConnected: boolean | null;
   onClose: () => void;
 }) {
-  const ollamaLine =
-    ollamaConnected === null ? (
-      <span className="text-[0.6875rem] text-muted-foreground">
-        Ollama: checking...
-      </span>
-    ) : ollamaConnected ? (
-      <span className="text-[0.6875rem] text-muted-foreground">
-        <span
-          className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-500/90 align-middle"
-          aria-hidden
-        />
-        Ollama connected
-      </span>
-    ) : (
-      <span className="text-[0.6875rem] text-muted-foreground">
-        <span
-          className="mr-1.5 inline-block size-1.5 rounded-full bg-red-500/70 align-middle"
-          aria-hidden
-        />
-        Ollama disconnected
-      </span>
-    );
-
   const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
     if (event.target === event.currentTarget) onClose();
   };
@@ -74,7 +49,6 @@ export function DebugModal({
                 <Bug size={18} />
                 Debug
               </h2>
-              <div className="mt-1.5">{ollamaLine}</div>
             </div>
             <button
               type="button"
