@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   completeSkillToken,
+  filterAssignedSkills,
   findActiveSkillToken,
 } from "../../ui/components/skillPicker";
 
@@ -39,5 +40,15 @@ describe("skill picker", () => {
         "release-notes",
       ),
     ).toEqual({ value: "$release-notes next", caret: 14 });
+  });
+
+  test("shows only skills assigned to the active agent", () => {
+    const skills = [
+      { id: "release", name: "release-notes" },
+      { id: "audit", name: "audit" },
+    ];
+
+    expect(filterAssignedSkills(skills, ["audit"])).toEqual([skills[1]!]);
+    expect(filterAssignedSkills(skills, [])).toEqual([]);
   });
 });

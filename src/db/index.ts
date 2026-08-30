@@ -1,12 +1,15 @@
 export { DEFAULT_COMFYUI_NEGATIVE_PROMPT } from "./constants";
 export { getDb, resetDbConnection } from "./connection";
-export type { AgentRow, AgentWithTools } from "./agents/types";
+export type { AgentData, AgentRow, AgentWriteData } from "./agents/types";
 export {
+  AgentCapabilityValidationError,
   createAgentRow,
   deleteAgentRow,
   getAgentById,
   getAgentByName,
+  listAssignedSkills,
   listAgents,
+  listDelegationTargets,
   updateAgentRow,
 } from "./agents/queries";
 export type { SkillRow } from "./skills/types";

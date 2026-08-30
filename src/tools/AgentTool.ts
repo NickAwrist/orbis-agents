@@ -3,7 +3,36 @@ import type { RunContext, Step } from "../RunContext";
 import { agentManager } from "../agents/agentManager";
 import { BaseTool } from "./BaseTool";
 
+export type AgentToolTarget = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+export function delegationToolName(
+  target: Pick<AgentToolTarget, "id" | "name">,
+) {
+  const normalizedName =
+    target.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 18) || "agent";
+  const stableId = target.id
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 32);
+  return `delegate_to_${normalizedName}_${stableId || "unknown"}`;
+}
+
 export class AgentTool extends BaseTool {
+  constructor(readonly target: AgentToolTarget) {
+    super(
+      delegationToolName(target),
+      `Delegate to ${target.name}: ${target.description || "No description provided."}`,
+    );
+  }
+
   override toTool(): Tool {
     return {
       type: "function",
@@ -47,7 +76,11 @@ export class AgentTool extends BaseTool {
     if (!ctx || !parentToolStep) {
       return "Error: missing context for sub-agent invocation";
     }
-    const agent = agentManager.createAgentForContext(this.name, ctx, task);
+    const agent = agentManager.createAgentByIdForContext(
+      this.target.id,
+      ctx,
+      task,
+    );
     const childCtx = ctx.createChild(agent, task, parentToolStep);
     return agent.run(task, childCtx);
   }

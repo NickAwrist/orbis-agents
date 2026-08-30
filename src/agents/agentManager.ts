@@ -1,7 +1,13 @@
 import os from "node:os";
 import type { RunContext } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
-import { getAgentByName, listSkills } from "../db/index";
+import {
+  type AgentData,
+  getAgentById,
+  getAgentByName,
+  listAssignedSkills,
+  listDelegationTargets,
+} from "../db/index";
 import {
   type PersonalizationFields,
   type PromptContext,
@@ -11,6 +17,7 @@ import { renderSkillsPrompt } from "../skills/runtime";
 import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
 import { BashTool } from "../tools/bash";
+import { isBuiltinToolName } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
 import { GenerateImageTool } from "../tools/generate_image";
@@ -23,26 +30,9 @@ import { RunTscTool } from "../tools/run_tsc";
 import { WebSearchTool } from "../tools/web_search";
 import { BaseAgent } from "./BaseAgent";
 
-export const BUILTIN_TOOLS = [
-  "create_file",
-  "delete_file",
-  "grep",
-  "list_files",
-  "modify_plan",
-  "read_file",
-  "run_tsc",
-  "web_search",
-  "bash",
-  "generate_image",
-] as const;
-
 export type CreateAgentOptions = {
   ownerUuid: string;
-  /**
-   * Pre-rendered system prompt. When provided it is used verbatim (plus
-   * appended core directives). When omitted the stored template is rendered
-   * on the server using `promptContext` - used for subagent invocations.
-   */
+  /** Pre-rendered prompt for a root run. Stored templates render on the server. */
   systemPrompt?: string;
   /** Resolved absolute directory tools use; also drives `{{SESSION_DIRECTORY}}`. */
   toolSessionDir?: string;
@@ -63,7 +53,7 @@ function serverPromptContext(
   };
 }
 
-/** PromptContext for run turns: OS + session dir from server; personalization from request metadata. */
+/** Prompt context for run turns, with server OS and session directory values. */
 export function buildServerRunPromptContext(opts: {
   metadata?: {
     name?: string | undefined;
@@ -88,107 +78,149 @@ export function buildServerRunPromptContext(opts: {
   );
 }
 
+function createBuiltinTool(toolName: string): BaseTool {
+  switch (toolName) {
+    case "create_file":
+      return new CreateFileTool();
+    case "delete_file":
+      return new DeleteFileTool();
+    case "grep":
+      return new GrepTool();
+    case "list_files":
+      return new ListFilesTool();
+    case "modify_plan":
+      return new ModifyPlan();
+    case "read_file":
+      return new ReadFileTool();
+    case "run_tsc":
+      return new RunTscTool();
+    case "web_search":
+      return new WebSearchTool();
+    case "bash":
+      return new BashTool();
+    case "generate_image":
+      return new GenerateImageTool();
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
+
+function buildAgent(config: AgentData, opts: CreateAgentOptions): BaseAgent {
+  const renderedAgentPrompt =
+    typeof opts.systemPrompt === "string" && opts.systemPrompt.length > 0
+      ? opts.systemPrompt
+      : renderSystemPrompt(
+          config.system_prompt,
+          serverPromptContext(opts.promptContext, opts.toolSessionDir),
+        );
+  const skills = listAssignedSkills(opts.ownerUuid, config.id);
+  const skillsPrompt = renderSkillsPrompt(skills, opts.userPrompt ?? "");
+  const finalPrompt = [renderedAgentPrompt, skillsPrompt]
+    .filter((part) => part.length > 0)
+    .join("\n\n");
+
+  const agent = new BaseAgent(
+    config.name,
+    config.description,
+    undefined,
+    undefined,
+    finalPrompt,
+  );
+  agent.addTools(
+    config.tools
+      .filter(isBuiltinToolName)
+      .map((tool) => createBuiltinTool(tool)),
+  );
+  const delegationTargets = listDelegationTargets(opts.ownerUuid, config.id);
+  agent.addTools(
+    delegationTargets.map(
+      (target) =>
+        new AgentTool({
+          id: target.id,
+          name: target.name,
+          description: target.description,
+        }),
+    ),
+  );
+  if (skills.length > 0) {
+    agent.addTool(new LoadSkillTool(skills));
+  }
+  return agent;
+}
+
+function inheritParentModel(agent: BaseAgent, ctx?: RunContext): BaseAgent {
+  const parentModel = ctx?.agentInstance?.model;
+  agent.model =
+    typeof parentModel === "string" && parentModel.length > 0
+      ? parentModel
+      : DEFAULT_RUN_MODEL;
+  return agent;
+}
+
+function contextOptions(
+  ctx?: RunContext,
+  userPrompt?: string,
+): CreateAgentOptions {
+  return {
+    ownerUuid: ctx?.ownerUuid ?? "",
+    toolSessionDir: ctx?.sessionDir,
+    promptContext: ctx?.promptContext,
+    userPrompt,
+  };
+}
+
 export const agentManager = {
-  /** Build a subagent that inherits the parent run's prompt context + session dir. */
+  /** Build a subagent by name that inherits its parent run context and model. */
   createAgentForContext(
     agentName: string,
     ctx?: RunContext,
     userPrompt?: string,
   ): BaseAgent {
-    const agent = this.createAgent(agentName, {
-      ownerUuid: ctx?.ownerUuid ?? "",
-      toolSessionDir: ctx?.sessionDir,
-      promptContext: ctx?.promptContext,
-      userPrompt,
-    });
-    const parentModel = ctx?.agentInstance?.model;
-    if (typeof parentModel === "string" && parentModel.length > 0) {
-      agent.model = parentModel;
-    } else {
-      agent.model = DEFAULT_RUN_MODEL;
-    }
-    return agent;
+    return inheritParentModel(
+      this.createAgent(agentName, contextOptions(ctx, userPrompt)),
+      ctx,
+    );
+  },
+
+  /** Build a subagent by stable ID that inherits its parent run context and model. */
+  createAgentByIdForContext(
+    agentId: string,
+    ctx?: RunContext,
+    userPrompt?: string,
+  ): BaseAgent {
+    return inheritParentModel(
+      this.createAgentById(agentId, contextOptions(ctx, userPrompt)),
+      ctx,
+    );
   },
 
   createAgent(agentName: string, opts?: CreateAgentOptions): BaseAgent {
-    const config = getAgentByName(opts?.ownerUuid ?? "", agentName);
+    const ownerUuid = opts?.ownerUuid ?? "";
+    const config = getAgentByName(ownerUuid, agentName);
     if (!config) {
       throw new Error(
         `Agent configuration for '${agentName}' not found in database`,
       );
     }
-
-    const renderedAgentPrompt =
-      typeof opts?.systemPrompt === "string" && opts.systemPrompt.length > 0
-        ? opts.systemPrompt
-        : renderSystemPrompt(
-            config.system_prompt,
-            serverPromptContext(opts?.promptContext, opts?.toolSessionDir),
-          );
-    const skills = listSkills(opts?.ownerUuid ?? "");
-    const skillsPrompt = renderSkillsPrompt(skills, opts?.userPrompt ?? "");
-    const finalPrompt = [renderedAgentPrompt, skillsPrompt]
-      .filter((part) => part.length > 0)
-      .join("\n\n");
-
-    const agent = new BaseAgent(
-      config.name,
-      config.description,
-      undefined,
-      undefined,
-      finalPrompt,
-    );
-
-    if (config.tools.length > 0) {
-      const tools = config.tools
-        .filter((t: string) => this.isToolEnabled(t))
-        .map((t: string) => this.getToolInstance(t, opts?.ownerUuid ?? ""));
-      agent.addTools(tools);
-    }
-
-    if (skills.length > 0) {
-      agent.addTool(new LoadSkillTool(opts?.ownerUuid ?? ""));
-    }
-
-    return agent;
+    return buildAgent(config, opts ?? { ownerUuid });
   },
 
-  getToolInstance(toolName: string, ownerUuid: string): BaseTool {
-    if (toolName.endsWith("_agent")) {
-      const agentRow = getAgentByName(ownerUuid, toolName);
-      return new AgentTool(toolName, agentRow?.description ?? toolName);
+  createAgentById(agentId: string, opts?: CreateAgentOptions): BaseAgent {
+    const ownerUuid = opts?.ownerUuid ?? "";
+    const config = getAgentById(ownerUuid, agentId);
+    if (!config) {
+      throw new Error(
+        `Agent configuration for ID '${agentId}' not found in database`,
+      );
     }
+    return buildAgent(config, opts ?? { ownerUuid });
+  },
 
-    switch (toolName) {
-      case "create_file":
-        return new CreateFileTool();
-      case "delete_file":
-        return new DeleteFileTool();
-      case "grep":
-        return new GrepTool();
-      case "list_files":
-        return new ListFilesTool();
-      case "modify_plan":
-        return new ModifyPlan();
-      case "read_file":
-        return new ReadFileTool();
-      case "run_tsc":
-        return new RunTscTool();
-      case "web_search":
-        return new WebSearchTool();
-      case "bash":
-        return new BashTool();
-      case "generate_image":
-        return new GenerateImageTool();
-      default:
-        throw new Error(`Unknown tool: ${toolName}`);
-    }
+  getToolInstance(toolName: string): BaseTool {
+    return createBuiltinTool(toolName);
   },
 
   isToolEnabled(toolName: string): boolean {
-    return (
-      toolName.endsWith("_agent") ||
-      (BUILTIN_TOOLS as readonly string[]).includes(toolName)
-    );
+    return isBuiltinToolName(toolName);
   },
 };

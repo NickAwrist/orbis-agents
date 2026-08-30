@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BUILTIN_TOOLS } from "../agents/agentManager";
+import { BUILTIN_TOOLS } from "../tools/builtinTools";
 
 const toolsRoutes = Router();
 

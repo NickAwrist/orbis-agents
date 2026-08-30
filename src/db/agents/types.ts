@@ -9,4 +9,17 @@ export type AgentRow = {
   updated_at: number;
 };
 
-export type AgentWithTools = AgentRow & { tools: string[] };
+export type AgentData = AgentRow & {
+  tools: string[];
+  skill_ids: string[];
+  delegate_agent_ids: string[];
+};
+
+export type AgentWriteData = {
+  name: string;
+  description: string;
+  system_prompt: string;
+  tools: string[];
+  skill_ids: string[];
+  delegate_agent_ids: string[];
+};

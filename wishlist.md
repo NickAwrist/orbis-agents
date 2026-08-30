@@ -5,7 +5,6 @@ Really want
 - Projects section that share a modified system prompt
 
 Nice to have
-
 - For some tools like bash, ask the user if it is okay to submit (can be set to not ask this ever)
 
 Still thinking about

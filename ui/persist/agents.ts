@@ -8,6 +8,8 @@ export type AgentData = {
   system_prompt: string;
   is_default: number;
   tools: string[];
+  skill_ids: string[];
+  delegate_agent_ids: string[];
   created_at: number;
   updated_at: number;
 };
@@ -17,6 +19,8 @@ export type AgentWriteBody = {
   description: string;
   system_prompt: string;
   tools: string[];
+  skill_ids: string[];
+  delegate_agent_ids: string[];
 };
 
 export async function fetchAgents(): Promise<AgentData[]> {

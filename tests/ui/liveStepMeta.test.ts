@@ -16,4 +16,20 @@ describe("live step metadata", () => {
       "Responding",
     );
   });
+
+  test("identifies delegation from nested run data instead of tool naming", () => {
+    const result = getLiveStepMeta(
+      {
+        kind: "tool_call",
+        status: "running",
+        toolName: "delegate_to_reviewer_a1b2c3d4",
+        childRun: { agentName: "reviewer", steps: [] },
+      },
+      2,
+      "",
+      "",
+    );
+
+    expect(result.label).toBe("Agent");
+  });
 });

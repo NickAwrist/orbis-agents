@@ -1,7 +1,8 @@
-import { Bot, Save, Trash2, Wrench } from "lucide-react";
+import { BookOpen, Bot, Save, Trash2, Wrench } from "lucide-react";
 import { type Dispatch, type SetStateAction, useRef } from "react";
 import { PROMPT_PLACEHOLDER_LIST } from "../../../src/prompts/render";
 import type { AgentData } from "../../persist/agents";
+import type { SkillData } from "../../persist/skills";
 import { cx, primaryButton, secondaryButton } from "../../styles";
 import { canDeleteAgent } from "./agentsPageUtils";
 import type { AgentEditorState } from "./types";
@@ -12,13 +13,16 @@ type Props = {
   editor: AgentEditorState;
   setEditor: Dispatch<SetStateAction<AgentEditorState>>;
   builtinTools: string[];
-  otherAgentNames: string[];
+  skills: SkillData[];
+  otherAgents: AgentData[];
   saving: boolean;
   saveDisabled: boolean;
   deleting: boolean;
   onSave: () => void;
   onCancelEdit: () => void;
   onToggleTool: (tool: string) => void;
+  onToggleSkill: (skillId: string) => void;
+  onToggleDelegation: (agentId: string) => void;
   onRequestDeleteAgent: (a: AgentData) => void;
 };
 
@@ -45,13 +49,16 @@ export function AgentEditor({
   editor,
   setEditor,
   builtinTools,
-  otherAgentNames,
+  skills,
+  otherAgents,
   saving,
   saveDisabled,
   deleting,
   onSave,
   onCancelEdit,
   onToggleTool,
+  onToggleSkill,
+  onToggleDelegation,
   onRequestDeleteAgent,
 }: Props) {
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
@@ -192,34 +199,65 @@ export function AgentEditor({
           </div>
         </fieldset>
 
-        {otherAgentNames.length > 0 && (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
-              <Bot size={13} />
-              Subagents
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {otherAgentNames.map((name) => {
-                const active = editor.tools.includes(name);
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => onToggleTool(name)}
-                    className={cx(
-                      "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
-                      active
-                        ? "border-accent/30 bg-accent-soft-strong text-foreground"
-                        : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                    )}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-        )}
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
+            <BookOpen size={13} />
+            Skills
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {skills.map((skill) => {
+              const active = editor.skill_ids.includes(skill.id);
+              return (
+                <button
+                  key={skill.id}
+                  type="button"
+                  onClick={() => onToggleSkill(skill.id)}
+                  className={cx(
+                    "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
+                    active
+                      ? "border-accent/30 bg-accent-soft-strong text-foreground"
+                      : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
+                  )}
+                >
+                  ${skill.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
+            This agent sees and can load only the selected skills.
+          </p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
+            <Bot size={13} />
+            Delegation routes
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {otherAgents.map((agent) => {
+              const active = editor.delegate_agent_ids.includes(agent.id);
+              return (
+                <button
+                  key={agent.id}
+                  type="button"
+                  onClick={() => onToggleDelegation(agent.id)}
+                  className={cx(
+                    "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
+                    active
+                      ? "border-accent/30 bg-accent-soft-strong text-foreground"
+                      : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
+                  )}
+                >
+                  {agent.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
+            Selected agents appear to the model as callable delegation tools.
+          </p>
+        </fieldset>
 
         <div className="flex items-center gap-3 pt-2">
           <button

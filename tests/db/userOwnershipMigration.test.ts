@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import {
   migrateAgentsInlinePlaceholders,
+  migrateAgentsOwnerColumn,
   runMigrations,
 } from "../../src/db/migrations";
 
@@ -103,5 +104,29 @@ test("ownership migration preserves legacy sessions, agents, and tools", () => {
     (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
       .foreign_keys,
   ).toBe(1);
+  db.close();
+});
+
+test("ownership migration preserves a disabled foreign-key setting", () => {
+  const db = new Database(":memory:");
+  db.run("PRAGMA foreign_keys = OFF");
+  db.run(`
+    CREATE TABLE agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  migrateAgentsOwnerColumn(db);
+
+  expect(
+    (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
+      .foreign_keys,
+  ).toBe(0);
   db.close();
 });

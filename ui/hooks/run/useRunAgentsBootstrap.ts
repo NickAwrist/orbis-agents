@@ -6,7 +6,7 @@ import {
 } from "../../persist/agents";
 
 export function useRunAgentsBootstrap() {
-  const [runAgents, setRunAgents] = useState<{ name: string }[]>([]);
+  const [runAgents, setRunAgents] = useState<AgentData[]>([]);
   const [serverDefaultRunAgent, setServerDefaultRunAgent] =
     useState("general_agent");
   /** Keeps the full agent records (including `system_prompt`) for client-side rendering. */
@@ -14,7 +14,7 @@ export function useRunAgentsBootstrap() {
 
   const apply = useCallback((list: AgentData[], def: string) => {
     agentMapRef.current = new Map(list.map((a) => [a.name, a]));
-    setRunAgents(list.map((a) => ({ name: a.name })));
+    setRunAgents(list);
     setServerDefaultRunAgent(def);
   }, []);
 

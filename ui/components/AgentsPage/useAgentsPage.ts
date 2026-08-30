@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AgentData,
   createAgentApi,
@@ -8,11 +8,14 @@ import {
   putDefaultRunAgentApi,
   updateAgentApi,
 } from "../../persist/agents";
+import { type SkillData, fetchSkills } from "../../persist/skills";
 import {
   canDeleteAgent,
   editorFromAgent,
   editorsEqual,
   emptyEditor,
+  reconcileEditorAfterRefresh,
+  removeUnavailableCapabilityIds,
 } from "./agentsPageUtils";
 import type { AgentEditorState } from "./types";
 
@@ -25,6 +28,7 @@ export function useAgentsPage({
 }) {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [builtinTools, setBuiltinTools] = useState<string[]>([]);
+  const [skills, setSkills] = useState<SkillData[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [editor, setEditor] = useState<AgentEditorState>(emptyEditor());
@@ -44,15 +48,40 @@ export function useAgentsPage({
     anchorRect: DOMRect;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const refreshGenerationRef = useRef(0);
+  const selectedIdRef = useRef(selectedId);
+  const isNewRef = useRef(isNew);
+  const editorRef = useRef(editor);
+  const baselineEditorRef = useRef(baselineEditor);
+  selectedIdRef.current = selectedId;
+  isNewRef.current = isNew;
+  editorRef.current = editor;
+  baselineEditorRef.current = baselineEditor;
 
-  const load = useCallback(async () => {
-    const [agentList, tools] = await Promise.all([
+  const fetchPageData = useCallback(async () => {
+    const [agentList, tools, skillList] = await Promise.all([
       fetchAgents(),
       fetchBuiltinTools(),
+      fetchSkills(),
     ]);
-    setAgents(agentList);
-    setBuiltinTools(tools);
+    return { agentList, tools, skillList };
   }, []);
+
+  const applyPageData = useCallback(
+    (data: Awaited<ReturnType<typeof fetchPageData>>) => {
+      const { agentList, tools, skillList } = data;
+      setAgents(agentList);
+      setBuiltinTools(tools);
+      setSkills(skillList);
+    },
+    [fetchPageData],
+  );
+
+  const load = useCallback(async () => {
+    const data = await fetchPageData();
+    applyPageData(data);
+    return data;
+  }, [applyPageData, fetchPageData]);
 
   useEffect(() => {
     void load();
@@ -62,9 +91,53 @@ export function useAgentsPage({
     setDefaultDraft(defaultRunAgent);
   }, [defaultRunAgent]);
 
-  const otherAgentNames = agents
-    .filter((a) => a.id !== selectedId)
-    .map((a) => a.name);
+  const otherAgents = agents.filter((agent) => agent.id !== selectedId);
+
+  const refreshSelectedEditor = async () => {
+    const refreshGeneration = ++refreshGenerationRef.current;
+    const data = await fetchPageData();
+    if (refreshGeneration !== refreshGenerationRef.current) return;
+    applyPageData(data);
+
+    const { agentList, skillList } = data;
+    const availableSkillIds = new Set(skillList.map((skill) => skill.id));
+    const availableAgentIds = new Set(agentList.map((agent) => agent.id));
+    if (isNewRef.current) {
+      const nextEditor = removeUnavailableCapabilityIds(
+        editorRef.current,
+        availableSkillIds,
+        availableAgentIds,
+      );
+      editorRef.current = nextEditor;
+      setEditor(nextEditor);
+      return;
+    }
+    const currentSelectedId = selectedIdRef.current;
+    if (!currentSelectedId) return;
+    const refreshedAgent = agentList.find(
+      (agent) => agent.id === currentSelectedId,
+    );
+    if (!refreshedAgent) {
+      selectedIdRef.current = null;
+      editorRef.current = emptyEditor();
+      baselineEditorRef.current = emptyEditor();
+      setSelectedId(null);
+      setEditor(editorRef.current);
+      setBaselineEditor(baselineEditorRef.current);
+      return;
+    }
+    const reconciled = reconcileEditorAfterRefresh(
+      editorRef.current,
+      baselineEditorRef.current,
+      refreshedAgent,
+      availableSkillIds,
+      availableAgentIds,
+    );
+    editorRef.current = reconciled.editor;
+    baselineEditorRef.current = reconciled.baseline;
+    setEditor(reconciled.editor);
+    setBaselineEditor(reconciled.baseline);
+  };
 
   const selectAgent = (a: AgentData) => {
     setSelectedId(a.id);
@@ -93,7 +166,26 @@ export function useAgentsPage({
     }));
   };
 
+  const toggleSkill = (skillId: string) => {
+    setEditor((previous) => ({
+      ...previous,
+      skill_ids: previous.skill_ids.includes(skillId)
+        ? previous.skill_ids.filter((id) => id !== skillId)
+        : [...previous.skill_ids, skillId],
+    }));
+  };
+
+  const toggleDelegation = (agentId: string) => {
+    setEditor((previous) => ({
+      ...previous,
+      delegate_agent_ids: previous.delegate_agent_ids.includes(agentId)
+        ? previous.delegate_agent_ids.filter((id) => id !== agentId)
+        : [...previous.delegate_agent_ids, agentId],
+    }));
+  };
+
   const handleSave = async () => {
+    refreshGenerationRef.current += 1;
     setError(null);
     if (editorsEqual(editor, baselineEditor)) return;
     if (!editor.name.trim()) {
@@ -113,7 +205,12 @@ export function useAgentsPage({
       } else if (selectedId) {
         await updateAgentApi(selectedId, editor);
         await load();
-        setBaselineEditor({ ...editor, tools: [...editor.tools] });
+        setBaselineEditor({
+          ...editor,
+          tools: [...editor.tools],
+          skill_ids: [...editor.skill_ids],
+          delegate_agent_ids: [...editor.delegate_agent_ids],
+        });
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -124,6 +221,7 @@ export function useAgentsPage({
 
   const performDelete = async () => {
     if (!pendingDelete) return;
+    refreshGenerationRef.current += 1;
     const { id } = pendingDelete;
     setOpenMenu(null);
     setDeleting(true);
@@ -178,6 +276,7 @@ export function useAgentsPage({
   return {
     agents,
     builtinTools,
+    skills,
     selectedId,
     setSelectedId,
     isNew,
@@ -195,10 +294,13 @@ export function useAgentsPage({
     setOpenMenu,
     deleting,
     load,
-    otherAgentNames,
+    refreshSelectedEditor,
+    otherAgents,
     selectAgent,
     startNew,
     toggleTool,
+    toggleSkill,
+    toggleDelegation,
     handleSave,
     performDelete,
     requestDeleteAgent,

@@ -9,7 +9,11 @@ import {
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep } from "../types";
-import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
+import {
+  completeSkillToken,
+  filterAssignedSkills,
+  findActiveSkillToken,
+} from "./skillPicker";
 
 export function RunInputDock({
   input,
@@ -28,6 +32,7 @@ export function RunInputDock({
   canAttachImages,
   attachImageDisabledReason,
   attachmentsSendReady,
+  assignedSkillIds,
   onFooterHeightChange,
 }: {
   input: string;
@@ -46,6 +51,7 @@ export function RunInputDock({
   canAttachImages: boolean;
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
+  assignedSkillIds: string[];
   onFooterHeightChange: (heightPx: number) => void;
 }) {
   const footerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +70,7 @@ export function RunInputDock({
     ? null
     : findActiveSkillToken(input, caretIndex);
   const matchingSkills = activeSkillToken
-    ? skills
+    ? filterAssignedSkills(skills, assignedSkillIds)
         .filter((skill) => skill.name.startsWith(activeSkillToken.query))
         .slice(0, 8)
     : [];

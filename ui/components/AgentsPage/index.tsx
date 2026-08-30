@@ -50,7 +50,10 @@ export function AgentsPage({
         <button
           type="button"
           className={tabButtonClass("agents")}
-          onClick={() => setTab("agents")}
+          onClick={() => {
+            setTab("agents");
+            void p.refreshSelectedEditor();
+          }}
         >
           Agents
         </button>
@@ -114,7 +117,8 @@ export function AgentsPage({
                   editor={p.editor}
                   setEditor={p.setEditor}
                   builtinTools={p.builtinTools}
-                  otherAgentNames={p.otherAgentNames}
+                  skills={p.skills}
+                  otherAgents={p.otherAgents}
                   saving={p.saving}
                   saveDisabled={!p.editorDirty || p.saving}
                   deleting={p.deleting}
@@ -125,6 +129,8 @@ export function AgentsPage({
                     p.setEditor(emptyEditor());
                   }}
                   onToggleTool={p.toggleTool}
+                  onToggleSkill={p.toggleSkill}
+                  onToggleDelegation={p.toggleDelegation}
                   onRequestDeleteAgent={p.requestDeleteAgent}
                 />
               ) : (

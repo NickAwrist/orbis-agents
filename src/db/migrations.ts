@@ -1,4 +1,20 @@
 import type { Database } from "bun:sqlite";
+import { isBuiltinToolName } from "../tools/builtinTools";
+
+function tableExists(db: Database, name: string): boolean {
+  return (
+    db
+      .query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(name) !== null
+  );
+}
+
+function foreignKeysEnabled(db: Database): boolean {
+  return (
+    (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
+      .foreign_keys === 1
+  );
+}
 
 export function migrateSessionsAgentColumn(db: Database) {
   const cols = db.query("PRAGMA table_info(sessions)").all() as {
@@ -43,6 +59,7 @@ export function migrateAgentsOwnerColumn(db: Database) {
   }[];
   if (cols.some((c) => c.name === "owner_uuid")) return;
 
+  const restoreForeignKeys = foreignKeysEnabled(db);
   db.run("PRAGMA foreign_keys = OFF");
   try {
     const tx = db.transaction(() => {
@@ -70,8 +87,99 @@ export function migrateAgentsOwnerColumn(db: Database) {
     });
     tx();
   } finally {
-    db.run("PRAGMA foreign_keys = ON");
+    db.run(`PRAGMA foreign_keys = ${restoreForeignKeys ? "ON" : "OFF"}`);
   }
+}
+
+export function migrateAgentSkills(db: Database) {
+  if (tableExists(db, "agent_skills")) return;
+  if (!tableExists(db, "agents") || !tableExists(db, "skills")) return;
+
+  const tx = db.transaction(() => {
+    db.run(`
+      CREATE TABLE agent_skills (
+        agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (agent_id, skill_id)
+      )
+    `);
+    db.run(`
+      INSERT INTO agent_skills (agent_id, skill_id, position)
+      SELECT
+        agent_id,
+        skill_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY agent_id
+          ORDER BY skill_created_at, skill_id
+        ) - 1
+      FROM (
+        SELECT
+          agents.id AS agent_id,
+          skills.id AS skill_id,
+          skills.created_at AS skill_created_at
+        FROM agents
+        INNER JOIN skills ON skills.owner_uuid = agents.owner_uuid
+      )
+    `);
+  });
+  tx();
+}
+
+export function migrateAgentDelegations(db: Database) {
+  if (tableExists(db, "agent_delegations")) return;
+  if (!tableExists(db, "agents") || !tableExists(db, "agent_tools")) return;
+
+  const tx = db.transaction(() => {
+    db.run(`
+      CREATE TABLE agent_delegations (
+        source_agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        target_agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (source_agent_id, target_agent_id),
+        CHECK (source_agent_id != target_agent_id)
+      )
+    `);
+
+    const legacyRows = db
+      .query(`
+        SELECT
+          agent_tools.id,
+          agent_tools.agent_id,
+          agent_tools.tool_name,
+          agent_tools.position,
+          agents.owner_uuid
+        FROM agent_tools
+        INNER JOIN agents ON agents.id = agent_tools.agent_id
+        ORDER BY agent_tools.id
+      `)
+      .all() as Array<{
+      id: number;
+      agent_id: string;
+      tool_name: string;
+      position: number;
+      owner_uuid: string | null;
+    }>;
+    const findTarget = db.query(
+      "SELECT id FROM agents WHERE owner_uuid IS ? AND name = ?",
+    );
+    const insertRoute = db.prepare(
+      "INSERT OR IGNORE INTO agent_delegations (source_agent_id, target_agent_id, position) VALUES (?, ?, ?)",
+    );
+    const removeLegacyTool = db.prepare("DELETE FROM agent_tools WHERE id = ?");
+
+    for (const row of legacyRows) {
+      if (isBuiltinToolName(row.tool_name)) continue;
+      const target = findTarget.get(row.owner_uuid, row.tool_name) as {
+        id: string;
+      } | null;
+      if (target && target.id !== row.agent_id) {
+        insertRoute.run(row.agent_id, target.id, row.position);
+      }
+      removeLegacyTool.run(row.id);
+    }
+  });
+  tx();
 }
 
 /**
@@ -146,5 +254,7 @@ export function runMigrations(db: Database) {
   migrateAgentsInlinePlaceholders(db);
   migrateSessionsOwnerColumn(db);
   migrateAgentsOwnerColumn(db);
+  migrateAgentSkills(db);
+  migrateAgentDelegations(db);
   migrateMessagesAttachmentsColumn(db);
 }

@@ -254,6 +254,11 @@ export default function App() {
                     canAttachImages={app.canAttachImages}
                     attachImageDisabledReason={app.attachImageDisabledReason}
                     attachmentsSendReady={app.attachmentsSendReady}
+                    assignedSkillIds={
+                      app.runAgents.find(
+                        (agent) => agent.name === app.selectedSessionAgent,
+                      )?.skill_ids ?? []
+                    }
                     onFooterHeightChange={setRunFooterInset}
                   />
                 )}

@@ -34,7 +34,7 @@ export function getLiveStepMeta(
   const toolName = step.toolName ? startCase(step.toolName) : null;
   const agentName = formatAgentName(step.agentName);
   const isSubagentTool =
-    step.kind === "tool_call" && step.toolName?.endsWith("_agent");
+    step.kind === "tool_call" && step.childRun !== undefined;
 
   if (isSubagentTool) {
     return {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  AgentCapabilityValidationError,
   createAgentRow,
   deleteAgentRow,
   getAgentById,
@@ -16,7 +17,26 @@ type AgentWriteBody = {
   description?: unknown;
   system_prompt?: unknown;
   tools?: unknown;
+  skill_ids?: unknown;
+  delegate_agent_ids?: unknown;
 };
+
+function parseStringArray(
+  value: unknown,
+  field: string,
+): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: [] };
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== "string" || !item.trim())
+  ) {
+    return { ok: false, error: `${field} must be an array of strings` };
+  }
+  return {
+    ok: true,
+    value: [...new Set(value.map((item) => (item as string).trim()))],
+  };
+}
 
 function parseAgentBody(body: AgentWriteBody):
   | {
@@ -26,6 +46,8 @@ function parseAgentBody(body: AgentWriteBody):
         description: string;
         system_prompt: string;
         tools: string[];
+        skill_ids: string[];
+        delegate_agent_ids: string[];
       };
     }
   | { ok: false; error: string } {
@@ -35,10 +57,47 @@ function parseAgentBody(body: AgentWriteBody):
     typeof body.description === "string" ? body.description.trim() : "";
   const system_prompt =
     typeof body.system_prompt === "string" ? body.system_prompt.trim() : "";
-  const tools = Array.isArray(body.tools)
-    ? body.tools.filter((t): t is string => typeof t === "string")
-    : [];
-  return { ok: true, data: { name, description, system_prompt, tools } };
+  const tools = parseStringArray(body.tools, "tools");
+  if (!tools.ok) return tools;
+  const skillIds = parseStringArray(body.skill_ids, "skill_ids");
+  if (!skillIds.ok) return skillIds;
+  const delegateAgentIds = parseStringArray(
+    body.delegate_agent_ids,
+    "delegate_agent_ids",
+  );
+  if (!delegateAgentIds.ok) return delegateAgentIds;
+  return {
+    ok: true,
+    data: {
+      name,
+      description,
+      system_prompt,
+      tools: tools.value,
+      skill_ids: skillIds.value,
+      delegate_agent_ids: delegateAgentIds.value,
+    },
+  };
+}
+
+function sendAgentWriteError(
+  res: Parameters<typeof sendApiError>[0],
+  error: unknown,
+) {
+  if (error instanceof AgentCapabilityValidationError) {
+    sendApiError(res, 400, "VALIDATION_ERROR", error.message);
+    return true;
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("UNIQUE constraint")) {
+    sendApiError(
+      res,
+      409,
+      "CONFLICT",
+      "An agent with that name already exists",
+    );
+    return true;
+  }
+  return false;
 }
 
 agentsRoutes.get("/", (req, res) => {
@@ -69,18 +128,9 @@ agentsRoutes.post("/", (req, res) => {
   try {
     const agent = createAgentRow(ownerUuid, parsed.data);
     res.status(201).json(agent);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg.includes("UNIQUE constraint")) {
-      sendApiError(
-        res,
-        409,
-        "CONFLICT",
-        "An agent with that name already exists",
-      );
-      return;
-    }
-    throw e;
+  } catch (error: unknown) {
+    if (sendAgentWriteError(res, error)) return;
+    throw error;
   }
 });
 
@@ -99,18 +149,9 @@ agentsRoutes.put("/:id", (req, res) => {
       return;
     }
     res.json({ ok: true });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg.includes("UNIQUE constraint")) {
-      sendApiError(
-        res,
-        409,
-        "CONFLICT",
-        "An agent with that name already exists",
-      );
-      return;
-    }
-    throw e;
+  } catch (error: unknown) {
+    if (sendAgentWriteError(res, error)) return;
+    throw error;
   }
 });
 

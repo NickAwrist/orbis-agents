@@ -1,13 +1,16 @@
 import type { Tool } from "ollama";
-import { getSkillByName } from "../db/index";
+import type { SkillRow } from "../db/index";
 import { BaseTool } from "./BaseTool";
 
 export class LoadSkillTool extends BaseTool {
-  constructor(private readonly ownerUuid: string) {
+  private readonly skillsByName: ReadonlyMap<string, SkillRow>;
+
+  constructor(skills: readonly SkillRow[]) {
     super(
       "load_skill",
       "Load the full instructions for an available user skill before applying it.",
     );
+    this.skillsByName = new Map(skills.map((skill) => [skill.name, skill]));
   }
 
   override toTool(): Tool {
@@ -33,7 +36,7 @@ export class LoadSkillTool extends BaseTool {
   override async execute(args: Record<string, unknown>): Promise<string> {
     const name = typeof args.name === "string" ? args.name.trim() : "";
     if (!name) return "Error: skill name is required";
-    const skill = getSkillByName(this.ownerUuid, name);
+    const skill = this.skillsByName.get(name);
     if (!skill) return `Error: skill '${name}' not found`;
     return JSON.stringify({
       name: skill.name,

@@ -4,6 +4,14 @@ export type ActiveSkillToken = {
   query: string;
 };
 
+export function filterAssignedSkills<T extends { id: string }>(
+  skills: readonly T[],
+  assignedSkillIds: readonly string[],
+): T[] {
+  const assigned = new Set(assignedSkillIds);
+  return skills.filter((skill) => assigned.has(skill.id));
+}
+
 export function findActiveSkillToken(
   value: string,
   caret: number,

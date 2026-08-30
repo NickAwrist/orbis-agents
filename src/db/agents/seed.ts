@@ -6,12 +6,14 @@ const DEFAULT_AGENTS: Array<{
   description: string;
   system_prompt: string;
   tools: string[];
+  delegates: string[];
 }> = [
   {
     name: "general_agent",
     description:
       "Orchestrator agent that answers questions directly or delegates to specialized subagents.",
-    tools: ["computer_agent", "web_search"],
+    tools: ["web_search"],
+    delegates: ["computer_agent"],
     system_prompt: [
       "You are the orchestrator agent. You answer the user's request directly when you can, and delegate to your tools when the task requires capabilities you do not have.",
       "",
@@ -35,6 +37,7 @@ const DEFAULT_AGENTS: Array<{
     description:
       "Runs shell commands, manages files, installs packages, and performs any OS-level task via bash. Provide a self-contained task description including the exact expected output or deliverable. Use for: running scripts, file operations (copy/move/delete), checking system state, git commands, process management.",
     tools: ["bash"],
+    delegates: [],
     system_prompt: [
       "You are a computer-use agent with access to a bash shell. You execute commands, manage files, and interact with the operating system to complete tasks.",
       "",
@@ -69,6 +72,7 @@ const DEFAULT_AGENTS: Array<{
       "modify_plan",
       "grep",
     ],
+    delegates: [],
     system_prompt: [
       "You are a software engineering agent. You read, write, analyze, and test code using the tools provided.",
       "",
@@ -117,10 +121,15 @@ export function seedDefaultAgents(db: Database, ownerUuid: string) {
   const insertTool = db.prepare(
     "INSERT INTO agent_tools (agent_id, tool_name, position) VALUES (?, ?, ?)",
   );
+  const insertDelegation = db.prepare(
+    "INSERT INTO agent_delegations (source_agent_id, target_agent_id, position) VALUES (?, ?, ?)",
+  );
 
   const tx = db.transaction(() => {
+    const agentIds = new Map<string, string>();
     for (const a of DEFAULT_AGENTS) {
       const id = crypto.randomUUID();
+      agentIds.set(a.name, id);
       insertAgent.run(
         id,
         ownerUuid,
@@ -130,7 +139,16 @@ export function seedDefaultAgents(db: Database, ownerUuid: string) {
         now,
         now,
       );
+    }
+    for (const a of DEFAULT_AGENTS) {
+      const id = agentIds.get(a.name);
+      if (!id) throw new Error(`Missing seeded agent ID for ${a.name}`);
       a.tools.forEach((t, i) => insertTool.run(id, t, i));
+      a.delegates.forEach((name, position) => {
+        const targetId = agentIds.get(name);
+        if (!targetId) throw new Error(`Missing seeded agent ID for ${name}`);
+        insertDelegation.run(id, targetId, position);
+      });
     }
   });
   tx();
