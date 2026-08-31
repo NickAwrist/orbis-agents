@@ -21,7 +21,10 @@ export function ModelSelectBar({
 }) {
   const modelNames = new Set(ollamaModels.map((m) => m.id));
   const showSelectedNotListed = Boolean(
-    selectedModel && ollamaModels.length > 0 && !modelNames.has(selectedModel),
+    selectedModel &&
+      !selectedModel.startsWith("openrouter:") &&
+      ollamaModels.length > 0 &&
+      !modelNames.has(selectedModel),
   );
   const hasModels = ollamaModels.length > 0;
   const placeholderValue = "__model_status__";
@@ -62,9 +65,7 @@ export function ModelSelectBar({
               return (
                 <optgroup
                   key={provider}
-                  label={
-                    provider === "ollama" ? "Ollama (local)" : "OpenRouter"
-                  }
+                  label={provider === "ollama" ? "Ollama" : "OpenRouter"}
                 >
                   {options.map((model) => (
                     <option

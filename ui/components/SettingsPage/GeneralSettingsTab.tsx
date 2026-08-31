@@ -162,9 +162,7 @@ export function GeneralSettingsTab({
               return (
                 <optgroup
                   key={provider}
-                  label={
-                    provider === "ollama" ? "Ollama (local)" : "OpenRouter"
-                  }
+                  label={provider === "ollama" ? "Ollama" : "OpenRouter"}
                 >
                   {models.map((model) => (
                     <option

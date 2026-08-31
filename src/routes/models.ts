@@ -46,7 +46,9 @@ modelsRoutes.get("/", async (_req, res) => {
   }
 
   const openrouterConfigured = getOpenRouterApiKey().length > 0;
-  const registeredOpenRouterModels = listOpenRouterModels();
+  const registeredOpenRouterModels = openrouterConfigured
+    ? listOpenRouterModels()
+    : [];
   const openRouterMetadata = await lookupOpenRouterModels(
     registeredOpenRouterModels.map((model) => model.route),
   );

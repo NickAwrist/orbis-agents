@@ -36,16 +36,9 @@ describe("OpenRouter API integration", () => {
       expect(
         body.models.some((model) => model.provider === "ollama"),
       ).toBeTrue();
-      const remote = body.models.find(
-        (model) => model.provider === "openrouter",
-      );
-      expect(remote?.id.startsWith("openrouter:")).toBeTrue();
-      expect(remote?.configured).toBeFalse();
       expect(
-        body.models.find(
-          (model) => model.id === "openrouter:openai/gpt-5.6-terra",
-        )?.inputCapabilities,
-      ).toEqual(["text", "image"]);
+        body.models.some((model) => model.provider === "openrouter"),
+      ).toBeFalse();
 
       await fetch(`${url}/api/settings/openrouter`, {
         method: "PUT",
@@ -61,6 +54,11 @@ describe("OpenRouter API integration", () => {
           .filter((model) => model.provider === "openrouter")
           .every((model) => model.configured === true),
       ).toBeTrue();
+      expect(
+        body.models.find(
+          (model) => model.id === "openrouter:openai/gpt-5.6-terra",
+        )?.inputCapabilities,
+      ).toEqual(["text", "image"]);
     } finally {
       await close();
     }

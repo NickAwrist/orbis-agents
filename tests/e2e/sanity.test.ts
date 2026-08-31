@@ -20,7 +20,8 @@ test("sanity E2E: start server, list agents, create agent", async () => {
     const agentNames = getData.agents.map((a) => a.name);
     expect(agentNames).toContain("general_agent");
     expect(agentNames).toContain("computer_agent");
-    expect(agentNames).toContain("coding_agent");
+    expect(agentNames).not.toContain("coding_agent");
+    expect(agentNames).toHaveLength(2);
 
     // 2. POST /api/agents (create a new agent)
     const newAgent = {

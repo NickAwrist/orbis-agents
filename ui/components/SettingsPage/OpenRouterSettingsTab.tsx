@@ -243,9 +243,9 @@ export function OpenRouterSettingsTab({
         </div>
       </section>
 
-      <hr className="border-border-subtle" />
+      <hr className={cx("border-border-subtle", !hasKey && "hidden")} />
 
-      <section className="space-y-4">
+      <section className={cx("space-y-4", !hasKey && "hidden")}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className={eyebrowText}>Model Registry</h2>

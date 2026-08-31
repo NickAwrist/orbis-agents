@@ -28,13 +28,13 @@ test("agent API persists tools, skills, and ID-based delegation routes", async (
     const defaults = (await defaultsResponse.json()) as {
       agents: Array<{ id: string; name: string }>;
     };
-    const coding = defaults.agents.find(
-      (agent) => agent.name === "coding_agent",
+    const general = defaults.agents.find(
+      (agent) => agent.name === "general_agent",
     );
     const computer = defaults.agents.find(
       (agent) => agent.name === "computer_agent",
     );
-    expect(coding).toBeDefined();
+    expect(general).toBeDefined();
     expect(computer).toBeDefined();
 
     const createResponse = await fetch(`${url}/api/agents`, {
@@ -46,7 +46,7 @@ test("agent API persists tools, skills, and ID-based delegation routes", async (
         system_prompt: "Coordinate this release.",
         tools: ["bash"],
         skill_ids: [skill.id],
-        delegate_agent_ids: [coding!.id],
+        delegate_agent_ids: [computer!.id],
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -59,7 +59,7 @@ test("agent API persists tools, skills, and ID-based delegation routes", async (
     expect(created).toMatchObject({
       tools: ["bash"],
       skill_ids: [skill.id],
-      delegate_agent_ids: [coding!.id],
+      delegate_agent_ids: [computer!.id],
     });
 
     const updateResponse = await fetch(`${url}/api/agents/${created.id}`, {
@@ -71,7 +71,7 @@ test("agent API persists tools, skills, and ID-based delegation routes", async (
         system_prompt: "Coordinate this release.",
         tools: ["web_search", "web_search"],
         skill_ids: [skill.id, skill.id],
-        delegate_agent_ids: [computer!.id, computer!.id],
+        delegate_agent_ids: [general!.id, general!.id],
       }),
     });
     expect(updateResponse.status).toBe(200);
@@ -83,7 +83,7 @@ test("agent API persists tools, skills, and ID-based delegation routes", async (
       id: created.id,
       tools: ["web_search"],
       skill_ids: [skill.id],
-      delegate_agent_ids: [computer!.id],
+      delegate_agent_ids: [general!.id],
     });
 
     const listResponse = await fetch(`${url}/api/agents`, {
@@ -127,7 +127,7 @@ test("invalid capability IDs and self-routes return 400 without partial writes",
       agents: Array<{ id: string; name: string }>;
     };
     const otherAgent = otherAgents.agents.find(
-      (agent) => agent.name === "coding_agent",
+      (agent) => agent.name === "computer_agent",
     );
     expect(otherAgent).toBeDefined();
     const createResponse = await fetch(`${url}/api/agents`, {
