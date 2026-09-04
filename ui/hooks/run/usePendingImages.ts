@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type ImageAttachment,
   ImageMimeTypeSchema,
   MAX_IMAGES_PER_MESSAGE,
   MAX_IMAGE_BYTES,
-  type MessageAttachment,
 } from "../../../src/attachments/types";
 import { uploadImageAttachment } from "../../persist/attachments";
 import { createBrowserUuid } from "../../persist/userIdentity";
@@ -110,7 +110,7 @@ export function usePendingImages({
   }, []);
 
   const uploadPendingImages = useCallback(
-    async (sessionId: string): Promise<MessageAttachment[] | null> => {
+    async (sessionId: string): Promise<ImageAttachment[] | null> => {
       setUploadPending(true);
       try {
         return await Promise.all(

@@ -9,10 +9,14 @@ import {
 } from "react";
 import {
   createSessionApi,
+  createTemporarySessionApi,
   deleteSessionApi,
+  deleteTemporarySessionApi,
   fetchSession,
   fetchSessionSummaries,
   patchSessionApi,
+  selectSessionDirectory,
+  useSessionSandbox,
 } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
@@ -21,15 +25,13 @@ import type {
   DebugData,
   Message,
   SessionSummary,
+  SessionWorkspace,
   TraceModalSelection,
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
 import type { RunFlightApi } from "./runTypes";
-import {
-  effectiveDefaultRunModel,
-  newEphemeralSessionId,
-} from "./sessionUtils";
+import { effectiveDefaultRunModel } from "./sessionUtils";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
 const RUN_PATH_PREFIX = "/run/";
@@ -96,8 +98,9 @@ export function useSessionsAndNavigation(p: Args) {
   );
   const [selectedSessionAgent, setSelectedSessionAgent] =
     useState("general_agent");
-  const [sessionDirectory, setSessionDirectory] = useState("");
-  const sessionDirectoryRef = useRef("");
+  const [workspace, setWorkspace] = useState<SessionWorkspace>({
+    kind: "sandbox",
+  });
 
   const loadGenRef = useRef(0);
   const restoreDoneRef = useRef(false);
@@ -105,7 +108,6 @@ export function useSessionsAndNavigation(p: Args) {
   p.activeSessionIdRef.current = activeSessionId;
   p.isEphemeralRef.current = isEphemeral;
   p.selectedSessionAgentRef.current = selectedSessionAgent;
-  sessionDirectoryRef.current = sessionDirectory;
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -152,13 +154,7 @@ export function useSessionsAndNavigation(p: Args) {
           : (p.ollamaModels[0]?.id ?? next);
       }
       setSelectedModel(next);
-      const sd =
-        stored?.sessionDirectory != null &&
-        String(stored.sessionDirectory).trim()
-          ? String(stored.sessionDirectory).trim()
-          : "";
-      setSessionDirectory(sd);
-      sessionDirectoryRef.current = sd;
+      setWorkspace(stored?.workspace ?? { kind: "sandbox" });
     })();
     return () => {
       cancelled = true;
@@ -176,25 +172,43 @@ export function useSessionsAndNavigation(p: Args) {
     setSelectedSessionAgent(name);
   }, []);
 
-  const setSessionDirectoryDraft = useCallback((next: string) => {
-    setSessionDirectory(next);
-    sessionDirectoryRef.current = next;
-  }, []);
-
-  const persistSessionDirectory = useCallback(async () => {
-    if (p.isEphemeralRef.current) return;
+  const chooseDirectory = useCallback(async () => {
     const sid = p.activeSessionIdRef.current;
     if (!sid) return;
-    const trimmed = sessionDirectoryRef.current.trim();
-    try {
-      await patchSessionApi(sid, {
-        sessionDirectory: trimmed.length > 0 ? trimmed : null,
-      });
-      await refreshSessions();
-    } catch (e) {
-      console.error(e);
+    const temporary = p.isEphemeralRef.current;
+    const selected = await selectSessionDirectory(sid, temporary);
+    if (selected) {
+      setWorkspace(selected);
+      if (temporary) {
+        p.setMessages((messages) => [
+          ...messages,
+          {
+            role: "event",
+            content: `Working directory changed to ${selected.kind === "local" ? selected.path : "the private workspace"}`,
+          },
+        ]);
+        return;
+      }
+      const refreshed = await fetchSession(sid);
+      if (refreshed) p.setMessages(refreshed.history);
     }
-  }, [p.activeSessionIdRef, p.isEphemeralRef, refreshSessions]);
+  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages]);
+
+  const returnToSandbox = useCallback(async () => {
+    const sid = p.activeSessionIdRef.current;
+    if (!sid) return;
+    const temporary = p.isEphemeralRef.current;
+    setWorkspace(await useSessionSandbox(sid, temporary));
+    if (temporary) {
+      p.setMessages((messages) => [
+        ...messages,
+        { role: "event", content: "Returned to the private workspace" },
+      ]);
+      return;
+    }
+    const refreshed = await fetchSession(sid);
+    if (refreshed) p.setMessages(refreshed.history);
+  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages]);
 
   const handleModelChange = useCallback(
     async (model: string) => {
@@ -227,13 +241,7 @@ export function useSessionsAndNavigation(p: Args) {
           const stored = await fetchSession(id);
           if (gen !== loadGenRef.current) return;
           p.modelMessagesRef.current = stored?.modelMessages ?? null;
-          const sd =
-            stored?.sessionDirectory != null &&
-            String(stored.sessionDirectory).trim()
-              ? String(stored.sessionDirectory).trim()
-              : "";
-          setSessionDirectory(sd);
-          sessionDirectoryRef.current = sd;
+          setWorkspace(stored?.workspace ?? { kind: "sandbox" });
         } catch (e) {
           if (gen !== loadGenRef.current) return;
           console.error(e);
@@ -252,13 +260,7 @@ export function useSessionsAndNavigation(p: Args) {
         if (gen !== loadGenRef.current) return;
         if (stored?.history?.length) p.setMessages(stored.history);
         p.modelMessagesRef.current = stored?.modelMessages ?? null;
-        const sd =
-          stored?.sessionDirectory != null &&
-          String(stored.sessionDirectory).trim()
-            ? String(stored.sessionDirectory).trim()
-            : "";
-        setSessionDirectory(sd);
-        sessionDirectoryRef.current = sd;
+        setWorkspace(stored?.workspace ?? { kind: "sandbox" });
       } catch (e) {
         if (gen !== loadGenRef.current) return;
         console.error(e);
@@ -340,10 +342,23 @@ export function useSessionsAndNavigation(p: Args) {
     replaceSessionUrl(null);
   }, [activeSessionId, isEphemeral]);
 
+  useEffect(() => {
+    if (!activeSessionId || !isEphemeral) return;
+    const temporarySessionId = activeSessionId;
+    const cleanup = () => {
+      void deleteTemporarySessionApi(temporarySessionId).catch(() => {});
+    };
+    window.addEventListener("pagehide", cleanup);
+    return () => window.removeEventListener("pagehide", cleanup);
+  }, [activeSessionId, isEphemeral]);
+
   const switchToSession = useCallback(
     async (id: string) => {
       const curId = p.activeSessionIdRef.current;
       const wasEphemeral = p.isEphemeralRef.current;
+      if (curId && wasEphemeral) {
+        await deleteTemporarySessionApi(curId).catch(() => {});
+      }
       if (curId && curId !== id && !wasEphemeral && p.messages.length === 0) {
         try {
           await deleteSessionApi(curId);
@@ -423,7 +438,10 @@ export function useSessionsAndNavigation(p: Args) {
       }
       await refreshSessions();
     }
-    const id = newEphemeralSessionId();
+    if (curId && p.isEphemeralRef.current) {
+      await deleteTemporarySessionApi(curId).catch(() => {});
+    }
+    const { id } = await createTemporarySessionApi();
     setActiveSessionId(id);
     p.setMessages([]);
     p.resetStreamingUi();
@@ -433,8 +451,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.modelMessagesRef.current = null;
     setSidebarOpen(false);
     setSelectedSessionAgent(p.serverDefaultRunAgent);
-    setSessionDirectory("");
-    sessionDirectoryRef.current = "";
+    setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
@@ -467,8 +484,7 @@ export function useSessionsAndNavigation(p: Args) {
       } else {
         setActiveSessionId(null);
         setIsEphemeral(false);
-        setSessionDirectory("");
-        sessionDirectoryRef.current = "";
+        setWorkspace({ kind: "sandbox" });
         p.setMessages([]);
         p.resetStreamingUi();
         p.setEditingUserIndex(null);
@@ -487,6 +503,9 @@ export function useSessionsAndNavigation(p: Args) {
 
   const goToHome = useCallback(async () => {
     const curId = p.activeSessionIdRef.current;
+    if (curId && p.isEphemeralRef.current) {
+      await deleteTemporarySessionApi(curId).catch(() => {});
+    }
     if (curId && !p.isEphemeralRef.current && p.messages.length === 0) {
       try {
         await deleteSessionApi(curId);
@@ -506,8 +525,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setDebugData(null);
     setSidebarOpen(false);
     setSelectedSessionAgent(p.serverDefaultRunAgent);
-    setSessionDirectory("");
-    sessionDirectoryRef.current = "";
+    setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
@@ -533,8 +551,7 @@ export function useSessionsAndNavigation(p: Args) {
       }
       if (activeSessionId === id) {
         setActiveSessionId(null);
-        setSessionDirectory("");
-        sessionDirectoryRef.current = "";
+        setWorkspace({ kind: "sandbox" });
         p.setMessages([]);
         p.setDebugOpen(false);
         p.setDebugData(null);
@@ -626,12 +643,11 @@ export function useSessionsAndNavigation(p: Args) {
     setPendingDeleteSessionId,
     selectedModel,
     selectedSessionAgent,
-    sessionDirectory,
-    sessionDirectoryRef,
+    workspace,
     refreshSessions,
     handleSessionAgentChange,
-    setSessionDirectoryDraft,
-    persistSessionDirectory,
+    chooseDirectory,
+    returnToSandbox,
     handleModelChange,
     switchToSession,
     createSession,

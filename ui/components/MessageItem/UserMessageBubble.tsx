@@ -166,9 +166,14 @@ export function UserMessageBubble({
         >
           {message.attachments && message.attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap justify-end gap-2">
-              {message.attachments.map((attachment) => (
-                <AttachmentImage key={attachment.id} attachment={attachment} />
-              ))}
+              {message.attachments
+                .filter((attachment) => attachment.kind === "image")
+                .map((attachment) => (
+                  <AttachmentImage
+                    key={attachment.id}
+                    attachment={attachment}
+                  />
+                ))}
             </div>
           )}
           {isEditingUser ? (

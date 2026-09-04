@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
-import type { ImageMimeType, MessageAttachment } from "../attachments/types";
+import type { ImageAttachment, ImageMimeType } from "../attachments/types";
 import { getDb } from "./connection";
 
-export type AttachmentRow = MessageAttachment & {
+export type AttachmentRow = ImageAttachment & {
   ownerUuid: string;
   sessionId: string;
   data: Uint8Array;
@@ -41,7 +41,7 @@ export function createImageAttachment(input: {
   name: string;
   mimeType: ImageMimeType;
   data: Uint8Array;
-}): MessageAttachment {
+}): ImageAttachment {
   const id = crypto.randomUUID();
   const createdAt = Date.now();
   getDb().run(

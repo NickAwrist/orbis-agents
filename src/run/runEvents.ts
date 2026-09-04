@@ -1,9 +1,25 @@
 import type { Response } from "express";
+import type { ApprovalRequest } from "../approvals/ApprovalManager";
+import type {
+  MessageAttachment,
+  WorkspaceFileAttachment,
+} from "../attachments/types";
 import { logger } from "../logger";
 import type { HistoryWireStep } from "../session/AgentSession";
 
 export type RunEvent =
   | { type: "run_started"; requestId: string }
+  | {
+      type: "approval_required";
+      requestId: string;
+      approvalId: string;
+      request: ApprovalRequest;
+    }
+  | {
+      type: "approval_resolved";
+      approvalId: string;
+      approved: boolean;
+    }
   | {
       type: "run_delta";
       contentDelta: string;
@@ -20,6 +36,7 @@ export type RunEvent =
       result: string;
       steps: HistoryWireStep[];
       modelMessages?: Array<Record<string, unknown>>;
+      attachments?: WorkspaceFileAttachment[];
     }
   | {
       type: "run_aborted";
@@ -29,6 +46,7 @@ export type RunEvent =
         role: string;
         content: string;
         steps?: HistoryWireStep[];
+        attachments?: MessageAttachment[];
       }>;
       modelMessages: Array<Record<string, unknown>> | null;
     }

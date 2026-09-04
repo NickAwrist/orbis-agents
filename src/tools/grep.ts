@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
-import { homedir } from "node:os";
 import pathModule from "node:path";
 import type { Ignore } from "ignore";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
 import { loadGitignore } from "../utils/gitignoreFilter";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 const MAX_PATTERN_LEN = 512;
 const SEARCH_BUDGET_MS = 2000;
@@ -45,33 +45,24 @@ export class GrepTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const patternStr = typeof args.pattern === "string" ? args.pattern : "";
     if (!patternStr) {
-      return "Error: missing pattern";
+      return textToolResult("Error: missing pattern");
     }
     if (patternStr.length > MAX_PATTERN_LEN) {
-      return `Error: pattern exceeds maximum length (${MAX_PATTERN_LEN} characters)`;
+      return textToolResult(
+        `Error: pattern exceeds maximum length (${MAX_PATTERN_LEN} characters)`,
+      );
     }
 
     const rawPath =
-      typeof args.path === "string" && args.path.length > 0
-        ? args.path
-        : (ctx?.sessionDir ?? homedir());
-
-    let path: string;
+      typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
-      path = resolveToolFilePath(rawPath, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
-      }
-      throw e;
-    }
-
-    try {
+      const path = await workspaceService.resolveExistingPath(
+        requireWorkspace(ctx),
+        rawPath,
+      );
       const regex = new RegExp(patternStr);
 
       let ig: Ignore | undefined;
@@ -87,12 +78,12 @@ export class GrepTool extends BaseTool {
       const results = await this.searchRecursive(path, regex, ig);
 
       if (results.length === 0) {
-        return "No matches found.";
+        return textToolResult("No matches found.");
       }
 
-      return results.join("\n");
+      return textToolResult(results.join("\n"));
     } catch (e) {
-      return `Error: ${(e as Error).message}`;
+      return textToolResult(workspaceError(e));
     }
   }
 
@@ -148,6 +139,8 @@ export class GrepTool extends BaseTool {
             return results;
           }
           const fullPath = pathModule.join(currentPath, entry.name);
+
+          if (entry.isSymbolicLink()) continue;
 
           if (ig?.ignores(entry.name)) {
             continue;

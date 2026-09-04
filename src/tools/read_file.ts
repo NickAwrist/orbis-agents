@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class ReadFileTool extends BaseTool {
   constructor() {
@@ -32,32 +33,22 @@ export class ReadFileTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const rawPath =
       typeof args.path === "string" && args.path.length > 0
         ? args.path
         : typeof args.filename === "string" && args.filename.length > 0
           ? args.filename
           : "";
-    let path: string;
     try {
-      path = resolveToolFilePath(rawPath, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
-      }
-      throw e;
-    }
-    if (!path) {
-      return "Error: missing path (provide path or filename)";
-    }
-    try {
+      const path = await workspaceService.resolveExistingPath(
+        requireWorkspace(ctx),
+        rawPath,
+      );
       const content = await fs.readFile(path, "utf8");
-      return content;
+      return textToolResult(content);
     } catch (e) {
-      return `Error: failed to read file ${path}: ${(e as Error).message}`;
+      return textToolResult(workspaceError(e));
     }
   }
 }

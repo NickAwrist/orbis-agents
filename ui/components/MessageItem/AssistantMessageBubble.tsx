@@ -1,5 +1,16 @@
-import { Check, Copy, Download, Gauge, Waypoints } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileText,
+  FolderOpen,
+  Gauge,
+  Waypoints,
+} from "lucide-react";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import type { WorkspaceFileAttachment } from "../../../src/attachments/types";
+import { readApiError } from "../../lib/readApiError";
+import { userScopedFetch } from "../../persist/userIdentity";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { traceStepsForDisplay } from "../ExecutionTrace";
@@ -35,6 +46,11 @@ export function AssistantMessageBubble({
   onViewSteps,
 }: Props) {
   const comfyImageUrls = extractComfyUIImageUrls(message.content);
+  const outputFiles =
+    message.attachments?.filter(
+      (attachment): attachment is WorkspaceFileAttachment =>
+        attachment.kind === "file",
+    ) ?? [];
   const stats = summarizeTraceMetrics(message.steps);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -141,6 +157,35 @@ export function AssistantMessageBubble({
           <MarkdownMessage className="text-foreground">
             {message.content}
           </MarkdownMessage>
+          {outputFiles.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {outputFiles.map((file) => (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => void openOutputFile(file)}
+                  className="flex max-w-md items-center gap-2 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                >
+                  <FileText
+                    size={15}
+                    className="shrink-0 text-muted-foreground"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                  {file.workspaceKind === "local" ? (
+                    <FolderOpen
+                      size={14}
+                      className="shrink-0 text-muted-foreground"
+                    />
+                  ) : (
+                    <Download
+                      size={14}
+                      className="shrink-0 text-muted-foreground"
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div
@@ -263,4 +308,35 @@ export function AssistantMessageBubble({
       )}
     </div>
   );
+}
+
+async function openOutputFile(file: WorkspaceFileAttachment): Promise<void> {
+  if (file.workspaceKind === "local") {
+    const route = file.temporary
+      ? `/api/temporary-sessions/${encodeURIComponent(file.sessionId)}/reveal`
+      : `/api/sessions/${encodeURIComponent(file.sessionId)}/workspace/reveal`;
+    const response = await userScopedFetch(route, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: file.path }),
+    });
+    if (!response.ok) window.alert(await readApiError(response));
+    return;
+  }
+  const route = file.temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(file.sessionId)}/file`
+    : `/api/sessions/${encodeURIComponent(file.sessionId)}/workspace/file`;
+  const response = await userScopedFetch(
+    `${route}?path=${encodeURIComponent(file.path)}`,
+  );
+  if (!response.ok) {
+    window.alert(await readApiError(response));
+    return;
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.name;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

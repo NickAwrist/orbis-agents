@@ -1,7 +1,7 @@
 import type { Tool } from "ollama";
 import type { RunContext, Step } from "../RunContext";
 import { agentManager } from "../agents/agentManager";
-import { BaseTool } from "./BaseTool";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export type AgentToolTarget = {
   id: string;
@@ -64,17 +64,18 @@ export class AgentTool extends BaseTool {
     args: Record<string, unknown>,
     ctx?: RunContext,
     parentToolStep?: Step,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const task =
       typeof args.task === "string"
         ? args.task
         : Array.isArray(args.task_lines)
           ? args.task_lines.join("\n")
           : "";
-    if (!task) return "Error: you must provide a task or task_lines";
+    if (!task)
+      return textToolResult("Error: you must provide a task or task_lines");
 
     if (!ctx || !parentToolStep) {
-      return "Error: missing context for sub-agent invocation";
+      return textToolResult("Error: missing context for sub-agent invocation");
     }
     const agent = agentManager.createAgentByIdForContext(
       this.target.id,
@@ -82,6 +83,6 @@ export class AgentTool extends BaseTool {
       task,
     );
     const childCtx = ctx.createChild(agent, task, parentToolStep);
-    return agent.run(task, childCtx);
+    return textToolResult(await agent.run(task, childCtx));
   }
 }

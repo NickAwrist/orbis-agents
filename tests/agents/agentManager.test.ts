@@ -72,7 +72,8 @@ describe("agent capability runtime", () => {
       "delegate_to_reviewer_",
     );
     expect(
-      await parent.TOOL_MAP.load_skill!.execute({ name: privateSkill.name }),
+      (await parent.TOOL_MAP.load_skill!.execute({ name: privateSkill.name }))
+        .text,
     ).toBe(`Error: skill '${privateSkill.name}' not found`);
 
     parent.model = "parent-model";
@@ -160,7 +161,7 @@ describe("AgentTool", () => {
 
     try {
       expect(
-        await tool.execute({ task: "Review this" }, context, parentStep),
+        (await tool.execute({ task: "Review this" }, context, parentStep)).text,
       ).toBe("Nested final text");
       expect(receivedId).toBe(target.id);
       expect(parentStep.childContext?.agentName).toBe("child");

@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { approvalManager } from "../approvals/ApprovalManager";
+import type { WorkspaceFileAttachment } from "../attachments/types";
 import type { WireMessage } from "../db/index";
 import { logger } from "../logger";
 import {
@@ -9,6 +11,7 @@ import {
   type SessionRunDeltaEvent,
   type SessionStepEvent,
 } from "../session/AgentSession";
+import { workspaceService } from "../workspaces/WorkspaceService";
 import type { RunPersistence } from "./runPersistence";
 import type { RunTurnContext } from "./runRequestContext";
 import type { RunStream } from "./runStream";
@@ -26,7 +29,8 @@ export async function runTurn(
   stream: RunStream,
   persistence: RunPersistence,
 ): Promise<void> {
-  const session = buildSession(ctx);
+  const session = buildSession(ctx, stream);
+  const filesBefore = await workspaceFileSnapshot(ctx);
 
   const onStep = (p: SessionStepEvent) =>
     stream.emit({ type: "run_step", step: p.step, steps: p.steps });
@@ -69,6 +73,11 @@ export async function runTurn(
       stream.signal,
     );
     if (stream.signal.aborted) return;
+    const changedFiles = await changedFileAttachments(ctx, filesBefore);
+    const assistantMessage = session.history[session.history.length - 1];
+    if (assistantMessage && changedFiles.length > 0) {
+      assistantMessage.attachments = changedFiles;
+    }
     const stepsSnapshot =
       (session.history[session.history.length - 1]?.steps as
         | HistoryWireStep[]
@@ -79,6 +88,7 @@ export async function runTurn(
       type: "run_done",
       result,
       steps: stepsSnapshot,
+      attachments: changedFiles,
       ...(ctx.ephemeral ? { modelMessages } : {}),
     });
   } catch (err) {
@@ -95,15 +105,80 @@ export async function runTurn(
   }
 }
 
-function buildSession(ctx: RunTurnContext): AgentSession {
+async function workspaceFileSnapshot(
+  ctx: RunTurnContext,
+): Promise<Map<string, string>> {
+  try {
+    return new Map(
+      (await workspaceService.listFiles(ctx.workspace)).map((file) => [
+        file.path,
+        `${file.size}:${file.modifiedAt}`,
+      ]),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+async function changedFileAttachments(
+  ctx: RunTurnContext,
+  before: Map<string, string>,
+): Promise<WorkspaceFileAttachment[]> {
+  try {
+    return (await workspaceService.listFiles(ctx.workspace))
+      .filter(
+        (file) => before.get(file.path) !== `${file.size}:${file.modifiedAt}`,
+      )
+      .map((file) => ({
+        id: crypto.randomUUID(),
+        kind: "file" as const,
+        name: file.name,
+        size: file.size,
+        path: file.path,
+        sessionId: ctx.sessionId,
+        workspaceKind: ctx.workspace.kind,
+        temporary: ctx.ephemeral,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function buildSession(ctx: RunTurnContext, stream: RunStream): AgentSession {
   const session = new AgentSession(crypto.randomUUID(), {
     model: ctx.model,
     agentName: ctx.agentName,
     promptContext: ctx.promptContext,
     toolSessionDir: ctx.toolSessionDir,
+    workspace: ctx.workspace,
     ownerUuid: ctx.ownerUuid,
     attachmentSessionId: ctx.sessionId,
     userPrompt: ctx.body.message,
+    requestApproval: async (request) => {
+      let emittedApprovalId = "";
+      const approved = await approvalManager.request({
+        ownerUuid: ctx.ownerUuid,
+        requestId: stream.requestId,
+        signal: AbortSignal.any([stream.signal, stream.approvalSignal]),
+        emit: (approvalId) => {
+          emittedApprovalId = approvalId;
+          stream.emit({
+            type: "approval_required",
+            requestId: stream.requestId,
+            approvalId,
+            request,
+          });
+        },
+      });
+      if (emittedApprovalId) {
+        stream.emit({
+          type: "approval_resolved",
+          approvalId: emittedApprovalId,
+          approved,
+        });
+      }
+      return approved;
+    },
   });
   session.restoreFromPersistence({
     history: ctx.body.history as SessionMessage[],

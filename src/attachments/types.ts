@@ -20,7 +20,7 @@ export const ImageMimeTypeSchema = z.enum(IMAGE_MIME_TYPES);
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_IMAGES_PER_MESSAGE = 4;
 
-export const MessageAttachmentSchema = z.object({
+export const ImageAttachmentSchema = z.object({
   id: z.uuid(),
   kind: z.literal("image"),
   name: z.string().min(1).max(255),
@@ -28,7 +28,28 @@ export const MessageAttachmentSchema = z.object({
   size: z.number().int().positive().max(MAX_IMAGE_BYTES),
 });
 
+export type ImageAttachment = z.infer<typeof ImageAttachmentSchema>;
+
+export const WorkspaceFileAttachmentSchema = z.object({
+  id: z.uuid(),
+  kind: z.literal("file"),
+  name: z.string().min(1).max(255),
+  size: z.number().int().nonnegative(),
+  path: z.string().min(1),
+  sessionId: z.string().min(1),
+  workspaceKind: z.enum(["sandbox", "local"]),
+  temporary: z.boolean(),
+});
+
+export const MessageAttachmentSchema = z.discriminatedUnion("kind", [
+  ImageAttachmentSchema,
+  WorkspaceFileAttachmentSchema,
+]);
+
 export type MessageAttachment = z.infer<typeof MessageAttachmentSchema>;
+export type WorkspaceFileAttachment = z.infer<
+  typeof WorkspaceFileAttachmentSchema
+>;
 
 export function imageUrl(attachmentId: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentId)}`;

@@ -28,7 +28,7 @@ export interface MessageStep {
 }
 
 export interface Message {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "event";
   content: string;
   steps?: MessageStep[];
   attachments?: MessageAttachment[];
@@ -54,4 +54,12 @@ export interface DebugData {
   /** Cumulative Ollama `messages` (excludes system); next turn prepends system and appends the new user message. */
   modelMessages?: Array<Record<string, unknown>> | null;
 }
+
+export type PendingApproval = {
+  requestId: string;
+  approvalId: string;
+  title: string;
+  target: string;
+  action: string;
+};
 import type { MessageAttachment } from "../../src/attachments/types";

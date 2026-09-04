@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class CreateFileTool extends BaseTool {
   constructor() {
@@ -43,26 +44,15 @@ export class CreateFileTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const rawPath =
       typeof args.path === "string" && args.path.length > 0
         ? args.path
         : typeof args.filename === "string" && args.filename.length > 0
           ? args.filename
           : "";
-    let path: string;
-    try {
-      path = resolveToolFilePath(rawPath, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
-      }
-      throw e;
-    }
-    if (!path) {
-      return "Error: missing path (provide path or filename)";
+    if (!rawPath) {
+      return textToolResult("Error: missing path (provide path or filename)");
     }
     const content =
       typeof args.content === "string"
@@ -70,7 +60,16 @@ export class CreateFileTool extends BaseTool {
         : Array.isArray(args.lines)
           ? args.lines.join("\n")
           : "";
-    await fs.writeFile(path, content);
-    return `File created at ${path}`;
+    try {
+      const workspace = requireWorkspace(ctx);
+      const path = await workspaceService.resolveNewFilePath(
+        workspace,
+        rawPath,
+      );
+      await fs.writeFile(path, content);
+      return textToolResult(`File created at ${path}`);
+    } catch (error) {
+      return textToolResult(workspaceError(error));
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { RunContext } from "../RunContext";
+import { type RequestApproval, RunContext } from "../RunContext";
 import type { BaseAgent } from "../agents/BaseAgent";
 import { agentManager } from "../agents/agentManager";
 import {
@@ -11,6 +11,7 @@ import type { LlmImage, LlmMessage } from "../llm/index";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { logger } from "../logger";
 import type { PromptContext } from "../prompts/render";
+import type { Workspace } from "../workspaces/WorkspaceService";
 
 const log = logger.child({ component: "AgentSession" });
 
@@ -55,10 +56,12 @@ export type AgentSessionOptions = {
   /** Values for `{{PLACEHOLDERS}}` passed to subagents via `RunContext`. */
   promptContext?: PromptContext;
   toolSessionDir?: string;
+  workspace?: Workspace;
   ownerUuid: string;
   attachmentSessionId?: string;
   /** Current task, used to activate explicit `$skill-name` references. */
   userPrompt?: string;
+  requestApproval?: RequestApproval;
 };
 
 export class AgentSession extends EventEmitter {
@@ -66,9 +69,11 @@ export class AgentSession extends EventEmitter {
   public history: SessionMessage[] = [];
   private generalAgent: BaseAgent;
   private readonly toolSessionDir?: string;
+  private readonly workspace?: Workspace;
   private readonly promptContext?: PromptContext;
   private readonly ownerUuid: string;
   private readonly attachmentSessionId?: string;
+  private readonly requestApproval?: RequestApproval;
 
   override on<K extends keyof SessionEvents>(
     event: K,
@@ -92,9 +97,11 @@ export class AgentSession extends EventEmitter {
     super();
     this.sessionId = sessionId;
     this.toolSessionDir = options?.toolSessionDir;
+    this.workspace = options?.workspace;
     this.promptContext = options?.promptContext;
     this.ownerUuid = options?.ownerUuid ?? "";
     this.attachmentSessionId = options?.attachmentSessionId;
+    this.requestApproval = options?.requestApproval;
     const agentName = options?.agentName?.trim() || "general_agent";
     this.generalAgent = agentManager.createAgent(agentName, {
       systemPrompt: options?.systemPrompt,
@@ -146,14 +153,16 @@ export class AgentSession extends EventEmitter {
         return row;
       });
     } else {
-      this.generalAgent.history = payload.history.map((h) => {
-        const images = this.hydrateImages(h.attachments);
-        return {
-          role: typeof h.role === "string" ? h.role : "user",
-          content: typeof h.content === "string" ? h.content : "",
-          ...(images.length > 0 ? { images } : {}),
-        };
-      });
+      this.generalAgent.history = payload.history
+        .filter((h) => h.role !== "event")
+        .map((h) => {
+          const images = this.hydrateImages(h.attachments);
+          return {
+            role: typeof h.role === "string" ? h.role : "user",
+            content: typeof h.content === "string" ? h.content : "",
+            ...(images.length > 0 ? { images } : {}),
+          };
+        });
     }
   }
 
@@ -161,7 +170,7 @@ export class AgentSession extends EventEmitter {
     if (!Array.isArray(value) || !this.attachmentSessionId) return [];
     return value.flatMap((candidate) => {
       const parsed = MessageAttachmentSchema.safeParse(candidate);
-      if (!parsed.success) return [];
+      if (!parsed.success || parsed.data.kind !== "image") return [];
       const stored = getAttachment(this.ownerUuid, parsed.data.id);
       if (!stored || stored.sessionId !== this.attachmentSessionId) return [];
       return [
@@ -226,6 +235,8 @@ export class AgentSession extends EventEmitter {
       this.toolSessionDir,
       this.promptContext,
       this.ownerUuid,
+      this.workspace,
+      this.requestApproval,
     );
 
     let result = "Error running agent.";

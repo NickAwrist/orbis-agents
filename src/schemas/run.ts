@@ -32,7 +32,6 @@ export const RunBodySchema = z.object({
   ephemeral: z.boolean().optional(),
   agentName: z.string().min(1),
   metadata: RunMetadataSchema.optional(),
-  sessionDirectory: z.string().optional(),
   attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).optional(),
 });
 

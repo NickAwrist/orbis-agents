@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import type { MessageAttachment } from "../../../src/attachments/types";
+import type { ImageAttachment } from "../../../src/attachments/types";
 import { fetchAttachmentImage } from "../../persist/attachments";
 
 export function AttachmentImage({
   attachment,
 }: {
-  attachment: MessageAttachment;
+  attachment: ImageAttachment;
 }) {
   const [url, setUrl] = useState<string | null>(null);
 

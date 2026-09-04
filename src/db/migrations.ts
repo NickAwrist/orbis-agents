@@ -34,6 +34,27 @@ export function migrateSessionsDirectoryColumn(db: Database) {
   }
 }
 
+export function migrateSessionsWorkspaceKindColumn(db: Database) {
+  const cols = db.query("PRAGMA table_info(sessions)").all() as {
+    name: string;
+  }[];
+  if (!cols.some((c) => c.name === "workspace_kind")) {
+    db.run(
+      "ALTER TABLE sessions ADD COLUMN workspace_kind TEXT NOT NULL DEFAULT 'sandbox'",
+    );
+  }
+  db.run(`
+    UPDATE sessions
+    SET workspace_kind = CASE
+      WHEN session_directory IS NOT NULL AND trim(session_directory) != '' THEN 'local'
+      ELSE 'sandbox'
+    END
+    WHERE workspace_kind NOT IN ('sandbox', 'local')
+       OR (workspace_kind = 'sandbox' AND session_directory IS NOT NULL AND trim(session_directory) != '')
+       OR (workspace_kind = 'local' AND (session_directory IS NULL OR trim(session_directory) = ''))
+  `);
+}
+
 export function migrateSessionsOwnerColumn(db: Database) {
   const cols = db.query("PRAGMA table_info(sessions)").all() as {
     name: string;
@@ -182,6 +203,42 @@ export function migrateAgentDelegations(db: Database) {
   tx();
 }
 
+export function migrateSeededComputerAgentName(db: Database) {
+  if (!tableExists(db, "agents")) return;
+  const rows = db
+    .query(
+      `SELECT id, owner_uuid FROM agents
+       WHERE name = 'computer_agent'
+         AND description LIKE 'Runs shell commands, manages files,%'`,
+    )
+    .all() as Array<{ id: string; owner_uuid: string | null }>;
+  const updateAgent = db.prepare(
+    `UPDATE agents
+     SET name = 'system_agent',
+         description = 'Uses contained shell and file tools in the active chat workspace. Provide a self-contained task description with the expected output or deliverable.',
+         system_prompt = replace(system_prompt, 'You are a computer-use agent with access to a bash shell. You execute commands, manage files, and interact with the operating system to complete tasks.', 'You are a system agent with contained shell and file access to the active chat workspace.'),
+         updated_at = ?
+     WHERE id = ?`,
+  );
+  for (const row of rows) {
+    const conflict = db
+      .query(
+        "SELECT 1 FROM agents WHERE owner_uuid IS ? AND name = 'system_agent'",
+      )
+      .get(row.owner_uuid);
+    if (conflict) continue;
+    updateAgent.run(Date.now(), row.id);
+    db.run(
+      "UPDATE sessions SET agent_name = 'system_agent' WHERE owner_uuid IS ? AND agent_name = 'computer_agent'",
+      [row.owner_uuid],
+    );
+    db.run(
+      "UPDATE user_settings SET value = 'system_agent' WHERE owner_uuid IS ? AND key = 'default_run_agent' AND value = 'computer_agent'",
+      [row.owner_uuid],
+    );
+  }
+}
+
 /**
  * One-shot migration from the old `include_personalization` / `include_session_directory` /
  * `include_os_info` flags to inline `{{PLACEHOLDER}}` tokens in `system_prompt`.
@@ -251,10 +308,12 @@ export function migrateAgentsInlinePlaceholders(db: Database) {
 export function runMigrations(db: Database) {
   migrateSessionsAgentColumn(db);
   migrateSessionsDirectoryColumn(db);
+  migrateSessionsWorkspaceKindColumn(db);
   migrateAgentsInlinePlaceholders(db);
   migrateSessionsOwnerColumn(db);
   migrateAgentsOwnerColumn(db);
   migrateAgentSkills(db);
   migrateAgentDelegations(db);
+  migrateSeededComputerAgentName(db);
   migrateMessagesAttachmentsColumn(db);
 }

@@ -7,7 +7,7 @@ import {
   getComfyUIImageSize,
   getComfyUINegativePrompt,
 } from "../db/index";
-import { BaseTool } from "./BaseTool";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class GenerateImageTool extends BaseTool {
   constructor() {
@@ -38,15 +38,15 @@ export class GenerateImageTool extends BaseTool {
     };
   }
 
-  override async execute(args: Record<string, unknown>): Promise<string> {
+  override async execute(args: Record<string, unknown>): Promise<ToolResult> {
     if (typeof args.prompt !== "string" || args.prompt.trim().length === 0) {
-      return "Error: prompt must be a non-empty string";
+      return textToolResult("Error: prompt must be a non-empty string");
     }
     const promptText = args.prompt.trim();
 
     const client = getComfyUIClient();
 
-    return client.runSerialized(async () => {
+    const result = await client.runSerialized(async () => {
       const health = await client.healthCheck();
       if (!health.ok) {
         return `Error: ComfyUI is not reachable - ${health.error ?? "unknown error"}`;
@@ -91,5 +91,6 @@ export class GenerateImageTool extends BaseTool {
         return `Error generating image: ${e instanceof Error ? e.message : String(e)}`;
       }
     }, "generate_image");
+    return textToolResult(result);
   }
 }

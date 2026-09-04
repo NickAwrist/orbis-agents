@@ -1,7 +1,7 @@
 import type { Tool } from "ollama";
 import { Plan } from "../Plan";
 import type { RunContext } from "../RunContext";
-import { BaseTool } from "./BaseTool";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class ModifyPlan extends BaseTool {
   constructor() {
@@ -45,11 +45,11 @@ export class ModifyPlan extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const action = args.action as string;
 
     if (!ctx?.agentInstance) {
-      return "Error: No agent instance found in context.";
+      return textToolResult("Error: No agent instance found in context.");
     }
 
     if (!ctx.agentInstance.plan) {
@@ -62,7 +62,9 @@ export class ModifyPlan extends BaseTool {
       case "create": {
         const stepsArg = args.steps as string[];
         if (!Array.isArray(stepsArg)) {
-          return "Error: 'steps' property must be an array of strings for 'create' action.";
+          return textToolResult(
+            "Error: 'steps' property must be an array of strings for 'create' action.",
+          );
         }
         plan.setSteps(stepsArg);
         break;
@@ -73,7 +75,9 @@ export class ModifyPlan extends BaseTool {
       case "add": {
         const stepArg = args.step as string;
         if (typeof stepArg !== "string") {
-          return "Error: 'step' property must be a string for 'add' action.";
+          return textToolResult(
+            "Error: 'step' property must be a string for 'add' action.",
+          );
         }
         plan.addStep(stepArg);
         break;
@@ -81,9 +85,11 @@ export class ModifyPlan extends BaseTool {
       case "view":
         break;
       default:
-        return `Error: Unknown action '${action}'. Valid actions are: create, complete_current, add, view.`;
+        return textToolResult(
+          `Error: Unknown action '${action}'. Valid actions are: create, complete_current, add, view.`,
+        );
     }
 
-    return `Current Plan:\n${plan.getSteps().join("\n")}`;
+    return textToolResult(`Current Plan:\n${plan.getSteps().join("\n")}`);
   }
 }

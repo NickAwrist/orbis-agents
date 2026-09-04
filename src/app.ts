@@ -15,9 +15,12 @@ import searxngRoutes from "./routes/searxng";
 import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
+import temporarySessionRoutes from "./routes/temporarySessions";
 import toolsRoutes from "./routes/tools";
+import { workspaceService } from "./workspaces/WorkspaceService";
 
 getDb();
+void workspaceService.initialize();
 
 const DEFAULT_FRONTEND_PORTS = [5173, 5174];
 const allowedFrontendPorts = Array.from(
@@ -46,6 +49,7 @@ app.use("/api/ollama", ollamaRoutes);
 app.use("/api/searxng", searxngRoutes);
 app.use("/api/models", modelsRoutes);
 app.use("/api/sessions", sessionRoutes);
+app.use("/api/temporary-sessions", temporarySessionRoutes);
 app.use("/api/runs", runRoutes);
 
 const distPath = join(process.cwd(), "dist");

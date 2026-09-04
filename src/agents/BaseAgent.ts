@@ -9,7 +9,11 @@ import {
 } from "../llm/index";
 import { logger } from "../logger";
 import { CORE_DIRECTIVES } from "../prompts/render";
-import type { BaseTool } from "../tools/BaseTool";
+import {
+  type BaseTool,
+  type ToolResult,
+  textToolResult,
+} from "../tools/BaseTool";
 import { toolErrorToString } from "../tools/errors";
 
 const log = logger.child({ component: "BaseAgent" });
@@ -67,7 +71,7 @@ export class BaseAgent {
     ctx?: RunContext,
     parentStep?: Step,
     turnIndex?: number,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const toolName = toolCall.function.name;
     const args = this.parseToolArguments(toolCall.function.arguments);
     const startedAt = Date.now();
@@ -87,13 +91,15 @@ export class BaseAgent {
         turnIndex,
         runMs: Date.now() - startedAt,
       });
-      return `Error: tool ${toolName} not found`;
+      return textToolResult(`Error: tool ${toolName} not found`);
     }
 
     try {
       return await tool.execute(args, ctx, parentStep);
     } catch (e) {
-      return `Error: ${toolErrorToString(e, toolName, ctx?.sessionDir)}`;
+      return textToolResult(
+        `Error: ${toolErrorToString(e, toolName, ctx?.sessionDir)}`,
+      );
     } finally {
       log.debug({
         event: "tool_call_done",
@@ -154,11 +160,15 @@ export class BaseAgent {
         ...this.history,
       ];
       if (userMessage) {
-        messages.push({
+        const pendingUserMessage: LlmMessage = {
           role: "user",
           content: userMessage,
           ...(userImages.length > 0 ? { images: userImages } : {}),
-        });
+        };
+        messages.push(pendingUserMessage);
+        this.history.push(pendingUserMessage);
+        userMessage = "";
+        userImages = [];
       }
 
       fullContent = "";
@@ -245,16 +255,6 @@ export class BaseAgent {
         ctx.endStep(llmStep, "", fullThinking || undefined, llmMetrics);
       }
 
-      if (userMessage) {
-        this.history.push({
-          role: "user",
-          content: userMessage,
-          ...(userImages.length > 0 ? { images: userImages } : {}),
-        });
-        userMessage = "";
-        userImages = [];
-      }
-
       const assistantMsg: LlmMessage = {
         role: "assistant",
         content: fullContent,
@@ -288,11 +288,15 @@ export class BaseAgent {
             toolStep,
             turnIndex,
           );
-          ctx.endStep(toolStep, result);
+          if (result.redactedArgs) {
+            ctx.redactStepArgs(toolStep, result.redactedArgs);
+          }
+          ctx.endStep(toolStep, result.text);
 
           this.history.push({
             role: "tool",
-            content: result,
+            content: result.text,
+            ...(result.images?.length ? { images: result.images } : {}),
             ...(toolCall.id ? { tool_call_id: toolCall.id } : {}),
           });
         }

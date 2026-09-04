@@ -1,7 +1,7 @@
 import { execFile as execFileCb } from "node:child_process";
 import { unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
 
@@ -19,6 +19,67 @@ export async function pickFolderNative(): Promise<string | null> {
     return pickMacos();
   }
   return pickLinux();
+}
+
+export async function revealFileNative(path: string): Promise<void> {
+  if (process.platform === "win32") {
+    await execFile("explorer.exe", ["/select,", path], {
+      windowsHide: false,
+      timeout: PICK_TIMEOUT_MS,
+    });
+    return;
+  }
+  if (process.platform === "darwin") {
+    await execFile("open", ["-R", path], { timeout: PICK_TIMEOUT_MS });
+    return;
+  }
+  await execFile("xdg-open", [dirname(path)], { timeout: PICK_TIMEOUT_MS });
+}
+
+export async function confirmFolderGrantNative(path: string): Promise<boolean> {
+  const message = `Allow this chat to read and modify files in "${path}" until you switch back to its private workspace.`;
+  try {
+    if (process.platform === "win32") {
+      const escaped = message.replace(/'/g, "''");
+      const script = `Add-Type -AssemblyName System.Windows.Forms; if ([System.Windows.Forms.MessageBox]::Show('${escaped}', 'Allow directory access?', 'YesNo', 'Warning') -eq 'Yes') { exit 0 } else { exit 2 }`;
+      await execFile(
+        "powershell.exe",
+        ["-NoProfile", "-STA", "-Command", script],
+        {
+          timeout: PICK_TIMEOUT_MS,
+        },
+      );
+      return true;
+    }
+    if (process.platform === "darwin") {
+      const escaped = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      await execFile("osascript", [
+        "-e",
+        `display dialog "${escaped}" with title "Allow directory access?" buttons {"Cancel", "Allow"} default button "Allow" with icon caution`,
+      ]);
+      return true;
+    }
+    try {
+      await execFile("zenity", [
+        "--question",
+        "--title=Allow directory access?",
+        `--text=${message}`,
+        "--ok-label=Allow",
+        "--cancel-label=Cancel",
+      ]);
+      return true;
+    } catch {
+      await execFile("kdialog", [
+        "--warningyesno",
+        message,
+        "--title",
+        "Allow directory access?",
+      ]);
+      return true;
+    }
+  } catch {
+    return false;
+  }
 }
 
 async function pickWindows(): Promise<string | null> {

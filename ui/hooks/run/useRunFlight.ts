@@ -10,7 +10,7 @@ import {
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
-import type { Message, MessageStep } from "../../types";
+import type { Message, MessageStep, PendingApproval } from "../../types";
 import type { RunFlightApi } from "./runTypes";
 import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 
@@ -26,6 +26,7 @@ type FlightDeps = {
   setStreamingContent: Dispatch<SetStateAction<string>>;
   setStreamingThinking: Dispatch<SetStateAction<string>>;
   setRunPending: Dispatch<SetStateAction<boolean>>;
+  setPendingApproval: Dispatch<SetStateAction<PendingApproval | null>>;
 };
 
 export function useRunFlight(
@@ -122,6 +123,27 @@ export function useRunFlight(
               if (typeof data.requestId === "string") {
                 activeRequestIdRef.current = data.requestId;
               }
+            } else if (data.type === "approval_required") {
+              const request = data.request as
+                | Record<string, unknown>
+                | undefined;
+              if (
+                typeof data.requestId === "string" &&
+                typeof data.approvalId === "string" &&
+                request
+              ) {
+                d.setPendingApproval({
+                  requestId: data.requestId,
+                  approvalId: data.approvalId,
+                  title: String(request.title ?? "Approval required"),
+                  target: String(request.target ?? "Unknown target"),
+                  action: String(request.action ?? "Unknown action"),
+                });
+              }
+            } else if (data.type === "approval_resolved") {
+              d.setPendingApproval((current) =>
+                current?.approvalId === data.approvalId ? null : current,
+              );
             } else if (data.type === "run_delta") {
               const cd =
                 typeof data.contentDelta === "string" ? data.contentDelta : "";
@@ -213,6 +235,7 @@ export function useRunFlight(
           turnMessagesSnapshotRef.current = null;
           setInFlightSessionId(null);
           depsRef.current.setRunPending(false);
+          depsRef.current.setPendingApproval(null);
           if (viewing()) {
             depsRef.current.setStreamingStep(null);
             depsRef.current.setStreamingSteps([]);

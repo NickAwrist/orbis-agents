@@ -1,18 +1,20 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { MessageAttachment } from "../../../src/attachments/types";
+import type {
+  ImageAttachment,
+  MessageAttachment,
+} from "../../../src/attachments/types";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
-import type { Message, MessageStep } from "../../types";
+import type { Message, MessageStep, PendingApproval } from "../../types";
 import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 
 type AppDeps = {
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  sessionDirectoryRef: MutableRefObject<string>;
   userSettingsRef: MutableRefObject<UserSettings>;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
@@ -37,6 +39,7 @@ type RuntimeDeps = {
   setStreamingSteps: Dispatch<SetStateAction<MessageStep[]>>;
   setStreamingContent: Dispatch<SetStateAction<string>>;
   setStreamingThinking: Dispatch<SetStateAction<string>>;
+  setPendingApproval: Dispatch<SetStateAction<PendingApproval | null>>;
   clearStreamingUi: () => void;
   reconnectToStream: (sessionId: string, requestId: string) => void;
   fetchDebugData: (sessionId: string) => Promise<void>;
@@ -52,7 +55,7 @@ export async function executeRunTurn(
   turnSessionId: string,
   priorMessages: Message[],
   messageText: string,
-  attachments: MessageAttachment[],
+  attachments: ImageAttachment[],
   options: TurnOptions,
 ) {
   if (!messageText.trim() || !turnSessionId || !p.modelSendReady) return;
@@ -72,6 +75,7 @@ export async function executeRunTurn(
     setStreamingSteps,
     setStreamingContent,
     setStreamingThinking,
+    setPendingApproval,
     clearStreamingUi,
     reconnectToStream,
     fetchDebugData,
@@ -163,8 +167,8 @@ export async function executeRunTurn(
           ? { attachmentIds: attachments.map((attachment) => attachment.id) }
           : {}),
         ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-        ...(ephemeral ? { ephemeral: true } : { sessionId: turnSessionId }),
-        sessionDirectory: p.sessionDirectoryRef.current.trim() || undefined,
+        sessionId: turnSessionId,
+        ...(ephemeral ? { ephemeral: true } : {}),
       };
       response = await userScopedFetch("/api/runs", {
         method: "POST",
@@ -225,6 +229,25 @@ export async function executeRunTurn(
           if (typeof data.requestId === "string") {
             activeRequestIdRef.current = data.requestId;
           }
+        } else if (data.type === "approval_required") {
+          const request = data.request as Record<string, unknown> | undefined;
+          if (
+            typeof data.requestId === "string" &&
+            typeof data.approvalId === "string" &&
+            request
+          ) {
+            setPendingApproval({
+              requestId: data.requestId,
+              approvalId: data.approvalId,
+              title: String(request.title ?? "Approval required"),
+              target: String(request.target ?? "Unknown target"),
+              action: String(request.action ?? "Unknown action"),
+            });
+          }
+        } else if (data.type === "approval_resolved") {
+          setPendingApproval((current) =>
+            current?.approvalId === data.approvalId ? null : current,
+          );
         } else if (data.type === "run_delta") {
           const contentDelta =
             typeof data.contentDelta === "string" ? data.contentDelta : "";
@@ -266,6 +289,7 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_done") {
           terminalEventReceived = true;
+          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           if (ephemeral) {
             const assistantContent =
@@ -273,10 +297,20 @@ export async function executeRunTurn(
             const steps = (
               Array.isArray(data.steps) ? data.steps : []
             ) as MessageStep[];
+            const outputAttachments = Array.isArray(data.attachments)
+              ? (data.attachments as MessageAttachment[])
+              : undefined;
             if (viewingThisTurn()) {
               p.setMessages([
                 ...nextHistory,
-                { role: "assistant", content: assistantContent, steps },
+                {
+                  role: "assistant",
+                  content: assistantContent,
+                  steps,
+                  ...(outputAttachments?.length
+                    ? { attachments: outputAttachments }
+                    : {}),
+                },
               ]);
               if (Array.isArray(data.modelMessages)) {
                 p.modelMessagesRef.current = data.modelMessages as Array<
@@ -312,6 +346,7 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_aborted") {
           terminalEventReceived = true;
+          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           const history = Array.isArray(data.history)
             ? (data.history as Message[])
@@ -331,6 +366,7 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_error") {
           terminalEventReceived = true;
+          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           const errorText =
             typeof data.error === "string" ? data.error : "Unknown error";
