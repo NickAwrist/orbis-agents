@@ -1,6 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
-import { ComputerUseModal } from "./components/ComputerUseModal";
 import { DebugModal } from "./components/DebugModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
@@ -28,14 +27,12 @@ export default function App() {
   const [runFooterInset, setRunFooterInset] = useState(104);
   const [currentView, setCurrentView] = useState<AppView>("run");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [computerOpen, setComputerOpen] = useState(false);
 
   const runCommand = async (command: RunCommandName) => {
     try {
       if (command === "directory") await app.chooseDirectory();
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
-      if (command === "computer") setComputerOpen(true);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Command failed");
     }
@@ -58,7 +55,6 @@ export default function App() {
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
-      computerOpen ||
       app.debugOpen ||
       stepsModalOpen,
     sessions: app.sessions,
@@ -322,9 +318,6 @@ export default function App() {
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}
           />
-        )}
-        {computerOpen && (
-          <ComputerUseModal onClose={() => setComputerOpen(false)} />
         )}
         {workspaceOpen && app.activeSessionId && (
           <WorkspaceModal

@@ -1,4 +1,4 @@
-export type RunCommandName = "directory" | "sandbox" | "workspace" | "computer";
+export type RunCommandName = "directory" | "sandbox" | "workspace";
 
 export type RunCommand = {
   name: RunCommandName;
@@ -12,7 +12,6 @@ export const RUN_COMMANDS: readonly RunCommand[] = [
   },
   { name: "sandbox", description: "Return this chat to its private workspace" },
   { name: "workspace", description: "Show files in this chat's workspace" },
-  { name: "computer", description: "Open computer-use controls" },
 ];
 
 export function matchingRunCommands(input: string): readonly RunCommand[] {

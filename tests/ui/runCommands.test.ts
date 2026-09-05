@@ -9,7 +9,6 @@ describe("run commands", () => {
     expect(exactRunCommand("/directory")).toBe("directory");
     expect(exactRunCommand(" /sandbox ")).toBe("sandbox");
     expect(exactRunCommand("/workspace")).toBe("workspace");
-    expect(exactRunCommand("/computer")).toBe("computer");
   });
 
   test("does not consume ordinary model messages", () => {
