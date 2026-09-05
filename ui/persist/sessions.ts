@@ -1,6 +1,10 @@
 import { readApiError } from "../lib/readApiError";
-import type { Message } from "../types";
-import type { SessionSummary } from "../types";
+import type {
+  Message,
+  SessionSummary,
+  SessionWorkspace,
+  WorkspaceFile,
+} from "../types";
 import { userScopedFetch } from "./userIdentity";
 
 export type StoredRunSession = {
@@ -11,7 +15,7 @@ export type StoredRunSession = {
   history: Message[];
   modelMessages?: Array<Record<string, unknown>> | null;
   model?: string | null;
-  sessionDirectory?: string | null;
+  workspace?: SessionWorkspace;
 };
 
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
@@ -53,10 +57,16 @@ export async function fetchSession(
           ? (s.modelMessages as Array<Record<string, unknown>>)
           : null,
     model: s.model == null ? null : String(s.model),
-    sessionDirectory:
-      s.sessionDirectory === null || s.sessionDirectory === undefined
-        ? null
-        : String(s.sessionDirectory),
+    workspace:
+      s.workspace &&
+      typeof s.workspace === "object" &&
+      (s.workspace as { kind?: unknown }).kind === "local"
+        ? {
+            kind: "local",
+            path: String((s.workspace as { path?: unknown }).path ?? ""),
+            label: String((s.workspace as { label?: unknown }).label ?? ""),
+          }
+        : { kind: "sandbox" },
   };
 }
 
@@ -99,5 +109,69 @@ export async function deleteSessionApi(id: string): Promise<void> {
   const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+  if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
+}
+
+export async function selectSessionDirectory(
+  id: string,
+  path: string,
+  temporary = false,
+): Promise<SessionWorkspace> {
+  const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
+  const res = await userScopedFetch(
+    `${base}/${encodeURIComponent(id)}/workspace/select-directory`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    },
+  );
+  if (!res.ok) throw new Error(await readApiError(res));
+  const data = (await res.json()) as {
+    workspace: SessionWorkspace;
+  };
+  return data.workspace;
+}
+
+export async function useSessionSandbox(
+  id: string,
+  temporary = false,
+): Promise<SessionWorkspace> {
+  const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
+  const res = await userScopedFetch(
+    `${base}/${encodeURIComponent(id)}/workspace/use-sandbox`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(await readApiError(res));
+  return { kind: "sandbox" };
+}
+
+export async function fetchWorkspaceFiles(
+  id: string,
+  temporary = false,
+): Promise<WorkspaceFile[]> {
+  const path = temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(id)}/files`
+    : `/api/sessions/${encodeURIComponent(id)}/workspace/files`;
+  const res = await userScopedFetch(path);
+  if (!res.ok) throw new Error(await readApiError(res));
+  const data = (await res.json()) as { files?: WorkspaceFile[] };
+  return Array.isArray(data.files) ? data.files : [];
+}
+
+export async function createTemporarySessionApi(): Promise<{ id: string }> {
+  const res = await userScopedFetch("/api/temporary-sessions", {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  const data = (await res.json()) as { id?: unknown };
+  return { id: String(data.id ?? "") };
+}
+
+export async function deleteTemporarySessionApi(id: string): Promise<void> {
+  const res = await userScopedFetch(
+    `/api/temporary-sessions/${encodeURIComponent(id)}`,
+    { method: "DELETE", keepalive: true },
+  );
   if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
 }

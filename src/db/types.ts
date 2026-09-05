@@ -17,6 +17,7 @@ export type SessionRow = {
   model_messages: string | null;
   agent_name: string | null;
   session_directory: string | null;
+  workspace_kind: "sandbox" | "local";
 };
 
 export type SessionSummaryRow = {

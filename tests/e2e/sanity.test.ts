@@ -19,7 +19,7 @@ test("sanity E2E: start server, list agents, create agent", async () => {
     // Check that we have default seeded agents
     const agentNames = getData.agents.map((a) => a.name);
     expect(agentNames).toContain("general_agent");
-    expect(agentNames).toContain("computer_agent");
+    expect(agentNames).toContain("system_agent");
     expect(agentNames).not.toContain("coding_agent");
     expect(agentNames).toHaveLength(2);
 

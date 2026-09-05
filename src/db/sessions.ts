@@ -51,7 +51,7 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name, session_directory FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -62,6 +62,26 @@ export function countMessagesForSession(sessionId: string): number {
     .query("SELECT COUNT(*) as c FROM messages WHERE session_id = ?")
     .get(sessionId) as { c: number } | null;
   return row?.c ?? 0;
+}
+
+export function appendSessionEvent(
+  ownerUuid: string,
+  sessionId: string,
+  content: string,
+): boolean {
+  if (!getSessionById(ownerUuid, sessionId)) return false;
+  const db = getDb();
+  const position = countMessagesForSession(sessionId);
+  db.run(
+    "INSERT INTO messages (session_id, role, content, steps, attachments, position) VALUES (?, 'event', ?, NULL, NULL, ?)",
+    [sessionId, content, position],
+  );
+  db.run("UPDATE sessions SET updated_at = ? WHERE owner_uuid = ? AND id = ?", [
+    Date.now(),
+    ownerUuid,
+    sessionId,
+  ]);
+  return true;
 }
 
 export function getMessagesForSession(
@@ -140,6 +160,7 @@ export function createSessionRow(
     model_messages: null,
     agent_name: null,
     session_directory: null,
+    workspace_kind: "sandbox",
   };
 }
 
@@ -161,6 +182,7 @@ export function patchSessionRow(
     model_messages?: Array<Record<string, unknown>> | null;
     agent_name?: string | null;
     session_directory?: string | null;
+    workspace_kind?: "sandbox" | "local";
     updated_at?: number;
   },
 ): boolean {
@@ -175,6 +197,7 @@ export function patchSessionRow(
     patch.session_directory !== undefined
       ? patch.session_directory
       : existing.session_directory;
+  const workspaceKind = patch.workspace_kind ?? existing.workspace_kind;
   let modelMessagesJson: string | null = existing.model_messages;
   if (patch.model_messages !== undefined) {
     modelMessagesJson =
@@ -185,13 +208,14 @@ export function patchSessionRow(
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, agent_name = ?, session_directory = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, agent_name = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
     [
       title,
       model,
       modelMessagesJson,
       agentName,
       sessionDirectory,
+      workspaceKind,
       updatedAt,
       ownerUuid,
       id,

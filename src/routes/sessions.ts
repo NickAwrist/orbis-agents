@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
-import { type Request, Router } from "express";
+import { Router } from "express";
 import {
   type WireMessage,
+  appendSessionEvent,
   createSessionRow,
   deleteSessionRow,
   getMessagesForSession,
@@ -11,43 +12,215 @@ import {
   patchSessionRow,
   persistSessionMessages,
 } from "../db/index";
+import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { sendApiError } from "../http/errors";
+import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
-import { pickFolderNative } from "../nativeFolderPicker";
+import { revealFileNative } from "../nativeFolderPicker";
+import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
+import {
+  WorkspaceError,
+  workspaceService,
+} from "../workspaces/WorkspaceService";
 
 const router = Router();
 
-function isFolderPickerAllowed(req: Request): boolean {
-  const raw = req.socket.remoteAddress ?? "";
-  return (
-    raw === "127.0.0.1" ||
-    raw === "::1" ||
-    raw === "::ffff:127.0.0.1" ||
-    raw.endsWith("127.0.0.1")
-  );
-}
-
-router.post("/pick-directory", async (req, res) => {
-  if (!requireUserId(req, res)) return;
-  if (!isFolderPickerAllowed(req)) {
+router.post("/:id/workspace/select-directory", async (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
     sendApiError(
       res,
-      403,
-      "FORBIDDEN",
-      "Folder picker only runs on the machine where the API server is started (localhost).",
+      409,
+      "CONFLICT",
+      "Wait for the current turn to finish before changing workspaces",
+    );
+    return;
+  }
+  const parsed = SelectDirectorySchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      "Enter an absolute folder path on the server",
     );
     return;
   }
   try {
-    const path = await pickFolderNative();
-    res.json({ path });
+    const path = await workspaceService.canonicalDirectory(parsed.data.path);
+    if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+      sendApiError(
+        res,
+        409,
+        "CONFLICT",
+        "Wait for the current turn to finish before changing workspaces",
+      );
+      return;
+    }
+    patchSessionRow(ownerUuid, row.id, {
+      workspace_kind: "local",
+      session_directory: path,
+    });
+    appendSessionEvent(
+      ownerUuid,
+      row.id,
+      `Working directory changed to ${path}`,
+    );
+    res.json({
+      workspace: {
+        kind: "local",
+        path,
+        label: path.split(/[\\/]/).pop() || path,
+      },
+    });
   } catch (e) {
     sendApiError(
       res,
-      500,
-      "INTERNAL_ERROR",
-      e instanceof Error ? e.message : "Failed to open folder dialog",
+      e instanceof WorkspaceError ? 400 : 500,
+      e instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
+      e instanceof Error ? e.message : "Could not select directory",
+    );
+  }
+});
+
+router.post("/:id/workspace/use-sandbox", async (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+    sendApiError(
+      res,
+      409,
+      "CONFLICT",
+      "Wait for the current turn to finish before changing workspaces",
+    );
+    return;
+  }
+  await workspaceService.provisionRetained(ownerUuid, row.id);
+  if (getSessionById(ownerUuid, row.id)?.workspace_kind === "sandbox") {
+    res.json({ workspace: { kind: "sandbox" } });
+    return;
+  }
+  patchSessionRow(ownerUuid, row.id, {
+    workspace_kind: "sandbox",
+    session_directory: null,
+  });
+  appendSessionEvent(ownerUuid, row.id, "Returned to the private workspace");
+  res.json({ workspace: { kind: "sandbox" } });
+});
+
+router.get("/:id/workspace/files", async (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  try {
+    const workspace = await workspaceService.resolveSession(row);
+    const files = await workspaceService.listFiles(workspace);
+    res.json({ files: files.slice(0, 200) });
+  } catch (error) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      error instanceof Error ? error.message : "Could not list workspace files",
+    );
+  }
+});
+
+router.get("/:id/workspace/file", async (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  if (row.workspace_kind !== "sandbox") {
+    sendApiError(
+      res,
+      403,
+      "FORBIDDEN",
+      "Local files cannot be downloaded through this route",
+    );
+    return;
+  }
+  const requestedPath =
+    typeof req.query.path === "string" ? req.query.path : "";
+  try {
+    const workspace = await workspaceService.resolveSession(row);
+    await downloadWorkspaceFile(res, workspace, requestedPath);
+  } catch (error) {
+    if (res.headersSent || res.destroyed) return;
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      error instanceof Error
+        ? error.message
+        : "Could not download workspace file",
+    );
+  }
+});
+
+router.post("/:id/workspace/reveal", async (req, res) => {
+  const ownerUuid = requireUserId(req, res);
+  if (!ownerUuid) return;
+  if (!isLoopbackRequest(req)) {
+    sendApiError(
+      res,
+      403,
+      "FORBIDDEN",
+      "Files can only be revealed on the machine running Orbis",
+    );
+    return;
+  }
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  if (row.workspace_kind !== "local") {
+    sendApiError(
+      res,
+      403,
+      "FORBIDDEN",
+      "Only local workspace files can be revealed",
+    );
+    return;
+  }
+  const requestedPath =
+    typeof (req.body as { path?: unknown }).path === "string"
+      ? (req.body as { path: string }).path
+      : "";
+  try {
+    const workspace = await workspaceService.resolveSession(row);
+    const path = await workspaceService.resolveExistingPath(
+      workspace,
+      requestedPath,
+    );
+    await revealFileNative(path);
+    res.json({ ok: true });
+  } catch (error) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      error instanceof Error ? error.message : "Could not reveal file",
     );
   }
 });
@@ -86,11 +259,11 @@ router.get("/:id", (req, res) => {
       parseModelMessages(row.model_messages),
     ),
     model: row.model,
-    sessionDirectory: row.session_directory ?? null,
+    workspace: workspaceService.presentation(row),
   });
 });
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   const body = req.body as { model?: unknown };
@@ -101,6 +274,12 @@ router.post("/", (req, res) => {
       ? body.model.trim()
       : null;
   createSessionRow(ownerUuid, id, now, model);
+  try {
+    await workspaceService.provisionRetained(ownerUuid, id);
+  } catch (error) {
+    deleteSessionRow(ownerUuid, id);
+    throw error;
+  }
   res.status(201).json({ id, createdAt: now, updatedAt: now });
 });
 
@@ -118,7 +297,6 @@ router.patch("/:id", (req, res) => {
     model?: unknown;
     modelMessages?: unknown;
     history?: unknown;
-    sessionDirectory?: unknown;
   };
   const now = Date.now();
 
@@ -167,26 +345,28 @@ router.patch("/:id", (req, res) => {
           ? (mm as Array<Record<string, unknown>>)
           : null;
   }
-  if (
-    "sessionDirectory" in body &&
-    body.sessionDirectory !== undefined &&
-    !Array.isArray(body.history)
-  ) {
-    const d = body.sessionDirectory;
-    patch.session_directory =
-      d === null || d === undefined
-        ? null
-        : typeof d === "string"
-          ? d.trim() || null
-          : null;
-  }
   patchSessionRow(ownerUuid, id, patch);
   res.json({ ok: true });
 });
 
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
+  const row = getSessionById(ownerUuid, req.params.id);
+  if (!row) {
+    sendApiError(res, 404, "NOT_FOUND", "Session not found");
+    return;
+  }
+  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+    sendApiError(
+      res,
+      409,
+      "CONFLICT",
+      "Stop the current turn before deleting this chat",
+    );
+    return;
+  }
+  await workspaceService.trashRetained(ownerUuid, row.id);
   const ok = deleteSessionRow(ownerUuid, req.params.id);
   if (!ok) {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");

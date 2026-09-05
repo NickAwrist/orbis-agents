@@ -1,6 +1,6 @@
 import type { Tool } from "ollama";
 import { getSearXNGClient } from "../searxng/client";
-import { BaseTool } from "./BaseTool";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class WebSearchTool extends BaseTool {
   constructor() {
@@ -31,9 +31,9 @@ export class WebSearchTool extends BaseTool {
     };
   }
 
-  override async execute(args: Record<string, unknown>): Promise<string> {
+  override async execute(args: Record<string, unknown>): Promise<ToolResult> {
     if (typeof args.query !== "string" || args.query.trim().length === 0) {
-      return "Error: query must be a non-empty string";
+      return textToolResult("Error: query must be a non-empty string");
     }
 
     const maxResults =
@@ -45,20 +45,24 @@ export class WebSearchTool extends BaseTool {
       const results = await getSearXNGClient().search(args.query, maxResults);
 
       if (results.length === 0) {
-        return "No results found.";
+        return textToolResult("No results found.");
       }
 
-      return results
-        .map((r, i) => {
-          const parts = [`Result ${i + 1} (${r.title}):`];
-          if (r.url) parts.push(r.url);
-          if (r.engine) parts.push(`Source: ${r.engine}`);
-          parts.push(r.content);
-          return parts.join("\n");
-        })
-        .join("\n\n---\n\n");
+      return textToolResult(
+        results
+          .map((r, i) => {
+            const parts = [`Result ${i + 1} (${r.title}):`];
+            if (r.url) parts.push(r.url);
+            if (r.engine) parts.push(`Source: ${r.engine}`);
+            parts.push(r.content);
+            return parts.join("\n");
+          })
+          .join("\n\n---\n\n"),
+      );
     } catch (e: unknown) {
-      return `Error performing web search: ${e instanceof Error ? e.message : String(e)}`;
+      return textToolResult(
+        `Error performing web search: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 }

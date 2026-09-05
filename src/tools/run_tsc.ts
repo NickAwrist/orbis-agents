@@ -1,15 +1,15 @@
-import { exec } from "node:child_process";
-import { homedir } from "node:os";
-import { promisify } from "node:util";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { BaseTool } from "./BaseTool";
-
-const execAsync = promisify(exec);
+import { sandboxRunner } from "../sandbox/SandboxRunner";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace } from "./workspace";
 
 export class RunTscTool extends BaseTool {
   constructor() {
-    super("run_tsc", "Run the typescript compiler to check for type errors.");
+    super(
+      "run_tsc",
+      "Run the TypeScript compiler inside the active workspace.",
+    );
   }
 
   override toTool(): Tool {
@@ -18,32 +18,34 @@ export class RunTscTool extends BaseTool {
       function: {
         name: this.name,
         description: this.description,
-        parameters: {
-          type: "object",
-          properties: {},
-          required: [],
-        },
+        parameters: { type: "object", properties: {}, required: [] },
       },
     };
   }
 
   override async execute(
-    args: Record<string, unknown>,
+    _args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
-    const cwd = ctx?.sessionDir?.trim() || homedir();
+  ): Promise<ToolResult> {
     try {
-      const { stdout, stderr } = await execAsync("npx tsc --noEmit", { cwd });
-      const output = stdout || stderr;
-      if (output.trim() === "") {
-        return "No type errors found! Compilation successful.";
-      }
-      return output;
-    } catch (error: unknown) {
-      // exec throws if tsc exits with a non-zero code (errors found)
-      const e = error as { stdout?: string; stderr?: string; message?: string };
-      const output = e.stdout || e.stderr || e.message;
-      return output?.trim() ? output : "Error running tsc (no output)";
+      const result = await sandboxRunner.run({
+        command: "npx --offline tsc --noEmit",
+        workspace: requireWorkspace(ctx),
+        signal: ctx?.signal,
+      });
+      const output = [result.stdout, result.stderr]
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+      if (result.exitCode === 0 && !output)
+        return textToolResult("No type errors found.");
+      return textToolResult(
+        output || `TypeScript exited with status ${result.exitCode}`,
+      );
+    } catch (error) {
+      return textToolResult(
+        `Error running TypeScript: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

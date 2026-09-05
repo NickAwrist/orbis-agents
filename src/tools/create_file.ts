@@ -1,12 +1,12 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class CreateFileTool extends BaseTool {
   constructor() {
-    super("create_file", "Create a new file");
+    super("create_file", "Create a file, creating missing parent directories");
   }
 
   override toTool(): Tool {
@@ -21,7 +21,8 @@ export class CreateFileTool extends BaseTool {
           properties: {
             path: {
               type: "string",
-              description: "File path (relative to cwd or absolute)",
+              description:
+                "File path (relative to /workspace or absolute under /workspace)",
             },
             content: {
               type: "string",
@@ -43,26 +44,15 @@ export class CreateFileTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const rawPath =
       typeof args.path === "string" && args.path.length > 0
         ? args.path
         : typeof args.filename === "string" && args.filename.length > 0
           ? args.filename
           : "";
-    let path: string;
-    try {
-      path = resolveToolFilePath(rawPath, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
-      }
-      throw e;
-    }
-    if (!path) {
-      return "Error: missing path (provide path or filename)";
+    if (!rawPath) {
+      return textToolResult("Error: missing path (provide path or filename)");
     }
     const content =
       typeof args.content === "string"
@@ -70,7 +60,12 @@ export class CreateFileTool extends BaseTool {
         : Array.isArray(args.lines)
           ? args.lines.join("\n")
           : "";
-    await fs.writeFile(path, content);
-    return `File created at ${path}`;
+    try {
+      const workspace = requireWorkspace(ctx);
+      await workspaceService.writeFile(workspace, rawPath, content);
+      return textToolResult(`File created at ${rawPath}`);
+    } catch (error) {
+      return textToolResult(workspaceError(error));
+    }
   }
 }

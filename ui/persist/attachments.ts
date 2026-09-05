@@ -1,6 +1,6 @@
 import {
-  type MessageAttachment,
-  MessageAttachmentSchema,
+  type ImageAttachment,
+  ImageAttachmentSchema,
 } from "../../src/attachments/types";
 import { readApiError } from "../lib/readApiError";
 import { userScopedFetch } from "./userIdentity";
@@ -8,7 +8,7 @@ import { userScopedFetch } from "./userIdentity";
 export async function uploadImageAttachment(
   sessionId: string,
   file: File,
-): Promise<MessageAttachment> {
+): Promise<ImageAttachment> {
   const response = await userScopedFetch("/api/attachments", {
     method: "POST",
     headers: {
@@ -20,7 +20,7 @@ export async function uploadImageAttachment(
   });
   if (!response.ok) throw new Error(await readApiError(response));
   const payload = (await response.json()) as { attachment?: unknown };
-  const parsed = MessageAttachmentSchema.safeParse(payload.attachment);
+  const parsed = ImageAttachmentSchema.safeParse(payload.attachment);
   if (!parsed.success) throw new Error("The server returned an invalid image");
   return parsed.data;
 }

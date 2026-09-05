@@ -1,4 +1,4 @@
-import type { MessageAttachment } from "../attachments/types";
+import type { ImageAttachment } from "../attachments/types";
 import { type WireMessage, persistSessionMessages } from "../db/index";
 
 /**
@@ -9,7 +9,7 @@ export type RunPersistence = {
   saveInitial(
     history: WireMessage[],
     userMessage: string,
-    attachments: MessageAttachment[],
+    attachments: ImageAttachment[],
     modelMessages: Array<Record<string, unknown>> | null,
   ): void;
   saveFinal(

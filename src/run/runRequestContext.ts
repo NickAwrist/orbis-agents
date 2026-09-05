@@ -15,16 +15,21 @@ import { sendValidationError } from "../http/validation";
 import { resolveModelSelection } from "../llm/index";
 import type { PromptContext } from "../prompts/render";
 import { type RunBody, RunBodySchema } from "../schemas/run";
-import { resolveEffectiveToolSessionDir } from "../sessionDirectory";
+import {
+  type Workspace,
+  WorkspaceError,
+  workspaceService,
+} from "../workspaces/WorkspaceService";
 
 export type RunTurnContext = {
   body: RunBody;
   ephemeral: boolean;
-  /** Empty string for ephemeral turns. */
+  /** Persisted session ID or temporary workspace lease ID. */
   sessionId: string;
   model: string;
   agentName: string;
   toolSessionDir?: string;
+  workspace: Workspace;
   promptContext: PromptContext;
   persistedSession: SessionRow | null;
   ownerUuid: string;
@@ -36,11 +41,11 @@ export type RunTurnContext = {
  * (persisted session, effective agent, tool dir, model). Writes a 4xx
  * response and returns `null` on failure so the caller can early-return.
  */
-export function buildTurnContext(
+export async function buildTurnContext(
   rawBody: unknown,
   res: Response,
   ownerUuid: string,
-): RunTurnContext | null {
+): Promise<RunTurnContext | null> {
   const parsed = RunBodySchema.safeParse(rawBody);
   if (!parsed.success) {
     sendValidationError(res, parsed.error);
@@ -48,14 +53,15 @@ export function buildTurnContext(
   }
   const body = parsed.data;
   const ephemeral = body.ephemeral === true;
-  const sessionId = body.sessionId ?? "";
+  let sessionId = body.sessionId ?? "";
+
+  if (!ephemeral && !sessionId) {
+    sendApiError(res, 400, "BAD_REQUEST", "sessionId required");
+    return null;
+  }
 
   let persistedSession: SessionRow | null = null;
   if (!ephemeral) {
-    if (!sessionId) {
-      sendApiError(res, 400, "BAD_REQUEST", "sessionId required");
-      return null;
-    }
     persistedSession = getSessionById(ownerUuid, sessionId);
     if (!persistedSession) {
       sendApiError(res, 404, "NOT_FOUND", "Session not found");
@@ -68,11 +74,6 @@ export function buildTurnContext(
     sendApiError(res, 400, "BAD_REQUEST", `Unknown agent: ${agentName}`);
     return null;
   }
-
-  const toolSessionDir = resolveEffectiveToolSessionDir(
-    body.sessionDirectory,
-    persistedSession?.session_directory,
-  );
 
   const model = body.model?.trim() || DEFAULT_RUN_MODEL;
   const resolvedModel = resolveModelSelection(model);
@@ -94,6 +95,34 @@ export function buildTurnContext(
       return null;
     }
   }
+
+  let workspace: Workspace;
+  try {
+    if (ephemeral && !sessionId) {
+      const lease = await workspaceService.createTemporary(ownerUuid);
+      sessionId = lease.id;
+      workspace = {
+        kind: "sandbox",
+        hostPath: lease.hostPath,
+        displayPath: "/workspace",
+      };
+    } else {
+      workspace = ephemeral
+        ? await workspaceService.resolveTemporary(ownerUuid, sessionId)
+        : await workspaceService.resolveSession(persistedSession!);
+    }
+  } catch (error) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      error instanceof WorkspaceError
+        ? error.message
+        : "The chat workspace is unavailable",
+    );
+    return null;
+  }
+  const toolSessionDir = workspace.hostPath;
 
   const attachmentIds = body.attachmentIds ?? [];
   if (ephemeral && attachmentIds.length > 0) {
@@ -122,9 +151,10 @@ export function buildTurnContext(
     model,
     agentName,
     toolSessionDir,
+    workspace,
     promptContext: buildServerRunPromptContext({
       metadata: body.metadata,
-      toolSessionDir,
+      toolSessionDir: workspace.displayPath,
     }),
     persistedSession,
     ownerUuid,

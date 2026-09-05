@@ -31,6 +31,7 @@ export {
   patchSessionRow,
   persistSessionMessages,
   countMessagesForSession,
+  appendSessionEvent,
 } from "./sessions";
 export { ensureUserData } from "./users";
 export type {

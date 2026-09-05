@@ -1,14 +1,15 @@
-import fs from "node:fs/promises";
-import { homedir } from "node:os";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
-import { loadGitignore } from "../utils/gitignoreFilter";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class ListFilesTool extends BaseTool {
   constructor() {
-    super("list_files", "List all files in the current directory");
+    super(
+      "list_files",
+      "List files in a directory, excluding .git, node_modules, .cache and gitignored entries",
+    );
   }
 
   override toTool(): Tool {
@@ -23,7 +24,7 @@ export class ListFilesTool extends BaseTool {
             path: {
               type: "string",
               description:
-                "Directory path (relative to cwd or absolute). If not provided, the current directory is used.",
+                "Directory path (relative to /workspace or absolute under /workspace). If not provided, the current directory is used.",
             },
           },
         },
@@ -34,32 +35,22 @@ export class ListFilesTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const raw =
-      typeof args.path === "string" && args.path.length > 0
-        ? args.path
-        : (ctx?.sessionDir ?? homedir());
-    let path: string;
+      typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
-      path = resolveToolFilePath(raw, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
-      }
-      throw e;
+      const workspace = requireWorkspace(ctx);
+      const entries = await workspaceService.readVisibleDirectory(
+        workspace,
+        raw,
+      );
+      const files = entries.map((entry) =>
+        entry.isDirectory() ? `${entry.name}/` : entry.name,
+      );
+
+      return textToolResult(`List of files: ${files.join(", ")}`);
+    } catch (error) {
+      return textToolResult(workspaceError(error));
     }
-    const entries = await fs.readdir(path, { withFileTypes: true });
-    let files = entries.map((entry) =>
-      entry.isDirectory() ? `${entry.name}/` : entry.name,
-    );
-
-    const ig = await loadGitignore(path);
-    files = files.filter(
-      (f) => !ig.ignores(f.endsWith("/") ? f.slice(0, -1) : f),
-    );
-
-    return `List of files: ${files.join(", ")}`;
   }
 }

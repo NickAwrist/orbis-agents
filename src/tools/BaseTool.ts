@@ -1,6 +1,14 @@
 import type { Tool } from "ollama";
 import type { RunContext, Step } from "../RunContext";
 
+export type ToolResult = {
+  text: string;
+};
+
+export function textToolResult(text: string): ToolResult {
+  return { text };
+}
+
 export class BaseTool {
   name: string;
   description: string;
@@ -14,7 +22,7 @@ export class BaseTool {
     args: Record<string, unknown>,
     _ctx?: RunContext,
     _parentToolStep?: Step,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     throw new Error("Tool not implemented");
   }
 

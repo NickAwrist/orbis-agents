@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { MessageAttachment } from "../../../src/attachments/types";
+import type { ImageAttachment } from "../../../src/attachments/types";
 import type { AgentData } from "../../persist/agents";
 import { patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
@@ -37,7 +37,7 @@ type Args = {
   userSettingsRef: MutableRefObject<UserSettings>;
   selectedSessionAgentRef: MutableRefObject<string>;
   agentMapRef: MutableRefObject<Map<string, AgentData>>;
-  sessionDirectoryRef: MutableRefObject<string>;
+  workspaceDisplayPath: string;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
   debugOpen: boolean;
@@ -133,7 +133,7 @@ export function useRunStreaming(p: Args) {
   const fetchDebugData = useRunDebug({
     agentMapRef: p.agentMapRef,
     selectedSessionAgentRef: p.selectedSessionAgentRef,
-    sessionDirectoryRef: p.sessionDirectoryRef,
+    workspaceDisplayPath: p.workspaceDisplayPath,
     userSettingsRef: p.userSettingsRef,
     isEphemeralRef: p.isEphemeralRef,
     setDebugData: p.setDebugData,
@@ -149,7 +149,7 @@ export function useRunStreaming(p: Args) {
     sessionId: string,
     priorMessages: Message[],
     message: string,
-    attachments: MessageAttachment[],
+    attachments: ImageAttachment[],
     options: { rebuildModelMessages: boolean },
   ) =>
     executeRunTurn(
@@ -157,7 +157,6 @@ export function useRunStreaming(p: Args) {
         activeSessionIdRef: p.activeSessionIdRef,
         isEphemeralRef: p.isEphemeralRef,
         selectedSessionAgentRef: p.selectedSessionAgentRef,
-        sessionDirectoryRef: p.sessionDirectoryRef,
         userSettingsRef: p.userSettingsRef,
         modelMessagesRef: p.modelMessagesRef,
         debugOpenRef: p.debugOpenRef,
@@ -274,7 +273,10 @@ export function useRunStreaming(p: Args) {
       sessionId,
       p.messages.slice(0, confirmation.userIndex),
       message,
-      row.attachments ?? [],
+      row.attachments?.filter(
+        (attachment): attachment is ImageAttachment =>
+          attachment.kind === "image",
+      ) ?? [],
       { rebuildModelMessages: true },
     );
   };

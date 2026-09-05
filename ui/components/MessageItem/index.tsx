@@ -64,6 +64,19 @@ export function MessageItem({
         }
       : undefined;
 
+  if (message.role === "event") {
+    return (
+      <div
+        className="flex items-center gap-3 py-2 text-xs text-muted-foreground"
+        role="note"
+      >
+        <span className="h-px flex-1 bg-border-subtle" />
+        <span>{message.content}</span>
+        <span className="h-px flex-1 bg-border-subtle" />
+      </div>
+    );
+  }
+
   if (message.role === "user") {
     return (
       <UserMessageBubble

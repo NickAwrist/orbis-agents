@@ -1,8 +1,8 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { SandboxError, resolveToolFilePath } from "../sessionDirectory";
-import { BaseTool } from "./BaseTool";
+import { workspaceService } from "../workspaces/WorkspaceService";
+import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class ReadFileTool extends BaseTool {
   constructor() {
@@ -21,7 +21,8 @@ export class ReadFileTool extends BaseTool {
           properties: {
             path: {
               type: "string",
-              description: "File path (relative to cwd or absolute)",
+              description:
+                "File path (relative to /workspace or absolute under /workspace)",
             },
           },
         },
@@ -32,32 +33,25 @@ export class ReadFileTool extends BaseTool {
   override async execute(
     args: Record<string, unknown>,
     ctx?: RunContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const rawPath =
       typeof args.path === "string" && args.path.length > 0
         ? args.path
         : typeof args.filename === "string" && args.filename.length > 0
           ? args.filename
           : "";
-    let path: string;
     try {
-      path = resolveToolFilePath(rawPath, ctx?.sessionDir, {
-        enforceSandbox: true,
-      });
-    } catch (e) {
-      if (e instanceof SandboxError) {
-        return `Error: ${e.message}`;
+      const file = await workspaceService.openFile(
+        requireWorkspace(ctx),
+        rawPath,
+      );
+      try {
+        return textToolResult(await file.readFile("utf8"));
+      } finally {
+        await file.close();
       }
-      throw e;
-    }
-    if (!path) {
-      return "Error: missing path (provide path or filename)";
-    }
-    try {
-      const content = await fs.readFile(path, "utf8");
-      return content;
     } catch (e) {
-      return `Error: failed to read file ${path}: ${(e as Error).message}`;
+      return textToolResult(workspaceError(e));
     }
   }
 }

@@ -22,7 +22,9 @@ export function getDb(): Database {
       title TEXT,
       model TEXT,
       model_messages TEXT,
-      agent_name TEXT
+      agent_name TEXT,
+      session_directory TEXT,
+      workspace_kind TEXT NOT NULL DEFAULT 'sandbox'
     );
   `);
   db.run(`

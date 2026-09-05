@@ -105,7 +105,10 @@ export function useRunApp() {
     userSettingsRef: settings.userSettingsRef,
     selectedSessionAgentRef,
     agentMapRef: agents.agentMapRef,
-    sessionDirectoryRef: sessions.sessionDirectoryRef,
+    workspaceDisplayPath:
+      sessions.workspace.kind === "local"
+        ? sessions.workspace.path
+        : "/workspace",
     modelMessagesRef,
     debugOpenRef,
     debugOpen,
@@ -166,9 +169,9 @@ export function useRunApp() {
     serverDefaultRunAgent: agents.serverDefaultRunAgent,
     setServerDefaultRunAgent: agents.setServerDefaultRunAgent,
     selectedSessionAgent: sessions.selectedSessionAgent,
-    sessionDirectory: sessions.sessionDirectory,
-    setSessionDirectoryDraft: sessions.setSessionDirectoryDraft,
-    persistSessionDirectory: sessions.persistSessionDirectory,
+    workspace: sessions.workspace,
+    chooseDirectory: sessions.chooseDirectory,
+    returnToSandbox: sessions.returnToSandbox,
     handleSessionAgentChange: sessions.handleSessionAgentChange,
     refreshAgentDefaults: agents.refreshAgentDefaults,
     ollamaConnected: ollama.ollamaConnected,

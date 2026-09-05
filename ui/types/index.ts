@@ -1,4 +1,8 @@
-export type { AppView } from "./app";
+export type {
+  AppView,
+  SessionWorkspace,
+  WorkspaceFile,
+} from "./app";
 export type {
   DebugData,
   Message,

@@ -1,4 +1,13 @@
-import { ArrowUp, BookOpen, ImagePlus, Square, Upload, X } from "lucide-react";
+import {
+  ArrowUp,
+  BookOpen,
+  Command,
+  Folder,
+  ImagePlus,
+  Square,
+  Upload,
+  X,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -9,6 +18,12 @@ import {
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep } from "../types";
+import type { SessionWorkspace } from "../types";
+import {
+  type RunCommandName,
+  exactRunCommand,
+  matchingRunCommands,
+} from "./runCommands";
 import {
   completeSkillToken,
   filterAssignedSkills,
@@ -33,6 +48,8 @@ export function RunInputDock({
   attachImageDisabledReason,
   attachmentsSendReady,
   assignedSkillIds,
+  workspace,
+  onRunCommand,
   onFooterHeightChange,
 }: {
   input: string;
@@ -52,6 +69,8 @@ export function RunInputDock({
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
   assignedSkillIds: string[];
+  workspace: SessionWorkspace;
+  onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
   const footerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +82,7 @@ export function RunInputDock({
   const [caretIndex, setCaretIndex] = useState(input.length);
   const [selectedSkillIndex, setSelectedSkillIndex] = useState(0);
   const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
   const canSend = modelSendReady && attachmentsSendReady && !isBusy;
@@ -75,6 +95,14 @@ export function RunInputDock({
         .slice(0, 8)
     : [];
   const skillPickerOpen = !isBusy && matchingSkills.length > 0;
+  const matchingCommands = matchingRunCommands(input, workspace.kind);
+  const commandPickerOpen = !isBusy && matchingCommands.length > 0;
+
+  const runCommand = (command: RunCommandName) => {
+    setInput("");
+    setSelectedCommandIndex(0);
+    void onRunCommand(command);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +126,11 @@ export function RunInputDock({
     if (selectedSkillIndex < matchingSkills.length) return;
     setSelectedSkillIndex(Math.max(0, matchingSkills.length - 1));
   }, [matchingSkills.length, selectedSkillIndex]);
+
+  useEffect(() => {
+    if (selectedCommandIndex < matchingCommands.length) return;
+    setSelectedCommandIndex(Math.max(0, matchingCommands.length - 1));
+  }, [matchingCommands.length, selectedCommandIndex]);
 
   const selectSkill = (skill: SkillData) => {
     if (!activeSkillToken) return;
@@ -147,11 +180,24 @@ export function RunInputDock({
   return (
     <div
       ref={footerRef}
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center border-t border-border-subtle/60 bg-background/[0.16] px-5 pb-4 pt-3 shadow-[0_-1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125 max-[640px]:px-3.5 max-[640px]:pb-3.5 max-[640px]:pt-2.5"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border-subtle/60 bg-background/[0.16] px-5 pb-4 pt-3 shadow-[0_-1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125 max-[640px]:px-3.5 max-[640px]:pb-3.5 max-[640px]:pt-2.5"
     >
+      {workspace.kind === "local" && (
+        <div className="pointer-events-auto flex w-full max-w-3xl items-center gap-2 px-1 text-xs text-muted-foreground">
+          <Folder size={13} />
+          <span className="min-w-0 truncate" title={workspace.path}>
+            Working in {workspace.label}
+          </span>
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          const command = exactRunCommand(input);
+          if (command) {
+            runCommand(command);
+            return;
+          }
           onSendMessage(e);
         }}
         onDragEnter={(e) => {
@@ -186,6 +232,36 @@ export function RunInputDock({
             : "border-border-subtle",
         )}
       >
+        {commandPickerOpen && (
+          <div
+            id="command-picker"
+            className="ui-animate-slide-up absolute inset-x-0 bottom-[calc(100%+8px)] z-40 overflow-hidden rounded-xl border border-border-subtle bg-surface p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.42)]"
+            aria-label="Chat commands"
+          >
+            {matchingCommands.map((command, index) => (
+              <button
+                key={command.name}
+                type="button"
+                aria-current={index === selectedCommandIndex}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setSelectedCommandIndex(index)}
+                onClick={() => runCommand(command.name)}
+                className={cx(
+                  "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left",
+                  index === selectedCommandIndex
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                )}
+              >
+                <Command size={14} className="shrink-0" />
+                <span className="font-mono text-[0.8125rem] text-foreground">
+                  /{command.name}
+                </span>
+                <span className="truncate text-xs">{command.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {skillPickerOpen && (
           <div
             id="skill-picker"
@@ -317,6 +393,29 @@ export function RunInputDock({
               }
             }}
             onKeyDown={(e) => {
+              if (commandPickerOpen) {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const direction = e.key === "ArrowDown" ? 1 : -1;
+                  setSelectedCommandIndex(
+                    (current) =>
+                      (current + direction + matchingCommands.length) %
+                      matchingCommands.length,
+                  );
+                  return;
+                }
+                if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+                  e.preventDefault();
+                  const command = matchingCommands[selectedCommandIndex];
+                  if (command) runCommand(command.name);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setInput("");
+                  return;
+                }
+              }
               if (skillPickerOpen) {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
@@ -354,8 +453,14 @@ export function RunInputDock({
             disabled={isBusy}
             placeholder="Send a message..."
             aria-autocomplete="list"
-            aria-controls={skillPickerOpen ? "skill-picker" : undefined}
-            aria-expanded={skillPickerOpen}
+            aria-controls={
+              commandPickerOpen
+                ? "command-picker"
+                : skillPickerOpen
+                  ? "skill-picker"
+                  : undefined
+            }
+            aria-expanded={skillPickerOpen || commandPickerOpen}
             className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
             rows={1}
           />

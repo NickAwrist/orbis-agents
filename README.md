@@ -91,6 +91,48 @@ networking has different behavior. In that case, use the local Bun dev commands
 or switch the Compose file back to port publishing plus
 `host.docker.internal`.
 
+## Workspaces
+
+Shell commands and file tools use `/workspace` for both private and selected
+local workspaces. File tools also accept relative paths within that directory.
+The UI shows the selected host directory for local workspaces.
+
+Workspace file operations require Linux with procfs. Reads, writes, directory
+listing, and scans open path components without following symlinks. Deletes use
+an open parent directory and unlink the final entry without following it. Ignore
+rules are read only from within the workspace through the same protected access.
+
+Temporary workspaces expire after 24 hours. The server checks for expired leases
+and abandoned directories every minute, deferring deletion during active turns.
+Leaving a temporary chat requests deletion immediately. Selected local directories
+are never removed by temporary workspace cleanup.
+
+The sandbox integration tests report skips when Bubblewrap is unavailable. Run
+`bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working
+Bubblewrap namespaces to verify workspace writes and network isolation.
+
+### Bubblewrap on Ubuntu 24.04
+
+If shell tools report `loopback: Failed RTM_NEWADDR: Operation not permitted`,
+check `journalctl -k` for AppArmor denials involving `bwrap` and the
+`unprivileged_userns` profile. Ubuntu can block the capabilities Bubblewrap
+needs to create its sandbox, including its isolated loopback interface.
+
+For `/usr/bin/bwrap`, install the included application-specific profile:
+
+```bash
+sudo install -m 0644 config/apparmor/orbis-bwrap /etc/apparmor.d/orbis-bwrap
+sudo apparmor_parser -r /etc/apparmor.d/orbis-bwrap
+```
+
+This follows [Ubuntu's application-specific user namespace guidance](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
+The profile permits Bubblewrap to create user namespaces. The runner continues
+using its filesystem restrictions and isolated network namespace.
+
+Restart the backend after loading the profile because it caches the sandbox
+capability check. Then run the sandbox tests above; workspace writes and network
+isolation tests should run rather than skip.
+
 ## Project Structure
 
 - `src/` - backend server, agent loop, tools, and session storage

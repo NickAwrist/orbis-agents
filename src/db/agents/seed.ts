@@ -13,7 +13,7 @@ const DEFAULT_AGENTS: Array<{
     description:
       "Orchestrator agent that answers questions directly or delegates to specialized subagents.",
     tools: ["web_search"],
-    delegates: ["computer_agent"],
+    delegates: ["system_agent"],
     system_prompt: [
       "You are the orchestrator agent. You answer the user's request directly when you can, and delegate to your tools when the task requires capabilities you do not have.",
       "",
@@ -33,13 +33,13 @@ const DEFAULT_AGENTS: Array<{
     ].join("\n"),
   },
   {
-    name: "computer_agent",
+    name: "system_agent",
     description:
-      "Runs shell commands, manages files, installs packages, and performs any OS-level task via bash. Provide a self-contained task description including the exact expected output or deliverable. Use for: running scripts, file operations (copy/move/delete), checking system state, git commands, process management.",
+      "Uses contained shell and file tools in the active chat workspace. Provide a self-contained task description with the expected output or deliverable.",
     tools: ["bash"],
     delegates: [],
     system_prompt: [
-      "You are a computer-use agent with access to a bash shell. You execute commands, manage files, and interact with the operating system to complete tasks.",
+      "You are a system agent with contained shell and file access to the active chat workspace.",
       "",
       "<execution_rules>",
       "- Before running a destructive command (rm, overwrite, etc.), verify the target path exists and is correct.",

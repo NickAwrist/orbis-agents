@@ -1,5 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { MessageAttachment } from "../../../src/attachments/types";
+import type {
+  ImageAttachment,
+  MessageAttachment,
+} from "../../../src/attachments/types";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
@@ -12,7 +15,6 @@ type AppDeps = {
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  sessionDirectoryRef: MutableRefObject<string>;
   userSettingsRef: MutableRefObject<UserSettings>;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
@@ -52,7 +54,7 @@ export async function executeRunTurn(
   turnSessionId: string,
   priorMessages: Message[],
   messageText: string,
-  attachments: MessageAttachment[],
+  attachments: ImageAttachment[],
   options: TurnOptions,
 ) {
   if (!messageText.trim() || !turnSessionId || !p.modelSendReady) return;
@@ -163,8 +165,8 @@ export async function executeRunTurn(
           ? { attachmentIds: attachments.map((attachment) => attachment.id) }
           : {}),
         ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-        ...(ephemeral ? { ephemeral: true } : { sessionId: turnSessionId }),
-        sessionDirectory: p.sessionDirectoryRef.current.trim() || undefined,
+        sessionId: turnSessionId,
+        ...(ephemeral ? { ephemeral: true } : {}),
       };
       response = await userScopedFetch("/api/runs", {
         method: "POST",
@@ -273,10 +275,20 @@ export async function executeRunTurn(
             const steps = (
               Array.isArray(data.steps) ? data.steps : []
             ) as MessageStep[];
+            const outputAttachments = Array.isArray(data.attachments)
+              ? (data.attachments as MessageAttachment[])
+              : undefined;
             if (viewingThisTurn()) {
               p.setMessages([
                 ...nextHistory,
-                { role: "assistant", content: assistantContent, steps },
+                {
+                  role: "assistant",
+                  content: assistantContent,
+                  steps,
+                  ...(outputAttachments?.length
+                    ? { attachments: outputAttachments }
+                    : {}),
+                },
               ]);
               if (Array.isArray(data.modelMessages)) {
                 p.modelMessagesRef.current = data.modelMessages as Array<

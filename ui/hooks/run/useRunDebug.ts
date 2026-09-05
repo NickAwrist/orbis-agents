@@ -13,7 +13,7 @@ import type { DebugData } from "../../types";
 type Args = {
   agentMapRef: MutableRefObject<Map<string, AgentData>>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  sessionDirectoryRef: MutableRefObject<string>;
+  workspaceDisplayPath: string;
   userSettingsRef: MutableRefObject<UserSettings>;
   isEphemeralRef: MutableRefObject<boolean>;
   setDebugData: (data: DebugData | null) => void;
@@ -22,7 +22,7 @@ type Args = {
 export function useRunDebug({
   agentMapRef,
   selectedSessionAgentRef,
-  sessionDirectoryRef,
+  workspaceDisplayPath,
   userSettingsRef,
   isEphemeralRef,
   setDebugData,
@@ -53,11 +53,11 @@ export function useRunDebug({
         location: settings.location,
         preferredFormats: settings.preferredFormats,
       },
-      sessionDirectory: sessionDirectoryRef.current.trim() || undefined,
+      sessionDirectory: workspaceDisplayPath,
       os: getClientOs(),
     };
     return renderSystemPrompt(await resolveAgentTemplate(), context);
-  }, [resolveAgentTemplate, sessionDirectoryRef, userSettingsRef]);
+  }, [resolveAgentTemplate, userSettingsRef, workspaceDisplayPath]);
 
   return useCallback(
     async (sessionId: string) => {

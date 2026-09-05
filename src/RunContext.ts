@@ -1,5 +1,6 @@
 import type { BaseAgent } from "./agents/BaseAgent";
 import type { PromptContext } from "./prompts/render";
+import type { Workspace } from "./workspaces/WorkspaceService";
 
 export type StepStatus = "running" | "done" | "error";
 
@@ -41,11 +42,12 @@ export class RunContext {
   readonly agentName: string;
   readonly prompt: string;
   readonly signal?: AbortSignal;
-  /** Resolved absolute directory for tools (session override or user home). */
+  /** Resolved host path for the active workspace. */
   readonly sessionDir?: string;
   /** Values used to render `{{PLACEHOLDERS}}` in subagent templates. */
   readonly promptContext?: PromptContext;
   readonly ownerUuid: string;
+  readonly workspace?: Workspace;
   private _steps: Step[] = [];
   private _onChange?: OnStepChange;
   private _onStreamDelta?: OnStreamDelta;
@@ -59,6 +61,7 @@ export class RunContext {
     sessionDir?: string,
     promptContext?: PromptContext,
     ownerUuid = "",
+    workspace?: Workspace,
   ) {
     this.agentInstance = agentInstance;
     this.agentName = agentInstance.name;
@@ -69,6 +72,7 @@ export class RunContext {
     this.sessionDir = sessionDir;
     this.promptContext = promptContext;
     this.ownerUuid = ownerUuid;
+    this.workspace = workspace;
   }
 
   /** Emit a streaming token delta for content and/or thinking. */
@@ -150,6 +154,7 @@ export class RunContext {
       this.sessionDir,
       this.promptContext,
       this.ownerUuid,
+      this.workspace,
     );
     if (parentStep.status === "running") {
       parentStep.childContext = child;

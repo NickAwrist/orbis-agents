@@ -10,7 +10,7 @@ function formatAgentName(name?: string) {
   if (!name) return null;
   if (name === "general_agent") return "Main agent";
   if (name === "coding_agent") return "Coding agent";
-  if (name === "computer_agent") return "Computer agent";
+  if (name === "system_agent") return "System agent";
   if (name === "code_discovery_agent") return "Code discovery agent";
   return startCase(name);
 }
