@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, parse } from "node:path";
+import { envConfig } from "../../src/env";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 test("browses server directories and completes partial paths without reading files", async () => {
@@ -63,6 +64,30 @@ test("browses server directories and completes partial paths without reading fil
       ).status,
     ).toBe(400);
   } finally {
+    await close();
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("browses the configured host folder for default and tilde paths", async () => {
+  const { url, close } = await startTestServer();
+  const root = await fs.mkdtemp(join(tmpdir(), "orbis-host-browse-"));
+  const previous = envConfig.hostDirectory;
+  envConfig.hostDirectory = root;
+  try {
+    await fs.mkdir(join(root, "projects"));
+    for (const input of ["", "?path=", "?path=~", "?path=~/projects"]) {
+      const response = await fetch(`${url}/api/directories${input}`, {
+        headers: userHeaders(),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        path: input.endsWith("/projects") ? join(root, "projects") : root,
+        exact: true,
+      });
+    }
+  } finally {
+    envConfig.hostDirectory = previous;
     await close();
     await fs.rm(root, { recursive: true, force: true });
   }

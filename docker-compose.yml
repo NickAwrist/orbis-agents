@@ -8,12 +8,18 @@ services:
     environment:
       AGENTS_BACKEND_HOST: 0.0.0.0
       AGENTS_BACKEND_PORT: ${AGENTS_BACKEND_PORT:-3000}
+      AGENTS_HOST_DIRECTORY: ${AGENTS_HOST_DIRECTORY:-${HOME:?Set HOME or AGENTS_HOST_DIRECTORY}}
     command: sh -c "bun install --frozen-lockfile && bun run build && bun run start"
     network_mode: host
     volumes:
       - .:/app
       - agents-node-modules:/app/node_modules
       - agents-data:/app/data
+      - type: bind
+        source: ${AGENTS_HOST_DIRECTORY:-${HOME:?Set HOME or AGENTS_HOST_DIRECTORY}}
+        target: ${AGENTS_HOST_DIRECTORY:-${HOME:?Set HOME or AGENTS_HOST_DIRECTORY}}
+        bind:
+          create_host_path: false
 
 volumes:
   agents-node-modules:

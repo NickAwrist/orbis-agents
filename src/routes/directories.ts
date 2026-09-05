@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { Router } from "express";
+import { envConfig } from "../env";
 import { sendApiError } from "../http/errors";
 import { requireUserId } from "../userIdentity";
 
@@ -19,10 +20,11 @@ router.get("/", async (req, res) => {
     return;
   }
   const input = (req.query.path ?? "").trim();
+  const home = envConfig.hostDirectory || homedir();
   const expanded =
     input === "~" || input.startsWith("~/")
-      ? join(homedir(), input.slice(1))
-      : input || homedir();
+      ? join(home, input.slice(1))
+      : input || home;
   if (!isAbsolute(expanded) || expanded.includes("\0")) {
     sendApiError(
       res,

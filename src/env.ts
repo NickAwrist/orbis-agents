@@ -37,6 +37,7 @@ function getBoolean(names: string[], fallback: boolean): boolean {
 }
 
 export const envConfig = {
+  hostDirectory: getEnv("AGENTS_HOST_DIRECTORY"),
   backendPort: getPort(
     ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
     DEFAULT_BACKEND_PORT,

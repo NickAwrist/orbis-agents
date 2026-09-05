@@ -78,6 +78,28 @@ docker compose up
 
 App data is persisted in the `agents-data` Docker volume.
 
+Compose also mounts your host home directory read/write at its original absolute
+path. The directory picker starts there, and `~` expands to that folder. Selecting
+a local workspace lets the chat edit files in that host folder.
+
+To use a different folder, set an existing absolute path in `.env`:
+
+```bash
+AGENTS_HOST_DIRECTORY=/home/your-user/projects
+```
+
+Set this explicitly when deploying through a service account or `sudo`, whose
+`HOME` may differ from yours. Recreate the container after changing the mount:
+
+```bash
+docker compose up -d --force-recreate
+```
+
+Paths outside that mount still refer to the container filesystem. To access
+another host location, add a bind mount with the same source and target path.
+The mount does not change per-chat containment: tools still use the selected
+workspace as `/workspace`.
+
 When Ollama or ComfyUI are running on the same Linux host, these local endpoint
 values work because the container shares the host network namespace:
 
