@@ -287,57 +287,115 @@ export class WorkspaceService {
     return canonical;
   }
 
-  async resolveNewFilePath(
-    workspace: Workspace,
-    requestedPath: string,
-  ): Promise<string> {
-    const lexical = this.resolveLexical(workspace, requestedPath);
-    const canonicalParent = await fs.realpath(dirname(lexical)).catch(() => {
-      throw new WorkspaceError(
-        `Parent directory does not exist: ${dirname(requestedPath)}`,
-      );
-    });
-    this.assertInside(workspace.hostPath, canonicalParent);
-    const target = join(canonicalParent, basename(lexical));
-    try {
-      const stat = await fs.lstat(target);
-      if (stat.isSymbolicLink()) {
-        throw new WorkspaceError("Symbolic-link file targets are not allowed");
-      }
-      const existing = await fs.realpath(target);
-      this.assertInside(workspace.hostPath, existing);
-      return existing;
-    } catch (error) {
-      if (error instanceof WorkspaceError) throw error;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return target;
-    }
-  }
-
   async listFiles(workspace: Workspace): Promise<WorkspaceFile[]> {
     const files: WorkspaceFile[] = [];
-    await this.walkFiles(workspace, workspace.hostPath, files);
+    await this.walkFiles(workspace, ".", files);
     return files.sort((a, b) => b.modifiedAt - a.modifiedAt);
   }
 
-  // Linux procfs gives openat-like access relative to pinned directory handles.
-  // Never reopen a validated pathname: every component is opened with NOFOLLOW.
+  async readFile(workspace: Workspace, path: string): Promise<string> {
+    const file = await this.openFile(workspace, path);
+    try {
+      return await file.readFile("utf8");
+    } finally {
+      await file.close();
+    }
+  }
+
+  async writeFile(
+    workspace: Workspace,
+    path: string,
+    content: string,
+  ): Promise<void> {
+    // Do not truncate until the opened descriptor has been checked as a regular file.
+    const file = await this.openFile(
+      workspace,
+      path,
+      constants.O_WRONLY | constants.O_CREAT,
+    );
+    try {
+      await file.truncate(0);
+      await file.writeFile(content, "utf8");
+    } finally {
+      await file.close();
+    }
+  }
+
+  async deleteFile(workspace: Workspace, path: string): Promise<void> {
+    const target = this.resolveLexical(workspace, path);
+    if (target === workspace.hostPath)
+      throw new WorkspaceError("Cannot delete the workspace root");
+    const parent = await this.openPath(
+      workspace,
+      relative(workspace.hostPath, dirname(target)) || ".",
+      constants.O_RDONLY | constants.O_DIRECTORY,
+    );
+    try {
+      // unlink never follows the final component, even if it becomes a symlink.
+      await fs.unlink(`/proc/self/fd/${parent.fd}/${basename(target)}`);
+    } finally {
+      await parent.close();
+    }
+  }
+
+  async readDirectory(workspace: Workspace, path: string) {
+    const directory = await this.openPath(
+      workspace,
+      path,
+      constants.O_RDONLY | constants.O_DIRECTORY,
+    );
+    try {
+      return await fs.readdir(`/proc/self/fd/${directory.fd}`, {
+        withFileTypes: true,
+      });
+    } finally {
+      await directory.close();
+    }
+  }
+
+  async statPath(workspace: Workspace, path: string) {
+    const handle = await this.openPath(workspace, path, constants.O_RDONLY);
+    try {
+      return await handle.stat();
+    } finally {
+      await handle.close();
+    }
+  }
+
   async openFile(
     workspace: Workspace,
-    requestedPath: string,
+    path: string,
+    flags = constants.O_RDONLY,
   ): Promise<fs.FileHandle> {
-    if (process.platform !== "linux") {
-      throw new WorkspaceError("Secure workspace file access requires Linux");
+    const file = await this.openPath(workspace, path, flags);
+    try {
+      if (!(await file.stat()).isFile())
+        throw new WorkspaceError("Requested path is not a file");
+      return file;
+    } catch (error) {
+      await file.close();
+      throw error;
     }
-    const target = this.resolveLexical(workspace, requestedPath);
+  }
+
+  // Linux procfs gives openat-like access relative to pinned directory handles.
+  // Every untrusted component is opened with NOFOLLOW, including parents.
+  private async openPath(
+    workspace: Workspace,
+    path: string,
+    flags: number,
+  ): Promise<fs.FileHandle> {
+    if (process.platform !== "linux")
+      throw new WorkspaceError("Secure workspace file access requires Linux");
+    const target = this.resolveLexical(workspace, path);
     const parts = relative(workspace.hostPath, target)
       .split("/")
       .filter(Boolean);
-    if (!parts.length) throw new WorkspaceError("Requested path is not a file");
     let directory = await fs.open(
       workspace.hostPath,
       constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
     );
+    if (!parts.length) return directory;
     try {
       for (const part of parts.slice(0, -1)) {
         const next = await fs.open(
@@ -347,18 +405,10 @@ export class WorkspaceService {
         await directory.close();
         directory = next;
       }
-      const file = await fs.open(
+      return await fs.open(
         `/proc/self/fd/${directory.fd}/${parts.at(-1)}`,
-        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+        flags | constants.O_NOFOLLOW | constants.O_NONBLOCK,
       );
-      try {
-        if (!(await file.stat()).isFile())
-          throw new WorkspaceError("Requested path is not a file");
-        return file;
-      } catch (error) {
-        await file.close();
-        throw error;
-      }
     } finally {
       await directory.close();
     }
@@ -413,15 +463,15 @@ export class WorkspaceService {
     directory: string,
     output: WorkspaceFile[],
   ): Promise<void> {
-    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    for (const entry of await this.readDirectory(workspace, directory)) {
       const fullPath = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
         await this.walkFiles(workspace, fullPath, output);
       } else if (entry.isFile()) {
-        const stat = await fs.stat(fullPath);
+        const stat = await this.statPath(workspace, fullPath);
         output.push({
-          path: relative(workspace.hostPath, fullPath).split("\\").join("/"),
+          path: fullPath.split("\\").join("/"),
           name: entry.name,
           size: stat.size,
           modifiedAt: stat.mtimeMs,

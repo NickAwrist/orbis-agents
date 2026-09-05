@@ -97,9 +97,10 @@ Shell commands and file tools use `/workspace` for both private and selected
 local workspaces. File tools also accept relative paths within that directory.
 The UI shows the selected host directory for local workspaces.
 
-Downloads and file reads require Linux with procfs. They open each path component
-without following symlinks and read from the resulting file descriptor. Symlinks
-are rejected even when they point inside the workspace.
+Workspace file operations require Linux with procfs. Reads, writes, directory
+listing, and scans open path components without following symlinks. Deletes use
+an open parent directory and unlink the final entry without following it. Ignore
+rules are read only from within the workspace through the same protected access.
 
 Temporary workspaces expire after 24 hours. The server checks for expired leases
 and abandoned directories every minute, deferring deletion during active turns.

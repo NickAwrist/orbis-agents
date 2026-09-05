@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
@@ -42,11 +41,7 @@ export class DeleteFileTool extends BaseTool {
           ? args.filename
           : "";
     try {
-      const path = await workspaceService.resolveExistingPath(
-        requireWorkspace(ctx),
-        rawPath,
-      );
-      await fs.unlink(path);
+      await workspaceService.deleteFile(requireWorkspace(ctx), rawPath);
       return textToolResult(`File deleted at ${rawPath}`);
     } catch (e) {
       return textToolResult(workspaceError(e));

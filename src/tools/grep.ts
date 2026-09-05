@@ -1,12 +1,17 @@
-import fs from "node:fs/promises";
 import pathModule from "node:path";
 import type { Ignore } from "ignore";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { loadGitignore } from "../utils/gitignoreFilter";
-import { workspaceService } from "../workspaces/WorkspaceService";
+import {
+  type Workspace,
+  workspaceService,
+} from "../workspaces/WorkspaceService";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { requireWorkspace, workspaceError } from "./workspace";
+import {
+  loadWorkspaceGitignore,
+  requireWorkspace,
+  workspaceError,
+} from "./workspace";
 
 const MAX_PATTERN_LEN = 512;
 const SEARCH_BUDGET_MS = 2000;
@@ -59,23 +64,21 @@ export class GrepTool extends BaseTool {
     const rawPath =
       typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
-      const path = await workspaceService.resolveExistingPath(
-        requireWorkspace(ctx),
-        rawPath,
-      );
+      const workspace = requireWorkspace(ctx);
+      const path = rawPath;
       const regex = new RegExp(patternStr);
 
       let ig: Ignore | undefined;
       try {
-        const stats = await fs.stat(path);
+        const stats = await workspaceService.statPath(workspace, path);
         if (stats.isDirectory()) {
-          ig = await loadGitignore(path);
+          ig = await loadWorkspaceGitignore(workspace, path);
         }
       } catch {
         // path might be a file, that's fine
       }
 
-      const results = await this.searchRecursive(path, regex, ig);
+      const results = await this.searchRecursive(workspace, path, regex, ig);
 
       if (results.length === 0) {
         return textToolResult("No matches found.");
@@ -92,12 +95,13 @@ export class GrepTool extends BaseTool {
   }
 
   private async searchFile(
+    workspace: Workspace,
     filePath: string,
     regex: RegExp,
     budget: { deadline: number },
   ): Promise<string[]> {
     const results: string[] = [];
-    const content = await fs.readFile(filePath, "utf8");
+    const content = await workspaceService.readFile(workspace, filePath);
     const lines = content.split("\n");
     for (let index = 0; index < lines.length; index++) {
       if (
@@ -120,6 +124,7 @@ export class GrepTool extends BaseTool {
   }
 
   private async searchRecursive(
+    workspace: Workspace,
     currentPath: string,
     regex: RegExp,
     ig?: Ignore,
@@ -128,12 +133,17 @@ export class GrepTool extends BaseTool {
     const b = budget ?? { deadline: Date.now() + SEARCH_BUDGET_MS };
     const results: string[] = [];
     try {
-      const stats = await fs.stat(currentPath);
+      const stats = await workspaceService.statPath(workspace, currentPath);
 
       if (stats.isFile()) {
-        results.push(...(await this.searchFile(currentPath, regex, b)));
+        results.push(
+          ...(await this.searchFile(workspace, currentPath, regex, b)),
+        );
       } else if (stats.isDirectory()) {
-        const entries = await fs.readdir(currentPath, { withFileTypes: true });
+        const entries = await workspaceService.readDirectory(
+          workspace,
+          currentPath,
+        );
 
         for (const entry of entries) {
           if (Date.now() > b.deadline) {
@@ -152,6 +162,7 @@ export class GrepTool extends BaseTool {
 
           if (entry.isDirectory()) {
             const subResults = await this.searchRecursive(
+              workspace,
               fullPath,
               regex,
               ig,
@@ -159,7 +170,9 @@ export class GrepTool extends BaseTool {
             );
             results.push(...subResults);
           } else {
-            results.push(...(await this.searchFile(fullPath, regex, b)));
+            results.push(
+              ...(await this.searchFile(workspace, fullPath, regex, b)),
+            );
           }
         }
       }

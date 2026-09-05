@@ -1,9 +1,9 @@
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { sandboxRunner } from "../sandbox/SandboxRunner";
-import { filterOutputLines, loadGitignore } from "../utils/gitignoreFilter";
+import { filterOutputLines } from "../utils/gitignoreFilter";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { requireWorkspace } from "./workspace";
+import { loadWorkspaceGitignore, requireWorkspace } from "./workspace";
 
 const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
 
@@ -50,7 +50,7 @@ export class BashTool extends BaseTool {
       });
       let output = "";
       if (result.stdout) {
-        const ig = await loadGitignore(workspace.hostPath);
+        const ig = await loadWorkspaceGitignore(workspace);
         const filtered = filterOutputLines(
           result.stdout,
           ig,

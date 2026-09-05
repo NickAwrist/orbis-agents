@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
@@ -63,11 +62,7 @@ export class CreateFileTool extends BaseTool {
           : "";
     try {
       const workspace = requireWorkspace(ctx);
-      const path = await workspaceService.resolveNewFilePath(
-        workspace,
-        rawPath,
-      );
-      await fs.writeFile(path, content);
+      await workspaceService.writeFile(workspace, rawPath, content);
       return textToolResult(`File created at ${rawPath}`);
     } catch (error) {
       return textToolResult(workspaceError(error));

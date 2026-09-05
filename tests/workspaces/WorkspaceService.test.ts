@@ -53,8 +53,8 @@ describe("workspace service", () => {
       workspaces.resolveExistingPath(workspace, "escape/secret.txt"),
     ).rejects.toBeInstanceOf(WorkspaceError);
     await expect(
-      workspaces.resolveNewFilePath(workspace, "escape/new.txt"),
-    ).rejects.toBeInstanceOf(WorkspaceError);
+      workspaces.writeFile(workspace, "escape/new.txt", "bad"),
+    ).rejects.toThrow();
   });
 
   test("maps shell paths for both local and sandbox workspaces", async () => {
@@ -67,11 +67,8 @@ describe("workspace service", () => {
         await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
       const workspace = await workspaces.resolveTemporary("owner-a", lease.id);
       expect(workspace.displayPath).toBe("/workspace");
-      const target = await workspaces.resolveNewFilePath(
-        workspace,
-        "/workspace/output.txt",
-      );
-      await fs.writeFile(target, "output");
+      const target = join(workspace.hostPath, "output.txt");
+      await workspaces.writeFile(workspace, "/workspace/output.txt", "output");
       expect(
         await workspaces.resolveExistingPath(workspace, "output.txt"),
       ).toBe(target);

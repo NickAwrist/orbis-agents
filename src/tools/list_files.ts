@@ -1,10 +1,12 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { loadGitignore } from "../utils/gitignoreFilter";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { requireWorkspace, workspaceError } from "./workspace";
+import {
+  loadWorkspaceGitignore,
+  requireWorkspace,
+  workspaceError,
+} from "./workspace";
 
 export class ListFilesTool extends BaseTool {
   constructor() {
@@ -38,16 +40,13 @@ export class ListFilesTool extends BaseTool {
     const raw =
       typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
-      const path = await workspaceService.resolveExistingPath(
-        requireWorkspace(ctx),
-        raw,
-      );
-      const entries = await fs.readdir(path, { withFileTypes: true });
+      const workspace = requireWorkspace(ctx);
+      const entries = await workspaceService.readDirectory(workspace, raw);
       let files = entries.map((entry) =>
         entry.isDirectory() ? `${entry.name}/` : entry.name,
       );
 
-      const ig = await loadGitignore(path);
+      const ig = await loadWorkspaceGitignore(workspace, raw);
       files = files.filter(
         (f) => !ig.ignores(f.endsWith("/") ? f.slice(0, -1) : f),
       );
