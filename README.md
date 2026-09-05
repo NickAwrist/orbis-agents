@@ -59,11 +59,18 @@ In development, the backend API and Vite UI are separate processes:
 Run with Docker Compose:
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
 The production Docker container is different from development: it serves the
 built UI and API from the same backend process, so there is only one app port.
+The Dockerfile installs Bubblewrap, which the shell tools require. Compose allows
+its nested namespaces and procfs mount by disabling Docker's seccomp, AppArmor,
+and system-path restrictions for this service. This reduces the container's outer
+isolation; Bubblewrap still restricts each shell command to its workspace and
+isolates its network. No privileged mode or extra host capabilities are granted.
+Rebuild and recreate existing containers after updating these files with
+`deployctl restart <deployment> --build` for deployctl-managed installations.
 On Linux, Docker Compose runs it with host networking so host-local services
 like Ollama and ComfyUI are reachable at `127.0.0.1` and `localhost`.
 `AGENTS_BACKEND_PORT` is the web UI/API port used by the production container.

@@ -1,6 +1,11 @@
 services:
   agents:
-    image: oven/bun:1
+    build: .
+    # Bubblewrap creates nested namespaces and mounts its own procfs.
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+      - systempaths=unconfined
     working_dir: /app
     env_file:
       - path: .env
