@@ -27,6 +27,27 @@ async function workspace(): Promise<Workspace> {
 }
 
 describe("bubblewrap sandbox runner", () => {
+  test.skipIf(!capability.available || process.getuid?.() !== 0)(
+    "runs a local workspace as its owner beneath a private home directory",
+    async () => {
+      const parent = await fs.mkdtemp(join(tmpdir(), "orbis-private-home-"));
+      directories.push(parent);
+      const hostPath = join(parent, "project");
+      await fs.mkdir(hostPath, { mode: 0o700 });
+      await fs.chown(parent, 1000, 1000);
+      await fs.chown(hostPath, 1000, 1000);
+
+      const result = await new BubblewrapSandboxRunner().run({
+        command: "touch created.txt; id -u",
+        workspace: { kind: "local", hostPath, displayPath: "/workspace" },
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe("1000");
+      expect((await fs.stat(join(hostPath, "created.txt"))).uid).toBe(1000);
+    },
+  );
+
   test.skipIf(capability.available)(
     "fails closed when containment is unavailable",
     async () => {

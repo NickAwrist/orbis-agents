@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import type { Workspace } from "../workspaces/WorkspaceService";
 
 export type SandboxRunOptions = {
@@ -60,10 +60,32 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
         reject(new Error("bubblewrap is not installed"));
         return;
       }
-      const child = spawn(executable, args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-      });
+      // A user namespace cannot use container root's DAC override to access
+      // another user's private directory. Use the local workspace's owner.
+      // Bun does not apply child_process.spawn's uid/gid options.
+      const owner =
+        process.getuid?.() === 0 && options.workspace.kind === "local"
+          ? statSync(options.workspace.hostPath)
+          : undefined;
+      const child = spawn(
+        owner ? "/usr/bin/setpriv" : executable,
+        owner
+          ? [
+              "--reuid",
+              String(owner.uid),
+              "--regid",
+              String(owner.gid),
+              "--clear-groups",
+              "--",
+              executable,
+              ...args,
+            ]
+          : args,
+        {
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        },
+      );
       const maxOutput = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
       let stdout = "";
       let stderr = "";

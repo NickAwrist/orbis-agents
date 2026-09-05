@@ -69,6 +69,9 @@ its nested namespaces and procfs mount by disabling Docker's seccomp, AppArmor,
 and system-path restrictions for this service. This reduces the container's outer
 isolation; Bubblewrap still restricts each shell command to its workspace and
 isolates its network. No privileged mode or extra host capabilities are granted.
+When the backend runs as root, local-directory shell commands use the directory
+owner's UID and GID through `setpriv`, supplied by `util-linux`. This permits
+access through private home directories and creates files owned by that user.
 Rebuild and recreate existing containers after updating these files with
 `deployctl restart <deployment> --build` for deployctl-managed installations.
 On Linux, Docker Compose runs it with host networking so host-local services
