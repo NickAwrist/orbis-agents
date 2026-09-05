@@ -16,11 +16,8 @@ import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
-import {
-  confirmFolderGrantNative,
-  pickFolderNative,
-  revealFileNative,
-} from "../nativeFolderPicker";
+import { revealFileNative } from "../nativeFolderPicker";
+import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
 import {
   WorkspaceError,
@@ -46,32 +43,18 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     );
     return;
   }
-  if (!isLoopbackRequest(req)) {
+  const parsed = SelectDirectorySchema.safeParse(req.body);
+  if (!parsed.success) {
     sendApiError(
       res,
-      403,
-      "FORBIDDEN",
-      "Folder picker only runs on the machine where the API server is started (localhost).",
+      400,
+      "BAD_REQUEST",
+      "Enter an absolute folder path on the server",
     );
     return;
   }
   try {
-    const selected = await pickFolderNative();
-    if (!selected) {
-      res.json({
-        workspace: workspaceService.presentation(row),
-        cancelled: true,
-      });
-      return;
-    }
-    const path = await workspaceService.canonicalDirectory(selected);
-    if (!(await confirmFolderGrantNative(path))) {
-      res.json({
-        workspace: workspaceService.presentation(row),
-        cancelled: true,
-      });
-      return;
-    }
+    const path = await workspaceService.canonicalDirectory(parsed.data.path);
     if (workspaceService.isTurnActive(ownerUuid, row.id)) {
       sendApiError(
         res,
@@ -102,7 +85,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
       res,
       e instanceof WorkspaceError ? 400 : 500,
       e instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
-      e instanceof Error ? e.message : "Failed to open folder dialog",
+      e instanceof Error ? e.message : "Could not select directory",
     );
   }
 });
@@ -125,6 +108,10 @@ router.post("/:id/workspace/use-sandbox", async (req, res) => {
     return;
   }
   await workspaceService.provisionRetained(ownerUuid, row.id);
+  if (getSessionById(ownerUuid, row.id)?.workspace_kind === "sandbox") {
+    res.json({ workspace: { kind: "sandbox" } });
+    return;
+  }
   patchSessionRow(ownerUuid, row.id, {
     workspace_kind: "sandbox",
     session_directory: null,

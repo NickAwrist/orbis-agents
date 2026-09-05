@@ -8,6 +8,7 @@ import { errorHandler, sendApiError } from "./http/errors";
 import agentsRoutes from "./routes/agents";
 import attachmentsRoutes from "./routes/attachments";
 import comfyuiRoutes from "./routes/comfyui";
+import directoriesRoutes from "./routes/directories";
 import modelsRoutes from "./routes/models";
 import ollamaRoutes from "./routes/ollama";
 import runRoutes from "./routes/runs";
@@ -40,6 +41,7 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use("/api/tools", toolsRoutes);
+app.use("/api/directories", directoriesRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/agents", agentsRoutes);
 app.use("/api/skills", skillsRoutes);

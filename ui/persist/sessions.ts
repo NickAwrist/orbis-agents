@@ -114,19 +114,23 @@ export async function deleteSessionApi(id: string): Promise<void> {
 
 export async function selectSessionDirectory(
   id: string,
+  path: string,
   temporary = false,
-): Promise<SessionWorkspace | null> {
+): Promise<SessionWorkspace> {
   const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
   const res = await userScopedFetch(
     `${base}/${encodeURIComponent(id)}/workspace/select-directory`,
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    },
   );
   if (!res.ok) throw new Error(await readApiError(res));
   const data = (await res.json()) as {
-    workspace?: SessionWorkspace;
-    cancelled?: boolean;
+    workspace: SessionWorkspace;
   };
-  return data.cancelled ? null : (data.workspace ?? null);
+  return data.workspace;
 }
 
 export async function useSessionSandbox(

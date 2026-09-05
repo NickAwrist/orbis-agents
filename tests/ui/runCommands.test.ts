@@ -18,9 +18,19 @@ describe("run commands", () => {
   });
 
   test("filters the command menu from a leading slash token", () => {
-    expect(matchingRunCommands("/dir").map((command) => command.name)).toEqual([
-      "directory",
-    ]);
-    expect(matchingRunCommands("hello /dir")).toEqual([]);
+    expect(
+      matchingRunCommands("/dir", "sandbox").map((command) => command.name),
+    ).toEqual(["directory"]);
+    expect(matchingRunCommands("hello /dir", "sandbox")).toEqual([]);
+  });
+
+  test("only offers returning to the private workspace from a directory", () => {
+    expect(
+      matchingRunCommands("/", "sandbox").map((command) => command.name),
+    ).toEqual(["directory", "workspace"]);
+    expect(
+      matchingRunCommands("/", "local").map((command) => command.name),
+    ).toEqual(["directory", "sandbox", "workspace"]);
+    expect(matchingRunCommands("/sandbox", "sandbox")).toEqual([]);
   });
 });

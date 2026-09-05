@@ -49,7 +49,6 @@ export function RunInputDock({
   attachmentsSendReady,
   assignedSkillIds,
   workspace,
-  onReturnToSandbox,
   onRunCommand,
   onFooterHeightChange,
 }: {
@@ -71,7 +70,6 @@ export function RunInputDock({
   attachmentsSendReady: boolean;
   assignedSkillIds: string[];
   workspace: SessionWorkspace;
-  onReturnToSandbox: () => void | Promise<void>;
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
@@ -97,7 +95,7 @@ export function RunInputDock({
         .slice(0, 8)
     : [];
   const skillPickerOpen = !isBusy && matchingSkills.length > 0;
-  const matchingCommands = matchingRunCommands(input);
+  const matchingCommands = matchingRunCommands(input, workspace.kind);
   const commandPickerOpen = !isBusy && matchingCommands.length > 0;
 
   const runCommand = (command: RunCommandName) => {
@@ -190,14 +188,6 @@ export function RunInputDock({
           <span className="min-w-0 truncate" title={workspace.path}>
             Working in {workspace.label}
           </span>
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => void onReturnToSandbox()}
-            className="ml-auto shrink-0 text-foreground/80 underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
-          >
-            Return to private workspace
-          </button>
         </div>
       )}
       <form

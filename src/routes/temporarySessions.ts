@@ -2,11 +2,8 @@ import { Router } from "express";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
-import {
-  confirmFolderGrantNative,
-  pickFolderNative,
-  revealFileNative,
-} from "../nativeFolderPicker";
+import { revealFileNative } from "../nativeFolderPicker";
+import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
 import {
   WorkspaceError,
@@ -25,12 +22,13 @@ router.post("/", async (req, res) => {
 router.post("/:id/workspace/select-directory", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  if (!isLoopbackRequest(req)) {
+  const parsed = SelectDirectorySchema.safeParse(req.body);
+  if (!parsed.success) {
     sendApiError(
       res,
-      403,
-      "FORBIDDEN",
-      "Folder picker only runs on the machine where the API server is started (localhost).",
+      400,
+      "BAD_REQUEST",
+      "Enter an absolute folder path on the server",
     );
     return;
   }
@@ -44,20 +42,8 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     return;
   }
   try {
-    const current = workspaceService.temporaryPresentation(
-      ownerUuid,
-      req.params.id,
-    );
-    const selected = await pickFolderNative();
-    if (!selected) {
-      res.json({ workspace: current, cancelled: true });
-      return;
-    }
-    const path = await workspaceService.canonicalDirectory(selected);
-    if (!(await confirmFolderGrantNative(path))) {
-      res.json({ workspace: current, cancelled: true });
-      return;
-    }
+    workspaceService.temporaryPresentation(ownerUuid, req.params.id);
+    const path = await workspaceService.canonicalDirectory(parsed.data.path);
     if (workspaceService.isTurnActive(ownerUuid, req.params.id)) {
       sendApiError(
         res,
@@ -78,7 +64,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
       res,
       error instanceof WorkspaceError ? 400 : 500,
       error instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
-      error instanceof Error ? error.message : "Failed to open folder dialog",
+      error instanceof Error ? error.message : "Could not select directory",
     );
   }
 });

@@ -1,0 +1,8 @@
+# Allow Bubblewrap to create the namespaces used to contain shell tools.
+# Filesystem and network isolation are enforced by Bubblewrap's arguments.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile orbis-bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}

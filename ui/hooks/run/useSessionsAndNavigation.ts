@@ -104,6 +104,7 @@ export function useSessionsAndNavigation(p: Args) {
 
   const loadGenRef = useRef(0);
   const restoreDoneRef = useRef(false);
+  const returningToSandboxRef = useRef(false);
 
   p.activeSessionIdRef.current = activeSessionId;
   p.isEphemeralRef.current = isEphemeral;
@@ -172,43 +173,53 @@ export function useSessionsAndNavigation(p: Args) {
     setSelectedSessionAgent(name);
   }, []);
 
-  const chooseDirectory = useCallback(async () => {
+  const chooseDirectory = useCallback(
+    async (path: string) => {
+      const sid = p.activeSessionIdRef.current;
+      if (!sid) return;
+      const temporary = p.isEphemeralRef.current;
+      const selected = await selectSessionDirectory(sid, path, temporary);
+      if (p.activeSessionIdRef.current === sid) {
+        setWorkspace(selected);
+        if (temporary) {
+          p.setMessages((messages) => [
+            ...messages,
+            {
+              role: "event",
+              content: `Working directory changed to ${selected.kind === "local" ? selected.path : "the private workspace"}`,
+            },
+          ]);
+          return;
+        }
+        const refreshed = await fetchSession(sid);
+        if (refreshed && p.activeSessionIdRef.current === sid)
+          p.setMessages(refreshed.history);
+      }
+    },
+    [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages],
+  );
+
+  const returnToSandbox = useCallback(async () => {
     const sid = p.activeSessionIdRef.current;
-    if (!sid) return;
-    const temporary = p.isEphemeralRef.current;
-    const selected = await selectSessionDirectory(sid, temporary);
-    if (selected) {
-      setWorkspace(selected);
+    if (!sid || workspace.kind !== "local" || returningToSandboxRef.current)
+      return;
+    returningToSandboxRef.current = true;
+    try {
+      const temporary = p.isEphemeralRef.current;
+      setWorkspace(await useSessionSandbox(sid, temporary));
       if (temporary) {
         p.setMessages((messages) => [
           ...messages,
-          {
-            role: "event",
-            content: `Working directory changed to ${selected.kind === "local" ? selected.path : "the private workspace"}`,
-          },
+          { role: "event", content: "Returned to the private workspace" },
         ]);
         return;
       }
       const refreshed = await fetchSession(sid);
       if (refreshed) p.setMessages(refreshed.history);
+    } finally {
+      returningToSandboxRef.current = false;
     }
-  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages]);
-
-  const returnToSandbox = useCallback(async () => {
-    const sid = p.activeSessionIdRef.current;
-    if (!sid) return;
-    const temporary = p.isEphemeralRef.current;
-    setWorkspace(await useSessionSandbox(sid, temporary));
-    if (temporary) {
-      p.setMessages((messages) => [
-        ...messages,
-        { role: "event", content: "Returned to the private workspace" },
-      ]);
-      return;
-    }
-    const refreshed = await fetchSession(sid);
-    if (refreshed) p.setMessages(refreshed.history);
-  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages]);
+  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages, workspace.kind]);
 
   const handleModelChange = useCallback(
     async (model: string) => {

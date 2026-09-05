@@ -111,6 +111,28 @@ The sandbox integration tests report skips when Bubblewrap is unavailable. Run
 `bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working
 Bubblewrap namespaces to verify workspace writes and network isolation.
 
+### Bubblewrap on Ubuntu 24.04
+
+If shell tools report `loopback: Failed RTM_NEWADDR: Operation not permitted`,
+check `journalctl -k` for AppArmor denials involving `bwrap` and the
+`unprivileged_userns` profile. Ubuntu can block the capabilities Bubblewrap
+needs to create its sandbox, including its isolated loopback interface.
+
+For `/usr/bin/bwrap`, install the included application-specific profile:
+
+```bash
+sudo install -m 0644 config/apparmor/orbis-bwrap /etc/apparmor.d/orbis-bwrap
+sudo apparmor_parser -r /etc/apparmor.d/orbis-bwrap
+```
+
+This follows [Ubuntu's application-specific user namespace guidance](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
+The profile permits Bubblewrap to create user namespaces. The runner continues
+using its filesystem restrictions and isolated network namespace.
+
+Restart the backend after loading the profile because it caches the sandbox
+capability check. Then run the sandbox tests above; workspace writes and network
+isolation tests should run rather than skip.
+
 ## Project Structure
 
 - `src/` - backend server, agent loop, tools, and session storage

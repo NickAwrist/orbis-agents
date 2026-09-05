@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getSessionById, patchSessionRow } from "../../src/db";
+import * as loopback from "../../src/http/isLoopbackRequest";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
 
@@ -28,6 +29,135 @@ async function createSession(url: string): Promise<string> {
 }
 
 describe("workspace API", () => {
+  for (const temporary of [false, true]) {
+    test(`selects and switches server directories remotely for a ${temporary ? "temporary" : "saved"} chat`, async () => {
+      const { url, close } = await startTestServer();
+      const directory = await fs.mkdtemp(
+        join(tmpdir(), "orbis-directory-test-"),
+      );
+      temporaryDirectories.push(directory);
+      const secondDirectory = join(directory, "second");
+      await fs.mkdir(secondDirectory);
+      await fs.writeFile(join(directory, "file.txt"), "file");
+      const lease = temporary
+        ? await workspaceService.createTemporary(TEST_USER_ID)
+        : null;
+      const id = lease?.id ?? (await createSession(url));
+      const base = temporary ? "temporary-sessions" : "sessions";
+      const isLoopback = spyOn(loopback, "isLoopbackRequest").mockReturnValue(
+        false,
+      );
+      const select = (body: unknown, owner?: string) =>
+        fetch(`${url}/api/${base}/${id}/workspace/select-directory`, {
+          method: "POST",
+          headers: userHeaders(owner, { "Content-Type": "application/json" }),
+          body: JSON.stringify(body),
+        });
+      try {
+        for (const body of [
+          {},
+          { path: 1 },
+          { path: "" },
+          { path: "relative/path" },
+          { path: join(directory, "missing") },
+          { path: join(directory, "file.txt") },
+        ]) {
+          expect((await select(body)).status).toBe(400);
+        }
+        expect(
+          (
+            await select(
+              { path: directory },
+              "22222222-2222-4222-8222-222222222222",
+            )
+          ).ok,
+        ).toBeFalse();
+        for (const path of [directory, secondDirectory]) {
+          const response = await select({ path });
+          expect(response.status).toBe(200);
+          expect(await response.json()).toMatchObject({
+            workspace: { kind: "local", path: await fs.realpath(path) },
+          });
+        }
+        const active = spyOn(workspaceService, "isTurnActive").mockReturnValue(
+          true,
+        );
+        try {
+          expect((await select({ path: directory })).status).toBe(409);
+        } finally {
+          active.mockRestore();
+        }
+        const workspace = temporary
+          ? workspaceService.temporaryPresentation(TEST_USER_ID, id)
+          : workspaceService.presentation(getSessionById(TEST_USER_ID, id)!);
+        expect(workspace).toMatchObject({
+          kind: "local",
+          path: await fs.realpath(secondDirectory),
+        });
+        const returned = await fetch(
+          `${url}/api/${base}/${id}/workspace/use-sandbox`,
+          {
+            method: "POST",
+            headers: userHeaders(),
+          },
+        );
+        expect(await returned.json()).toEqual({
+          workspace: { kind: "sandbox" },
+        });
+      } finally {
+        isLoopback.mockRestore();
+        if (lease) await workspaceService.deleteTemporary(TEST_USER_ID, id);
+        await close();
+      }
+    });
+  }
+
+  test("returning to the private workspace records only actual transitions", async () => {
+    const { url, close } = await startTestServer();
+    try {
+      const sessionId = await createSession(url);
+      const returnToSandbox = () =>
+        fetch(`${url}/api/sessions/${sessionId}/workspace/use-sandbox`, {
+          method: "POST",
+          headers: userHeaders(),
+        });
+      const history = async () => {
+        const response = await fetch(`${url}/api/sessions/${sessionId}`, {
+          headers: userHeaders(),
+        });
+        return (
+          (await response.json()) as {
+            history: { role: string; content: string }[];
+          }
+        ).history;
+      };
+      expect((await returnToSandbox()).status).toBe(200);
+      expect(await history()).toEqual([]);
+
+      patchSessionRow(TEST_USER_ID, sessionId, {
+        workspace_kind: "local",
+        session_directory: tmpdir(),
+      });
+      const responses = await Promise.all([
+        returnToSandbox(),
+        returnToSandbox(),
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
+      expect((await returnToSandbox()).status).toBe(200);
+      expect(await history()).toEqual([
+        expect.objectContaining({
+          role: "event",
+          content: "Returned to the private workspace",
+        }),
+      ]);
+      expect(getSessionById(TEST_USER_ID, sessionId)?.workspace_kind).toBe(
+        "sandbox",
+      );
+    } finally {
+      await close();
+    }
+  });
+
   test("creates a private server-owned workspace and ignores path patches", async () => {
     const { url, close } = await startTestServer();
     try {

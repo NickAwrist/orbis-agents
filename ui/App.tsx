@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
 import { DebugModal } from "./components/DebugModal";
+import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { RenameSessionModal } from "./components/RenameSessionModal";
@@ -27,10 +28,15 @@ export default function App() {
   const [runFooterInset, setRunFooterInset] = useState(104);
   const [currentView, setCurrentView] = useState<AppView>("run");
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [directorySessionId, setDirectorySessionId] = useState<string | null>(
+    null,
+  );
+  const directoryOpen =
+    directorySessionId !== null && directorySessionId === app.activeSessionId;
 
   const runCommand = async (command: RunCommandName) => {
     try {
-      if (command === "directory") await app.chooseDirectory();
+      if (command === "directory") setDirectorySessionId(app.activeSessionId);
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
     } catch (error) {
@@ -55,6 +61,7 @@ export default function App() {
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
+      directoryOpen ||
       app.debugOpen ||
       stepsModalOpen,
     sessions: app.sessions,
@@ -270,7 +277,6 @@ export default function App() {
                       )?.skill_ids ?? []
                     }
                     workspace={app.workspace}
-                    onReturnToSandbox={app.returnToSandbox}
                     onRunCommand={runCommand}
                     onFooterHeightChange={setRunFooterInset}
                   />
@@ -317,6 +323,15 @@ export default function App() {
             confirmLabel="Delete"
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}
+          />
+        )}
+        {directoryOpen && (
+          <DirectoryModal
+            initialPath={
+              app.workspace.kind === "local" ? app.workspace.path : ""
+            }
+            onSelect={app.chooseDirectory}
+            onClose={() => setDirectorySessionId(null)}
           />
         )}
         {workspaceOpen && app.activeSessionId && (
