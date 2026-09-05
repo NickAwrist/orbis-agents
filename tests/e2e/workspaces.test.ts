@@ -2,7 +2,7 @@ import "../setup";
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { getSessionById, patchSessionRow } from "../../src/db";
 import * as loopback from "../../src/http/isLoopbackRequest";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
@@ -316,4 +316,41 @@ describe("workspace API", () => {
       await close();
     }
   });
+});
+
+test("an ephemeral run without an ID holds its generated lease lock until completion", async () => {
+  const { url, close } = await startTestServer();
+  const listFiles = workspaceService.listFiles.bind(workspaceService);
+  let leaseId = "";
+  const activeDuringScan: boolean[] = [];
+  const scan = spyOn(workspaceService, "listFiles").mockImplementation(
+    async (workspace) => {
+      leaseId = basename(workspace.hostPath);
+      activeDuringScan.push(
+        workspaceService.isTurnActive(TEST_USER_ID, leaseId),
+      );
+      return listFiles(workspace);
+    },
+  );
+  try {
+    const response = await fetch(`${url}/api/runs`, {
+      method: "POST",
+      headers: userHeaders(undefined, { "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        ephemeral: true,
+        message: "Hello",
+        history: [],
+        model: "llama3:latest",
+        agentName: "general_agent",
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('"type":"run_done"');
+    expect(activeDuringScan).toEqual([true, true]);
+    expect(workspaceService.isTurnActive(TEST_USER_ID, leaseId)).toBeFalse();
+  } finally {
+    scan.mockRestore();
+    if (leaseId) await workspaceService.deleteTemporary(TEST_USER_ID, leaseId);
+    await close();
+  }
 });

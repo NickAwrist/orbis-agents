@@ -181,6 +181,8 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
     ];
     if (existsSync("/usr/local"))
       args.push("--ro-bind", "/usr/local", "/usr/local");
+    if (existsSync("/etc/alternatives"))
+      args.push("--ro-bind", "/etc/alternatives", "/etc/alternatives");
     args.push("--symlink", "usr/bin", "/bin", "--symlink", "usr/lib", "/lib");
     if (existsSync("/usr/lib64")) args.push("--symlink", "usr/lib64", "/lib64");
     args.push(

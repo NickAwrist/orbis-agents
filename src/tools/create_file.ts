@@ -6,7 +6,7 @@ import { requireWorkspace, workspaceError } from "./workspace";
 
 export class CreateFileTool extends BaseTool {
   constructor() {
-    super("create_file", "Create a new file");
+    super("create_file", "Create a file, creating missing parent directories");
   }
 
   override toTool(): Tool {

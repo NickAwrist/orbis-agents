@@ -2,15 +2,14 @@ import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import {
-  loadWorkspaceGitignore,
-  requireWorkspace,
-  workspaceError,
-} from "./workspace";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 export class ListFilesTool extends BaseTool {
   constructor() {
-    super("list_files", "List all files in the current directory");
+    super(
+      "list_files",
+      "List files in a directory, excluding .git, node_modules, .cache and gitignored entries",
+    );
   }
 
   override toTool(): Tool {
@@ -41,14 +40,12 @@ export class ListFilesTool extends BaseTool {
       typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
       const workspace = requireWorkspace(ctx);
-      const entries = await workspaceService.readDirectory(workspace, raw);
-      let files = entries.map((entry) =>
-        entry.isDirectory() ? `${entry.name}/` : entry.name,
+      const entries = await workspaceService.readVisibleDirectory(
+        workspace,
+        raw,
       );
-
-      const ig = await loadWorkspaceGitignore(workspace, raw);
-      files = files.filter(
-        (f) => !ig.ignores(f.endsWith("/") ? f.slice(0, -1) : f),
+      const files = entries.map((entry) =>
+        entry.isDirectory() ? `${entry.name}/` : entry.name,
       );
 
       return textToolResult(`List of files: ${files.join(", ")}`);

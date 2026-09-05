@@ -21,7 +21,7 @@ export async function handleRun(
   const rawBody = req.body as { sessionId?: unknown };
   const requestedSessionId =
     typeof rawBody.sessionId === "string" ? rawBody.sessionId : "";
-  const releaseTurn = requestedSessionId
+  let releaseTurn = requestedSessionId
     ? workspaceService.beginTurn(ownerUuid, requestedSessionId)
     : () => {};
   if (!releaseTurn) {
@@ -37,6 +37,19 @@ export async function handleRun(
   try {
     const ctx = await buildTurnContext(req.body, res, ownerUuid);
     if (!ctx) return;
+    if (!requestedSessionId) {
+      const release = workspaceService.beginTurn(ownerUuid, ctx.sessionId);
+      if (!release) {
+        sendApiError(
+          res,
+          409,
+          "CONFLICT",
+          "A turn is already running for this chat",
+        );
+        return;
+      }
+      releaseTurn = release;
+    }
 
     const stream = openRunStream(res, sse, {
       ephemeral: ctx.ephemeral,

@@ -2,8 +2,10 @@ import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { sandboxRunner } from "../sandbox/SandboxRunner";
 import { filterOutputLines } from "../utils/gitignoreFilter";
+import { loadWorkspaceIgnore } from "../workspaces/WorkspaceIgnore";
+import { workspaceService } from "../workspaces/WorkspaceService";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { loadWorkspaceGitignore, requireWorkspace } from "./workspace";
+import { requireWorkspace } from "./workspace";
 
 const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
 
@@ -50,15 +52,11 @@ export class BashTool extends BaseTool {
       });
       let output = "";
       if (result.stdout) {
-        const ig = await loadWorkspaceGitignore(workspace);
-        const filtered = filterOutputLines(
-          result.stdout,
-          ig,
-          workspace.hostPath,
-        );
+        const ig = await loadWorkspaceIgnore(workspaceService, workspace, ".");
+        const filtered = filterOutputLines(result.stdout, ig, "/workspace");
         output = filtered.filtered;
         if (filtered.removedCount > 0) {
-          output += `\n[${filtered.removedCount} gitignored entries hidden]`;
+          output += `\n[${filtered.removedCount} ignored entries hidden]`;
         }
       }
       if (result.stderr) output += `\n--- stderr ---\n${result.stderr}`;

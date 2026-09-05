@@ -24,7 +24,7 @@ import {
 export type RunTurnContext = {
   body: RunBody;
   ephemeral: boolean;
-  /** Empty string for ephemeral turns. */
+  /** Persisted session ID or temporary workspace lease ID. */
   sessionId: string;
   model: string;
   agentName: string;

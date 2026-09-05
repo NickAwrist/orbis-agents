@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,3 +74,15 @@ describe("bubblewrap sandbox runner", () => {
     },
   );
 });
+
+test.skipIf(!capability.available || !existsSync("/etc/alternatives/awk"))(
+  "runs alternatives-backed executables inside the sandbox",
+  async () => {
+    const result = await new BubblewrapSandboxRunner().run({
+      command: "awk 'BEGIN { print 42 }'",
+      workspace: await workspace(),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.trim()).toBe("42");
+  },
+);

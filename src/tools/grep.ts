@@ -1,5 +1,4 @@
 import pathModule from "node:path";
-import type { Ignore } from "ignore";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import {
@@ -7,11 +6,7 @@ import {
   workspaceService,
 } from "../workspaces/WorkspaceService";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import {
-  loadWorkspaceGitignore,
-  requireWorkspace,
-  workspaceError,
-} from "./workspace";
+import { requireWorkspace, workspaceError } from "./workspace";
 
 const MAX_PATTERN_LEN = 512;
 const SEARCH_BUDGET_MS = 2000;
@@ -19,7 +14,10 @@ const LINE_CHECK_INTERVAL = 500;
 
 export class GrepTool extends BaseTool {
   constructor() {
-    super("grep", "Search for a regex pattern in a specific file or directory");
+    super(
+      "grep",
+      "Search for a regex pattern in a file or directory. Directory searches exclude .git, node_modules, .cache and gitignored entries.",
+    );
   }
 
   override toTool(): Tool {
@@ -68,17 +66,7 @@ export class GrepTool extends BaseTool {
       const path = rawPath;
       const regex = new RegExp(patternStr);
 
-      let ig: Ignore | undefined;
-      try {
-        const stats = await workspaceService.statPath(workspace, path);
-        if (stats.isDirectory()) {
-          ig = await loadWorkspaceGitignore(workspace, path);
-        }
-      } catch {
-        // path might be a file, that's fine
-      }
-
-      const results = await this.searchRecursive(workspace, path, regex, ig);
+      const results = await this.searchRecursive(workspace, path, regex);
 
       if (results.length === 0) {
         return textToolResult("No matches found.");
@@ -127,7 +115,6 @@ export class GrepTool extends BaseTool {
     workspace: Workspace,
     currentPath: string,
     regex: RegExp,
-    ig?: Ignore,
     budget?: { deadline: number },
   ): Promise<string[]> {
     const b = budget ?? { deadline: Date.now() + SEARCH_BUDGET_MS };
@@ -140,7 +127,7 @@ export class GrepTool extends BaseTool {
           ...(await this.searchFile(workspace, currentPath, regex, b)),
         );
       } else if (stats.isDirectory()) {
-        const entries = await workspaceService.readDirectory(
+        const entries = await workspaceService.readVisibleDirectory(
           workspace,
           currentPath,
         );
@@ -156,16 +143,11 @@ export class GrepTool extends BaseTool {
 
           if (entry.isSymbolicLink()) continue;
 
-          if (ig?.ignores(entry.name)) {
-            continue;
-          }
-
           if (entry.isDirectory()) {
             const subResults = await this.searchRecursive(
               workspace,
               fullPath,
               regex,
-              ig,
               b,
             );
             results.push(...subResults);

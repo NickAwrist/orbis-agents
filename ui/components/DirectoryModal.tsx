@@ -21,6 +21,7 @@ export function DirectoryModal({
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const resolvedPathRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,6 +29,8 @@ export function DirectoryModal({
   }, []);
 
   useEffect(() => {
+    if (resolvedPathRef.current === path) return;
+    resolvedPathRef.current = null;
     const controller = new AbortController();
     setLoading(true);
     setListing(null);
@@ -38,7 +41,10 @@ export function DirectoryModal({
           if (controller.signal.aborted) return;
           setListing(result);
           setLoading(false);
-          if (!path.trim() || path.trim() === "~") setPath(result.path);
+          if (!path.trim() || path.trim() === "~") {
+            resolvedPathRef.current = result.path;
+            setPath(result.path);
+          }
         },
         (error: unknown) => {
           if (controller.signal.aborted) return;

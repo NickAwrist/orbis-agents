@@ -63,7 +63,7 @@ function joinRelDir(base: string, segment: string): string {
  */
 export function filterOutputLines(
   output: string,
-  ig: Ignore,
+  ig: Pick<Ignore, "ignores">,
   cwd: string = process.cwd(),
 ): { filtered: string; removedCount: number } {
   const lines = output.split("\n");

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
+import { sandboxRunner } from "../../src/sandbox/SandboxRunner";
+import { BashTool } from "../../src/tools/bash";
 import { CreateFileTool } from "../../src/tools/create_file";
 import { DeleteFileTool } from "../../src/tools/delete_file";
 import { GrepTool } from "../../src/tools/grep";
@@ -183,4 +185,159 @@ test("symlinked ignore rules are not read", async () => {
   expect((await new ListFilesTool().execute({}, ctx)).text).toContain(
     "parent/",
   );
+});
+
+test("browsing, grep and snapshots exclude repository noise and honor nested ignore rules", async () => {
+  const { ctx, workspace, service } = await fixture();
+  const files = [
+    "README.md",
+    ".github/README.md",
+    "dist/output.txt",
+    "build/output.txt",
+    "node_modules/pkg/README.md",
+    ".git/objects/README.md",
+    ".cache/README.md",
+    "docs/assets/README.md",
+    "docs/generated.js",
+    "docs/keep.js",
+    "docs/private/README.md",
+    "docs/nested/root-only.txt",
+  ];
+  for (const path of files) {
+    await service.writeFile(workspace, path, "readme marker");
+  }
+  await service.writeFile(
+    workspace,
+    ".gitignore",
+    "docs/assets/\ndocs/*.js\n/root-only.txt\n",
+  );
+  await service.writeFile(
+    workspace,
+    "docs/.gitignore",
+    "!keep.js\n/private/\n",
+  );
+  const visited: string[] = [];
+  const originalRead = service.readDirectory.bind(service);
+  const read = spyOn(service, "readDirectory").mockImplementation(
+    async (workspace, path) => {
+      visited.push(path);
+      return originalRead(workspace, path);
+    },
+  );
+  try {
+    const paths = (await service.listFiles(workspace)).map((file) => file.path);
+    for (const path of [
+      "README.md",
+      ".github/README.md",
+      "dist/output.txt",
+      "build/output.txt",
+      "docs/keep.js",
+      "docs/nested/root-only.txt",
+    ]) {
+      expect(paths).toContain(path);
+    }
+    for (const path of [
+      "node_modules/pkg/README.md",
+      ".git/objects/README.md",
+      ".cache/README.md",
+      "docs/assets/README.md",
+      "docs/generated.js",
+      "docs/private/README.md",
+    ]) {
+      expect(paths).not.toContain(path);
+    }
+    expect(visited).not.toContain("node_modules");
+    expect(visited).not.toContain(".git");
+  } finally {
+    read.mockRestore();
+  }
+  const listing = (await new ListFilesTool().execute({}, ctx)).text;
+  expect(listing).not.toContain("node_modules");
+  expect(listing).not.toContain(".git,");
+  expect(listing).toContain(".github/");
+  for (const path of [".", "docs", "/workspace/docs"]) {
+    const output = (
+      await new GrepTool().execute({ path, pattern: "readme marker" }, ctx)
+    ).text;
+    expect(output).toContain("keep.js");
+    expect(output).toContain("root-only.txt");
+    for (const noise of [
+      "node_modules",
+      ".git/",
+      ".cache/",
+      "assets/",
+      "generated.js",
+      "private/",
+    ]) {
+      expect(output).not.toContain(noise);
+    }
+  }
+});
+
+test("create_file creates missing parents but rejects a symlink substituted after mkdir", async () => {
+  const { ctx, workspace, outside } = await fixture();
+  const tool = new CreateFileTool();
+  expect(
+    (
+      await tool.execute(
+        { path: "src/utils/math.ts", content: "export {};" },
+        ctx,
+      )
+    ).text,
+  ).toContain("File created");
+  expect(
+    await fs.readFile(join(workspace.hostPath, "src/utils/math.ts"), "utf8"),
+  ).toBe("export {};");
+  const originalMkdir = fs.mkdir.bind(fs);
+  let replaced = false;
+  const mkdir = spyOn(fs, "mkdir").mockImplementation(async (path, options) => {
+    await originalMkdir(path, options);
+    if (String(path).endsWith("/new-parent")) {
+      replaced = true;
+      await fs.rmdir(path);
+      await fs.symlink(outside, path);
+    }
+    return undefined;
+  });
+  try {
+    expect(
+      (
+        await tool.execute(
+          { path: "new-parent/file.txt", content: "overwrite" },
+          ctx,
+        )
+      ).text,
+    ).toContain("Error:");
+    expect(replaced).toBeTrue();
+    expect(await fs.readFile(join(outside, "file.txt"), "utf8")).toBe(
+      "outside secret",
+    );
+  } finally {
+    mkdir.mockRestore();
+  }
+});
+
+test("bash filters dependency and Git paths using the sandbox working directory", async () => {
+  const { ctx } = await fixture();
+  const run = spyOn(sandboxRunner, "run").mockResolvedValue({
+    stdout:
+      "/workspace/README.md\n/workspace/node_modules/pkg/README.md\n./.git/objects/README.md\n.cache/README.md\n/workspace/.github/README.md",
+    stderr: "",
+    exitCode: 0,
+    truncated: false,
+  });
+  try {
+    const result = await new BashTool().execute(
+      { command: "find . -name README.md" },
+      ctx,
+    );
+    expect(result.text).toContain("/workspace/README.md");
+    expect(result.text).toContain("/workspace/.github/README.md");
+    expect(result.text).not.toContain("node_modules");
+    expect(result.text).not.toContain(".git/");
+    expect(result.text).not.toContain(".cache/");
+    expect(result.text).toContain("3 ignored entries hidden");
+  } finally {
+    run.mockRestore();
+  }
 });

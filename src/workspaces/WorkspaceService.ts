@@ -11,6 +11,7 @@ import {
 } from "node:path";
 import { DATA_ROOT } from "../db/constants";
 import type { SessionRow } from "../db/types";
+import { loadWorkspaceIgnore } from "./WorkspaceIgnore";
 
 export type WorkspaceKind = "sandbox" | "local";
 
@@ -353,6 +354,14 @@ export class WorkspaceService {
     }
   }
 
+  async readVisibleDirectory(workspace: Workspace, path: string) {
+    const rules = await loadWorkspaceIgnore(this, workspace, path);
+    const entries = await this.readDirectory(workspace, path);
+    return entries.filter(
+      (entry) => !rules.ignores(entry.name, entry.isDirectory()),
+    );
+  }
+
   async statPath(workspace: Workspace, path: string) {
     const handle = await this.openPath(workspace, path, constants.O_RDONLY);
     try {
@@ -398,8 +407,21 @@ export class WorkspaceService {
     if (!parts.length) return directory;
     try {
       for (const part of parts.slice(0, -1)) {
+        const childPath = `/proc/self/fd/${directory.fd}/${part}`;
+        if (flags & constants.O_CREAT) {
+          try {
+            await fs.mkdir(childPath);
+          } catch (error) {
+            if (
+              !(error instanceof Error) ||
+              !("code" in error) ||
+              error.code !== "EEXIST"
+            )
+              throw error;
+          }
+        }
         const next = await fs.open(
-          `/proc/self/fd/${directory.fd}/${part}`,
+          childPath,
           constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
         );
         await directory.close();
@@ -463,7 +485,7 @@ export class WorkspaceService {
     directory: string,
     output: WorkspaceFile[],
   ): Promise<void> {
-    for (const entry of await this.readDirectory(workspace, directory)) {
+    for (const entry of await this.readVisibleDirectory(workspace, directory)) {
       const fullPath = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
