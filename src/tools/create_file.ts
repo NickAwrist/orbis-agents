@@ -22,7 +22,8 @@ export class CreateFileTool extends BaseTool {
           properties: {
             path: {
               type: "string",
-              description: "File path (relative to cwd or absolute)",
+              description:
+                "File path (relative to /workspace or absolute under /workspace)",
             },
             content: {
               type: "string",
@@ -67,7 +68,7 @@ export class CreateFileTool extends BaseTool {
         rawPath,
       );
       await fs.writeFile(path, content);
-      return textToolResult(`File created at ${path}`);
+      return textToolResult(`File created at ${rawPath}`);
     } catch (error) {
       return textToolResult(workspaceError(error));
     }

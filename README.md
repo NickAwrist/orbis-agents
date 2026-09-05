@@ -91,6 +91,25 @@ networking has different behavior. In that case, use the local Bun dev commands
 or switch the Compose file back to port publishing plus
 `host.docker.internal`.
 
+## Workspaces
+
+Shell commands and file tools use `/workspace` for both private and selected
+local workspaces. File tools also accept relative paths within that directory.
+The UI shows the selected host directory for local workspaces.
+
+Downloads and file reads require Linux with procfs. They open each path component
+without following symlinks and read from the resulting file descriptor. Symlinks
+are rejected even when they point inside the workspace.
+
+Temporary workspaces expire after 24 hours. The server checks for expired leases
+and abandoned directories every minute, deferring deletion during active turns.
+Leaving a temporary chat requests deletion immediately. Selected local directories
+are never removed by temporary workspace cleanup.
+
+The sandbox integration tests report skips when Bubblewrap is unavailable. Run
+`bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working
+Bubblewrap namespaces to verify workspace writes and network isolation.
+
 ## Project Structure
 
 - `src/` - backend server, agent loop, tools, and session storage

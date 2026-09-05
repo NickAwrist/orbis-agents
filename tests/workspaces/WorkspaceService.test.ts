@@ -57,6 +57,71 @@ describe("workspace service", () => {
     ).rejects.toBeInstanceOf(WorkspaceError);
   });
 
+  test("maps shell paths for both local and sandbox workspaces", async () => {
+    const workspaces = await service();
+    const lease = await workspaces.createTemporary("owner-a");
+    const local = await fs.mkdtemp(join(tmpdir(), "orbis-path-test-"));
+    roots.push(local);
+    for (const kind of ["sandbox", "local"] as const) {
+      if (kind === "local")
+        await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
+      const workspace = await workspaces.resolveTemporary("owner-a", lease.id);
+      expect(workspace.displayPath).toBe("/workspace");
+      const target = await workspaces.resolveNewFilePath(
+        workspace,
+        "/workspace/output.txt",
+      );
+      await fs.writeFile(target, "output");
+      expect(
+        await workspaces.resolveExistingPath(workspace, "output.txt"),
+      ).toBe(target);
+      expect(
+        await workspaces.resolveExistingPath(
+          workspace,
+          "/workspace/output.txt",
+        ),
+      ).toBe(target);
+      await expect(
+        workspaces.resolveExistingPath(workspace, "/workspace/../outside"),
+      ).rejects.toThrow();
+    }
+  });
+
+  test("expiry removes leases and private files while preserving local directories and active turns", async () => {
+    const workspaces = await service();
+    const lease = await workspaces.createTemporary("owner-a");
+    const local = await fs.mkdtemp(join(tmpdir(), "orbis-expiry-test-"));
+    roots.push(local);
+    await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
+    lease.expiresAt = Date.now() - 1;
+    const endTurn = workspaces.beginTurn("owner-a", lease.id)!;
+    await workspaces.cleanupExpired();
+    await fs.access(lease.hostPath);
+    endTurn();
+    await workspaces.cleanupExpired();
+    await expect(fs.access(lease.hostPath)).rejects.toThrow();
+    expect(await workspaces.deleteTemporary("owner-a", lease.id)).toBeFalse();
+    await fs.access(local);
+  });
+
+  test("scans outputs beyond 1,000 dependency files before sorting", async () => {
+    const workspaces = await service();
+    const workspace = await workspaces.provisionRetained("owner-a", "chat-a");
+    const dependencies = join(workspace.hostPath, "dependencies");
+    await fs.mkdir(dependencies);
+    await Promise.all(
+      Array.from({ length: 1000 }, async (_, index) => {
+        const path = join(dependencies, `${index}.txt`);
+        await fs.writeFile(path, "dependency");
+        await fs.utimes(path, 1, 1);
+      }),
+    );
+    await fs.writeFile(join(workspace.hostPath, "output.txt"), "output");
+    const files = await workspaces.listFiles(workspace);
+    expect(files).toHaveLength(1001);
+    expect(files.slice(0, 200)[0]?.path).toBe("output.txt");
+  });
+
   test("temporary leases are owner-scoped and disappear on delete", async () => {
     const workspaces = await service();
     const lease = await workspaces.createTemporary("owner-a");

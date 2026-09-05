@@ -1,5 +1,4 @@
 import type { Response } from "express";
-import type { ApprovalRequest } from "../approvals/ApprovalManager";
 import type {
   MessageAttachment,
   WorkspaceFileAttachment,
@@ -9,17 +8,6 @@ import type { HistoryWireStep } from "../session/AgentSession";
 
 export type RunEvent =
   | { type: "run_started"; requestId: string }
-  | {
-      type: "approval_required";
-      requestId: string;
-      approvalId: string;
-      request: ApprovalRequest;
-    }
-  | {
-      type: "approval_resolved";
-      approvalId: string;
-      approved: boolean;
-    }
   | {
       type: "run_delta";
       contentDelta: string;

@@ -1,5 +1,5 @@
 import "../setup";
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -88,6 +88,75 @@ describe("workspace API", () => {
       await close();
     }
   });
+
+  for (const temporary of [false, true]) {
+    for (const swap of ["file", "parent"] as const) {
+      test(`download pins the ${swap} during replacement in a ${temporary ? "temporary" : "saved"} workspace`, async () => {
+        const { url, close } = await startTestServer();
+        const outside = await fs.mkdtemp(
+          join(tmpdir(), "orbis-download-race-"),
+        );
+        temporaryDirectories.push(outside);
+        await fs.writeFile(join(outside, "output.txt"), "outside secret");
+        const lease = temporary
+          ? await workspaceService.createTemporary(TEST_USER_ID)
+          : null;
+        const id = lease?.id ?? (await createSession(url));
+        const workspace = temporary
+          ? await workspaceService.resolveTemporary(TEST_USER_ID, id)
+          : await workspaceService.resolveSession(
+              getSessionById(TEST_USER_ID, id)!,
+            );
+        const parent = join(workspace.hostPath, "parent");
+        await fs.mkdir(parent);
+        await fs.writeFile(join(parent, "output.txt"), "workspace output");
+        const originalOpen = fs.open.bind(fs);
+        let replaced = false;
+        const open = spyOn(fs, "open").mockImplementation(
+          async (path, flags, mode) => {
+            const handle = await originalOpen(path, flags, mode);
+            if (
+              !replaced &&
+              String(path).endsWith(
+                swap === "parent" ? "/parent" : "/output.txt",
+              )
+            ) {
+              replaced = true;
+              const target =
+                swap === "parent" ? parent : join(parent, "output.txt");
+              await fs.rename(target, `${target}.original`);
+              await fs.symlink(
+                swap === "parent" ? outside : join(outside, "output.txt"),
+                target,
+              );
+            }
+            return handle;
+          },
+        );
+        try {
+          const route = temporary
+            ? `temporary-sessions/${id}/file`
+            : `sessions/${id}/workspace/file`;
+          const response = await fetch(
+            `${url}/api/${route}?path=parent/output.txt`,
+            { headers: userHeaders() },
+          );
+          expect(response.status).toBe(200);
+          expect(await response.text()).toBe("workspace output");
+          expect(replaced).toBeTrue();
+          const rejected = await fetch(
+            `${url}/api/${route}?path=parent/output.txt`,
+            { headers: userHeaders() },
+          );
+          expect(rejected.status).toBe(400);
+        } finally {
+          open.mockRestore();
+          if (lease) await workspaceService.deleteTemporary(TEST_USER_ID, id);
+          await close();
+        }
+      });
+    }
+  }
 
   test("temporary workspace leases are owner scoped", async () => {
     const { url, close } = await startTestServer();

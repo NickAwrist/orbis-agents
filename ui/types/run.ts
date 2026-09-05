@@ -55,11 +55,4 @@ export interface DebugData {
   modelMessages?: Array<Record<string, unknown>> | null;
 }
 
-export type PendingApproval = {
-  requestId: string;
-  approvalId: string;
-  title: string;
-  target: string;
-  action: string;
-};
 import type { MessageAttachment } from "../../src/attachments/types";

@@ -162,8 +162,6 @@ export function useRunApp() {
     pendingDeleteSessionId: sessions.pendingDeleteSessionId,
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
     runPending: stream.runPending,
-    pendingApproval: stream.pendingApproval,
-    resolveApproval: stream.resolveApproval,
     ollamaModels: ollama.ollamaModels,
     modelsLoadError: ollama.modelsLoadError,
     selectedModel: sessions.selectedModel,

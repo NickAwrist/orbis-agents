@@ -34,7 +34,7 @@ export class GrepTool extends BaseTool {
             path: {
               type: "string",
               description:
-                "The file or directory to search in (relative to cwd or absolute). If not provided, the current directory is used.",
+                "The file or directory to search in (relative to /workspace or absolute under /workspace). If not provided, the current directory is used.",
             },
           },
         },
@@ -81,7 +81,11 @@ export class GrepTool extends BaseTool {
         return textToolResult("No matches found.");
       }
 
-      return textToolResult(results.join("\n"));
+      return textToolResult(
+        results
+          .join("\n")
+          .replaceAll(requireWorkspace(ctx).hostPath, "/workspace"),
+      );
     } catch (e) {
       return textToolResult(workspaceError(e));
     }

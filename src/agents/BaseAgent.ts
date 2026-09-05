@@ -288,15 +288,11 @@ export class BaseAgent {
             toolStep,
             turnIndex,
           );
-          if (result.redactedArgs) {
-            ctx.redactStepArgs(toolStep, result.redactedArgs);
-          }
           ctx.endStep(toolStep, result.text);
 
           this.history.push({
             role: "tool",
             content: result.text,
-            ...(result.images?.length ? { images: result.images } : {}),
             ...(toolCall.id ? { tool_call_id: toolCall.id } : {}),
           });
         }

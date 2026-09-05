@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { z } from "zod";
-import { approvalManager } from "../approvals/ApprovalManager";
 import { sendApiError } from "../http/errors";
 import { handleRun } from "../run/runController";
 import { sseManager } from "../run/sseManager";
@@ -24,29 +23,6 @@ router.post("/abort", (req, res) => {
   }
   const aborted = sseManager.abortRequest(parsed.data.requestId, ownerUuid);
   res.json({ aborted });
-});
-
-const ApprovalBodySchema = z.object({ approved: z.boolean() });
-
-router.post("/:requestId/approvals/:approvalId", (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const parsed = ApprovalBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    sendApiError(res, 400, "BAD_REQUEST", "approved must be a boolean");
-    return;
-  }
-  const resolved = approvalManager.resolve({
-    ownerUuid,
-    requestId: req.params.requestId,
-    approvalId: req.params.approvalId,
-    approved: parsed.data.approved,
-  });
-  if (!resolved) {
-    sendApiError(res, 404, "NOT_FOUND", "Approval request not found");
-    return;
-  }
-  res.json({ ok: true });
 });
 
 router.get("/active/:sessionId", (req, res) => {

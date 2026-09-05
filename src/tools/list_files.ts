@@ -23,7 +23,7 @@ export class ListFilesTool extends BaseTool {
             path: {
               type: "string",
               description:
-                "Directory path (relative to cwd or absolute). If not provided, the current directory is used.",
+                "Directory path (relative to /workspace or absolute under /workspace). If not provided, the current directory is used.",
             },
           },
         },

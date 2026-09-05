@@ -7,7 +7,6 @@ export type {
   DebugData,
   Message,
   MessageStep,
-  PendingApproval,
   SessionSummary,
   SubagentRun,
   TruncateConfirmState,

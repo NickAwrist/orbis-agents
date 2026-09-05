@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { basename } from "node:path";
 import { Router } from "express";
 import {
   type WireMessage,
@@ -13,6 +12,7 @@ import {
   patchSessionRow,
   persistSessionMessages,
 } from "../db/index";
+import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
@@ -176,20 +176,9 @@ router.get("/:id/workspace/file", async (req, res) => {
     typeof req.query.path === "string" ? req.query.path : "";
   try {
     const workspace = await workspaceService.resolveSession(row);
-    const path = await workspaceService.resolveExistingPath(
-      workspace,
-      requestedPath,
-    );
-    const stat = await import("node:fs/promises").then((fs) => fs.stat(path));
-    if (!stat.isFile())
-      throw new WorkspaceError("Requested path is not a file");
-    const name = basename(path).replace(/["\r\n]/g, "_");
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader("Content-Length", String(stat.size));
-    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    workspaceService.createReadStream(path).pipe(res);
+    await downloadWorkspaceFile(res, workspace, requestedPath);
   } catch (error) {
+    if (res.headersSent || res.destroyed) return;
     sendApiError(
       res,
       400,

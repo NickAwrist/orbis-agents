@@ -17,7 +17,6 @@ import type {
   DebugData,
   Message,
   MessageStep,
-  PendingApproval,
   TruncateConfirmState,
 } from "../../types";
 import { executeRunTurn } from "./executeRunTurn";
@@ -64,8 +63,6 @@ export function useRunStreaming(p: Args) {
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingThinking, setStreamingThinking] = useState("");
   const [runPending, setRunPending] = useState(false);
-  const [pendingApproval, setPendingApproval] =
-    useState<PendingApproval | null>(null);
 
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
@@ -112,7 +109,6 @@ export function useRunStreaming(p: Args) {
       setStreamingContent,
       setStreamingThinking,
       setRunPending,
-      setPendingApproval,
     },
     p.runFlightRef,
     rawRunPendingRef,
@@ -184,7 +180,6 @@ export function useRunStreaming(p: Args) {
         setStreamingSteps,
         setStreamingContent,
         setStreamingThinking,
-        setPendingApproval,
         clearStreamingUi,
         reconnectToStream,
         fetchDebugData,
@@ -222,7 +217,6 @@ export function useRunStreaming(p: Args) {
     setInFlightSessionId(null);
     setRunPending(false);
     clearStreamingUi();
-    setPendingApproval(null);
 
     p.setMessages((current) => {
       if (!sessionId || p.activeSessionIdRef.current !== sessionId) {
@@ -295,23 +289,6 @@ export function useRunStreaming(p: Args) {
     p.setDebugOpen((open) => !open);
   };
 
-  const resolveApproval = async (approved: boolean) => {
-    const approval = pendingApproval;
-    if (!approval) return;
-    setPendingApproval(null);
-    const response = await userScopedFetch(
-      `/api/runs/${encodeURIComponent(approval.requestId)}/approvals/${encodeURIComponent(approval.approvalId)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approved }),
-      },
-    );
-    if (!response.ok && response.status !== 404) {
-      console.error("Failed to resolve approval");
-    }
-  };
-
   const sessionRunBusy =
     images.uploadPending ||
     ((runPending || streamingStep !== null || streamingSteps.length > 0) &&
@@ -330,8 +307,6 @@ export function useRunStreaming(p: Args) {
     sendMessage,
     confirmTruncateAndRetry,
     toggleDebug,
-    pendingApproval,
-    resolveApproval,
     pendingImages: images.pendingImages,
     imageError: images.imageError,
     addPendingImages: images.addPendingImages,

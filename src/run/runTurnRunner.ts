@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { approvalManager } from "../approvals/ApprovalManager";
 import type { WorkspaceFileAttachment } from "../attachments/types";
 import type { WireMessage } from "../db/index";
 import { logger } from "../logger";
@@ -29,7 +28,7 @@ export async function runTurn(
   stream: RunStream,
   persistence: RunPersistence,
 ): Promise<void> {
-  const session = buildSession(ctx, stream);
+  const session = buildSession(ctx);
   const filesBefore = await workspaceFileSnapshot(ctx);
 
   const onStep = (p: SessionStepEvent) =>
@@ -144,7 +143,7 @@ async function changedFileAttachments(
   }
 }
 
-function buildSession(ctx: RunTurnContext, stream: RunStream): AgentSession {
+function buildSession(ctx: RunTurnContext): AgentSession {
   const session = new AgentSession(crypto.randomUUID(), {
     model: ctx.model,
     agentName: ctx.agentName,
@@ -154,31 +153,6 @@ function buildSession(ctx: RunTurnContext, stream: RunStream): AgentSession {
     ownerUuid: ctx.ownerUuid,
     attachmentSessionId: ctx.sessionId,
     userPrompt: ctx.body.message,
-    requestApproval: async (request) => {
-      let emittedApprovalId = "";
-      const approved = await approvalManager.request({
-        ownerUuid: ctx.ownerUuid,
-        requestId: stream.requestId,
-        signal: AbortSignal.any([stream.signal, stream.approvalSignal]),
-        emit: (approvalId) => {
-          emittedApprovalId = approvalId;
-          stream.emit({
-            type: "approval_required",
-            requestId: stream.requestId,
-            approvalId,
-            request,
-          });
-        },
-      });
-      if (emittedApprovalId) {
-        stream.emit({
-          type: "approval_resolved",
-          approvalId: emittedApprovalId,
-          approved,
-        });
-      }
-      return approved;
-    },
   });
   session.restoreFromPersistence({
     history: ctx.body.history as SessionMessage[],

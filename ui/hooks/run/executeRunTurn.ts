@@ -8,7 +8,7 @@ import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
-import type { Message, MessageStep, PendingApproval } from "../../types";
+import type { Message, MessageStep } from "../../types";
 import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 
 type AppDeps = {
@@ -39,7 +39,6 @@ type RuntimeDeps = {
   setStreamingSteps: Dispatch<SetStateAction<MessageStep[]>>;
   setStreamingContent: Dispatch<SetStateAction<string>>;
   setStreamingThinking: Dispatch<SetStateAction<string>>;
-  setPendingApproval: Dispatch<SetStateAction<PendingApproval | null>>;
   clearStreamingUi: () => void;
   reconnectToStream: (sessionId: string, requestId: string) => void;
   fetchDebugData: (sessionId: string) => Promise<void>;
@@ -75,7 +74,6 @@ export async function executeRunTurn(
     setStreamingSteps,
     setStreamingContent,
     setStreamingThinking,
-    setPendingApproval,
     clearStreamingUi,
     reconnectToStream,
     fetchDebugData,
@@ -229,25 +227,6 @@ export async function executeRunTurn(
           if (typeof data.requestId === "string") {
             activeRequestIdRef.current = data.requestId;
           }
-        } else if (data.type === "approval_required") {
-          const request = data.request as Record<string, unknown> | undefined;
-          if (
-            typeof data.requestId === "string" &&
-            typeof data.approvalId === "string" &&
-            request
-          ) {
-            setPendingApproval({
-              requestId: data.requestId,
-              approvalId: data.approvalId,
-              title: String(request.title ?? "Approval required"),
-              target: String(request.target ?? "Unknown target"),
-              action: String(request.action ?? "Unknown action"),
-            });
-          }
-        } else if (data.type === "approval_resolved") {
-          setPendingApproval((current) =>
-            current?.approvalId === data.approvalId ? null : current,
-          );
         } else if (data.type === "run_delta") {
           const contentDelta =
             typeof data.contentDelta === "string" ? data.contentDelta : "";
@@ -289,7 +268,6 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_done") {
           terminalEventReceived = true;
-          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           if (ephemeral) {
             const assistantContent =
@@ -346,7 +324,6 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_aborted") {
           terminalEventReceived = true;
-          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           const history = Array.isArray(data.history)
             ? (data.history as Message[])
@@ -366,7 +343,6 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_error") {
           terminalEventReceived = true;
-          setPendingApproval(null);
           if (viewingThisTurn()) clearStreamingUi();
           const errorText =
             typeof data.error === "string" ? data.error : "Unknown error";

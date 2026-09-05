@@ -22,7 +22,8 @@ export class DeleteFileTool extends BaseTool {
           properties: {
             path: {
               type: "string",
-              description: "File path (relative to cwd or absolute)",
+              description:
+                "File path (relative to /workspace or absolute under /workspace)",
             },
           },
         },
@@ -46,7 +47,7 @@ export class DeleteFileTool extends BaseTool {
         rawPath,
       );
       await fs.unlink(path);
-      return textToolResult(`File deleted at ${path}`);
+      return textToolResult(`File deleted at ${rawPath}`);
     } catch (e) {
       return textToolResult(workspaceError(e));
     }

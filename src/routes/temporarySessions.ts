@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import {
@@ -211,21 +212,9 @@ router.get("/:id/file", async (req, res) => {
       );
       return;
     }
-    const path = await workspaceService.resolveExistingPath(
-      workspace,
-      requestedPath,
-    );
-    const fs = await import("node:fs/promises");
-    const { basename } = await import("node:path");
-    const stat = await fs.stat(path);
-    if (!stat.isFile()) throw new Error("Requested path is not a file");
-    const name = basename(path).replace(/["\r\n]/g, "_");
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader("Content-Length", String(stat.size));
-    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    workspaceService.createReadStream(path).pipe(res);
+    await downloadWorkspaceFile(res, workspace, requestedPath);
   } catch (error) {
+    if (res.headersSent || res.destroyed) return;
     sendApiError(
       res,
       400,

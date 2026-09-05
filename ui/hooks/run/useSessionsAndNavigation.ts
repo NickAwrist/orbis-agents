@@ -384,6 +384,9 @@ export function useSessionsAndNavigation(p: Args) {
     setIsLoading(true);
     try {
       const curId = p.activeSessionIdRef.current;
+      if (curId && p.isEphemeralRef.current) {
+        await deleteTemporarySessionApi(curId);
+      }
       if (curId && !p.isEphemeralRef.current && p.messages.length === 0) {
         try {
           await deleteSessionApi(curId);
@@ -477,6 +480,10 @@ export function useSessionsAndNavigation(p: Args) {
 
   useEffect(() => {
     const onPopState = () => {
+      const curId = p.activeSessionIdRef.current;
+      if (curId && p.isEphemeralRef.current) {
+        void deleteTemporarySessionApi(curId).catch(() => {});
+      }
       const urlId = sessionIdFromUrl();
       if (urlId) {
         setIsEphemeral(false);
@@ -495,6 +502,8 @@ export function useSessionsAndNavigation(p: Args) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [
     loadSession,
+    p.activeSessionIdRef,
+    p.isEphemeralRef,
     p.setMessages,
     p.resetStreamingUi,
     p.setEditingUserIndex,

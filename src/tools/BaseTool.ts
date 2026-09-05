@@ -1,11 +1,8 @@
 import type { Tool } from "ollama";
 import type { RunContext, Step } from "../RunContext";
-import type { LlmImage } from "../llm/types";
 
 export type ToolResult = {
   text: string;
-  images?: LlmImage[];
-  redactedArgs?: Record<string, unknown>;
 };
 
 export function textToolResult(text: string): ToolResult {

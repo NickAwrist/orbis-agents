@@ -1,6 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
-import { ApprovalModal } from "./components/ApprovalModal";
 import { ComputerUseModal } from "./components/ComputerUseModal";
 import { DebugModal } from "./components/DebugModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
@@ -322,12 +321,6 @@ export default function App() {
             confirmLabel="Delete"
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}
-          />
-        )}
-        {app.pendingApproval && (
-          <ApprovalModal
-            approval={app.pendingApproval}
-            onResolve={app.resolveApproval}
           />
         )}
         {computerOpen && (

@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
@@ -22,7 +21,8 @@ export class ReadFileTool extends BaseTool {
           properties: {
             path: {
               type: "string",
-              description: "File path (relative to cwd or absolute)",
+              description:
+                "File path (relative to /workspace or absolute under /workspace)",
             },
           },
         },
@@ -41,12 +41,15 @@ export class ReadFileTool extends BaseTool {
           ? args.filename
           : "";
     try {
-      const path = await workspaceService.resolveExistingPath(
+      const file = await workspaceService.openFile(
         requireWorkspace(ctx),
         rawPath,
       );
-      const content = await fs.readFile(path, "utf8");
-      return textToolResult(content);
+      try {
+        return textToolResult(await file.readFile("utf8"));
+      } finally {
+        await file.close();
+      }
     } catch (e) {
       return textToolResult(workspaceError(e));
     }

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { type RequestApproval, RunContext } from "../RunContext";
+import { RunContext } from "../RunContext";
 import type { BaseAgent } from "../agents/BaseAgent";
 import { agentManager } from "../agents/agentManager";
 import {
@@ -61,7 +61,6 @@ export type AgentSessionOptions = {
   attachmentSessionId?: string;
   /** Current task, used to activate explicit `$skill-name` references. */
   userPrompt?: string;
-  requestApproval?: RequestApproval;
 };
 
 export class AgentSession extends EventEmitter {
@@ -73,7 +72,6 @@ export class AgentSession extends EventEmitter {
   private readonly promptContext?: PromptContext;
   private readonly ownerUuid: string;
   private readonly attachmentSessionId?: string;
-  private readonly requestApproval?: RequestApproval;
 
   override on<K extends keyof SessionEvents>(
     event: K,
@@ -101,7 +99,6 @@ export class AgentSession extends EventEmitter {
     this.promptContext = options?.promptContext;
     this.ownerUuid = options?.ownerUuid ?? "";
     this.attachmentSessionId = options?.attachmentSessionId;
-    this.requestApproval = options?.requestApproval;
     const agentName = options?.agentName?.trim() || "general_agent";
     this.generalAgent = agentManager.createAgent(agentName, {
       systemPrompt: options?.systemPrompt,
@@ -236,7 +233,6 @@ export class AgentSession extends EventEmitter {
       this.promptContext,
       this.ownerUuid,
       this.workspace,
-      this.requestApproval,
     );
 
     let result = "Error running agent.";

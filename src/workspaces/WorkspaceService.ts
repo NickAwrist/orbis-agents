@@ -1,11 +1,5 @@
 import crypto from "node:crypto";
-import {
-  constants,
-  createReadStream,
-  existsSync,
-  mkdirSync,
-  statSync,
-} from "node:fs";
+import { constants, existsSync, mkdirSync, statSync } from "node:fs";
 import fs from "node:fs/promises";
 import {
   basename,
@@ -73,7 +67,32 @@ export class WorkspaceService {
     mkdirSync(this.trashRoot, { recursive: true });
   }
 
+  private cleanupTimer?: ReturnType<typeof setInterval>;
+
   async initialize(): Promise<void> {
+    this.cleanupTimer ??= setInterval(() => {
+      void this.cleanupExpired().catch((error) =>
+        console.error("Workspace cleanup failed", error),
+      );
+    }, 60_000);
+    this.cleanupTimer.unref();
+    await this.cleanupExpired();
+  }
+
+  dispose(): void {
+    clearInterval(this.cleanupTimer);
+    this.cleanupTimer = undefined;
+  }
+
+  async cleanupExpired(): Promise<void> {
+    for (const lease of this.temporaryLeases.values()) {
+      if (
+        lease.expiresAt <= Date.now() &&
+        !this.isTurnActive(lease.ownerUuid, lease.id)
+      ) {
+        await this.deleteTemporary(lease.ownerUuid, lease.id);
+      }
+    }
     await Promise.all([
       this.purgeExpiredDirectories(
         this.ephemeralRoot,
@@ -127,7 +146,7 @@ export class WorkspaceService {
         );
       }
       const hostPath = await this.canonicalDirectory(row.session_directory);
-      return { kind: "local", hostPath, displayPath: hostPath };
+      return { kind: "local", hostPath, displayPath: "/workspace" };
     }
     return this.provisionRetained(row.owner_uuid, row.id);
   }
@@ -190,7 +209,7 @@ export class WorkspaceService {
         );
       }
       const hostPath = await this.canonicalDirectory(lease.localPath);
-      return { kind: "local", hostPath, displayPath: hostPath };
+      return { kind: "local", hostPath, displayPath: "/workspace" };
     }
     await fs.access(lease.hostPath, constants.R_OK | constants.W_OK);
     return {
@@ -238,8 +257,8 @@ export class WorkspaceService {
   async deleteTemporary(ownerUuid: string, id: string): Promise<boolean> {
     const lease = this.temporaryLeases.get(id);
     if (!lease || lease.ownerUuid !== ownerUuid) return false;
-    this.temporaryLeases.delete(id);
     await fs.rm(lease.hostPath, { recursive: true, force: true });
+    this.temporaryLeases.delete(id);
     return true;
   }
 
@@ -297,27 +316,79 @@ export class WorkspaceService {
 
   async listFiles(workspace: Workspace): Promise<WorkspaceFile[]> {
     const files: WorkspaceFile[] = [];
-    await this.walkFiles(workspace, workspace.hostPath, files, 1_000);
+    await this.walkFiles(workspace, workspace.hostPath, files);
     return files.sort((a, b) => b.modifiedAt - a.modifiedAt);
   }
 
-  createReadStream(path: string) {
-    return createReadStream(path);
+  // Linux procfs gives openat-like access relative to pinned directory handles.
+  // Never reopen a validated pathname: every component is opened with NOFOLLOW.
+  async openFile(
+    workspace: Workspace,
+    requestedPath: string,
+  ): Promise<fs.FileHandle> {
+    if (process.platform !== "linux") {
+      throw new WorkspaceError("Secure workspace file access requires Linux");
+    }
+    const target = this.resolveLexical(workspace, requestedPath);
+    const parts = relative(workspace.hostPath, target)
+      .split("/")
+      .filter(Boolean);
+    if (!parts.length) throw new WorkspaceError("Requested path is not a file");
+    let directory = await fs.open(
+      workspace.hostPath,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    try {
+      for (const part of parts.slice(0, -1)) {
+        const next = await fs.open(
+          `/proc/self/fd/${directory.fd}/${part}`,
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        );
+        await directory.close();
+        directory = next;
+      }
+      const file = await fs.open(
+        `/proc/self/fd/${directory.fd}/${parts.at(-1)}`,
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      );
+      try {
+        if (!(await file.stat()).isFile())
+          throw new WorkspaceError("Requested path is not a file");
+        return file;
+      } catch (error) {
+        await file.close();
+        throw error;
+      }
+    } finally {
+      await directory.close();
+    }
   }
 
   private resolveLexical(workspace: Workspace, requestedPath: string): string {
     const requested = requestedPath.trim();
     if (!requested) throw new WorkspaceError("A path is required");
-    const target = isAbsolute(requested)
-      ? resolve(requested)
-      : resolve(workspace.hostPath, requested);
+    if (
+      isAbsolute(requested) &&
+      requested !== "/workspace" &&
+      !requested.startsWith("/workspace/")
+    ) {
+      throw new WorkspaceError(
+        "Absolute tool paths must start with /workspace",
+      );
+    }
+    const target = resolve(
+      workspace.hostPath,
+      isAbsolute(requested)
+        ? requested.slice("/workspace".length + 1)
+        : requested,
+    );
     this.assertInside(workspace.hostPath, target);
     return target;
   }
 
   private assertInside(root: string, target: string): void {
     const rel = relative(resolve(root), resolve(target));
-    if (rel.startsWith("..") || isAbsolute(rel)) {
+    if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) {
       throw new WorkspaceError("Path escapes the active workspace");
     }
   }
@@ -341,14 +412,12 @@ export class WorkspaceService {
     workspace: Workspace,
     directory: string,
     output: WorkspaceFile[],
-    limit: number,
   ): Promise<void> {
     for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-      if (output.length >= limit) return;
       const fullPath = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        await this.walkFiles(workspace, fullPath, output, limit);
+        await this.walkFiles(workspace, fullPath, output);
       } else if (entry.isFile()) {
         const stat = await fs.stat(fullPath);
         output.push({
@@ -368,6 +437,8 @@ export class WorkspaceService {
     const now = Date.now();
     for (const entry of await fs.readdir(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+      if (root === this.ephemeralRoot && this.temporaryLeases.has(entry.name))
+        continue;
       const path = join(root, entry.name);
       try {
         const stat = statSync(path);

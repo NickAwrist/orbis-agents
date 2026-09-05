@@ -12,7 +12,6 @@ const PING_INTERVAL_MS = 15_000;
 export type RunStream = {
   readonly requestId: string;
   readonly signal: AbortSignal;
-  readonly approvalSignal: AbortSignal;
   emit(event: RunEvent): void;
   close(): void;
 };
@@ -34,7 +33,6 @@ export function openRunStream(
 
   const requestId = crypto.randomUUID();
   const abortController = new AbortController();
-  const approvalAbortController = new AbortController();
   sse.registerRequest(requestId, opts.ownerUuid, abortController);
 
   const pingInterval = setInterval(() => {
@@ -61,13 +59,11 @@ export function openRunStream(
     } else {
       abortController.abort();
     }
-    approvalAbortController.abort();
   });
 
   return {
     requestId,
     signal: abortController.signal,
-    approvalSignal: approvalAbortController.signal,
     emit(event) {
       if (gen) {
         sse.broadcast(gen, event);
