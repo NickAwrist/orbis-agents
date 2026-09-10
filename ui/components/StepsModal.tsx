@@ -1,10 +1,9 @@
-import { Check, Coins, Copy, Gauge, Search, X } from "lucide-react";
+import { Check, Coins, Copy, Gauge, Waypoints, X } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useState } from "react";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import {
   cx,
-  eyebrowText,
   iconButton,
   modalCloseButton,
   modalHeader,
@@ -59,7 +58,7 @@ export function StepsModal({
   return (
     <dialog
       className={modalShell}
-      aria-label="Agent steps"
+      aria-label="Execution Trace"
       open
       onClick={handleDialogClick}
       onKeyDown={handleDialogKeyDown}
@@ -67,13 +66,10 @@ export function StepsModal({
       <div className="relative max-h-[calc(100vh-32px)] w-full max-w-[42rem]">
         <div className={modalSurface}>
           <div className={modalHeader}>
-            <div>
-              <div className={eyebrowText}>Execution trace</div>
-              <h2 className="mt-1 flex items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
-                <Search size={18} />
-                Agent Steps
-              </h2>
-            </div>
+            <h2 className="flex items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
+              <Waypoints size={18} />
+              Execution Trace
+            </h2>
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
