@@ -6,6 +6,7 @@ import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { AttachmentImage } from "./AttachmentImage";
+import { MessageMoreActions } from "./MessageMoreActions";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
@@ -62,6 +63,7 @@ export function UserMessageBubble({
           ref={bubbleRef}
           className={cx(
             "rounded-xl border border-border-subtle bg-muted px-[14px] py-2.5",
+            !isEditingUser && "user-message-hold",
             "max-w-[min(85%,36rem)] min-w-0 max-[640px]:max-w-[92%]",
           )}
           style={bubbleEditStyle}
@@ -102,7 +104,7 @@ export function UserMessageBubble({
           <div
             className={cx(
               "mt-1.5 flex max-w-[min(85%,36rem)] flex-wrap justify-end gap-1 self-end max-[640px]:max-w-[92%]",
-              "message-actions opacity-0 transition-opacity duration-300 ease-out",
+              "user-message-actions message-actions opacity-0 transition-opacity duration-300 ease-out",
               "group-hover/msg:opacity-100 focus-within:opacity-100",
             )}
           >
@@ -119,26 +121,28 @@ export function UserMessageBubble({
                 <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
               )}
             </button>
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={() => onRequestRetryConfirm(messageIndex)}
-              className={msgIconBtn}
-              title="Retry"
-              aria-label="Retry from this message; later messages will be deleted"
-            >
-              <RotateCcw size={msgIconSize} strokeWidth={msgIconStroke} />
-            </button>
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={beginEdit}
-              className={msgIconBtn}
-              title="Edit"
-              aria-label="Edit message and retry"
-            >
-              <Pencil size={msgIconSize} strokeWidth={msgIconStroke} />
-            </button>
+            <MessageMoreActions
+              holdTargetRef={bubbleRef}
+              actions={[
+                {
+                  label: "Copy message",
+                  icon: <Copy size={18} />,
+                  onSelect: copyContent,
+                },
+                {
+                  label: "Edit message",
+                  icon: <Pencil size={18} />,
+                  onSelect: beginEdit,
+                  disabled: isBusy,
+                },
+                {
+                  label: "Retry from here",
+                  icon: <RotateCcw size={18} />,
+                  onSelect: () => onRequestRetryConfirm(messageIndex),
+                  disabled: isBusy,
+                },
+              ]}
+            />
           </div>
         ) : (
           <div className="mt-1.5 flex max-w-[min(85%,36rem)] flex-wrap justify-end gap-1 self-end max-[640px]:max-w-[92%]">

@@ -12,10 +12,12 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "check": "biome check --write .",
-    "test": "bun test --preload ./tests/setup.ts"
+    "test": "bun test --preload ./tests/setup.ts",
+    "test:browser": "bunx playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",

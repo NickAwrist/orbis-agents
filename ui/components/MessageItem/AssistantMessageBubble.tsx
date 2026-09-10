@@ -4,7 +4,6 @@ import {
   Download,
   FileText,
   FolderOpen,
-  Gauge,
   Waypoints,
 } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -14,12 +13,8 @@ import { userScopedFetch } from "../../persist/userIdentity";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { traceStepsForDisplay } from "../ExecutionTrace";
-import {
-  formatCost,
-  formatTokensPerSecond,
-  summarizeTraceMetrics,
-} from "../ExecutionTrace/traceMetrics";
 import { MarkdownMessage, extractComfyUIImageUrls } from "../MarkdownMessage";
+import { MessageMoreActions } from "./MessageMoreActions";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
@@ -45,7 +40,6 @@ export function AssistantMessageBubble({
       (attachment): attachment is WorkspaceFileAttachment =>
         attachment.kind === "file",
     ) ?? [];
-  const stats = summarizeTraceMetrics(message.steps);
   return (
     <div
       className={cx(
@@ -103,37 +97,6 @@ export function AssistantMessageBubble({
             "group-hover/msg:opacity-100 focus-within:opacity-100",
           )}
         >
-          {stats &&
-            (stats.tokensPerSecond !== undefined ||
-              stats.inputTokens !== undefined ||
-              stats.outputTokens !== undefined) && (
-              <span
-                className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-1.5 text-[0.6875rem] font-medium text-muted-foreground"
-                title={[
-                  stats.tokensPerSecond !== undefined
-                    ? `${formatTokensPerSecond(stats.tokensPerSecond)} tokens/sec`
-                    : null,
-                  stats.inputTokens !== undefined
-                    ? `${stats.inputTokens} input tokens`
-                    : null,
-                  stats.outputTokens !== undefined
-                    ? `${stats.outputTokens} output tokens`
-                    : null,
-                  stats.cost !== undefined
-                    ? `${formatCost(stats.cost)} OpenRouter cost`
-                    : null,
-                  stats.calls === 1 ? "1 LLM call" : `${stats.calls} LLM calls`,
-                ]
-                  .filter(Boolean)
-                  .join(" - ")}
-                aria-label="Generation speed"
-              >
-                <Gauge size={msgIconSize} strokeWidth={msgIconStroke} />
-                {stats.tokensPerSecond !== undefined
-                  ? `${formatTokensPerSecond(stats.tokensPerSecond)} tok/s`
-                  : `${stats.outputTokens ?? stats.inputTokens} tokens`}
-              </span>
-            )}
           <button
             type="button"
             onClick={() => void copyContent()}
@@ -164,19 +127,26 @@ export function AssistantMessageBubble({
               <Download size={msgIconSize} strokeWidth={msgIconStroke} />
             </a>
           ))}
-          {message.steps &&
-            traceStepsForDisplay(message.steps).length > 0 &&
-            onViewSteps && (
-              <button
-                type="button"
-                onClick={onViewSteps}
-                className={msgIconBtn}
-                title="View trace"
-                aria-label="View trace"
-              >
-                <Waypoints size={msgIconSize} strokeWidth={msgIconStroke} />
-              </button>
-            )}
+          <MessageMoreActions
+            actions={[
+              {
+                label: "Copy message",
+                icon: <Copy size={18} />,
+                onSelect: copyContent,
+              },
+              ...(message.steps &&
+              traceStepsForDisplay(message.steps).length > 0 &&
+              onViewSteps
+                ? [
+                    {
+                      label: "View trace",
+                      icon: <Waypoints size={18} />,
+                      onSelect: onViewSteps,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </div>
       </div>
     </div>

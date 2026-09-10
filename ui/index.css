@@ -177,26 +177,117 @@
   }
 }
 
-/* Keep message controls visible on touch devices, including hybrid laptops. */
+.markdown-code-block {
+  margin: 0.65em 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-background);
+}
+
+.markdown-code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+
+.code-copy-action {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 6px;
+}
+
+.markdown-code-single {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.markdown-code-single pre {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-action-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(248px, calc(100vw - 16px));
+  max-width: none;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(16px);
+  color: var(--color-foreground);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
+}
+
+/* Safari may mark the automatically focused action as focus-visible on touch. */
+.message-action-popover[data-keyboard="false"] button:focus {
+  outline: none;
+}
+
+.message-action-popover::backdrop {
+  background: transparent;
+}
+
+/* Touch targets stay generous without outlining each target. */
 @media (hover: none), (any-pointer: coarse) {
-  .message-actions,
-  .code-copy-action {
+  .message-actions {
     opacity: 1;
+    margin-top: 2px;
+    gap: 0;
   }
 
-  .message-action,
-  .code-copy-action {
+  .message-action {
     width: 44px;
     height: 44px;
   }
 
-  .message-action svg,
-  .code-copy-action svg {
-    width: 16px;
-    height: 16px;
+  .code-copy-action {
+    min-width: 44px;
+    min-height: 44px;
   }
 
-  .markdown-code-block pre {
-    padding-top: 60px;
+  .user-message-actions:not(:focus-within) {
+    height: 0;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  .user-message-hold {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .user-message-hold pre {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .message-holding {
+    background: var(--color-border-subtle);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .message-action-popover[open] {
+    animation: ui-slide-fade-up 150ms ease-out;
   }
 }

@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import {
   type ComponentPropsWithoutRef,
+  isValidElement,
   useEffect,
   useRef,
   useState,
@@ -69,7 +70,7 @@ async function highlightCode(
       theme: "github-dark-dimmed",
     });
     const match = /<code>([\s\S]*?)<\/code>/.exec(fullHtml);
-    return match ? match[1] : null;
+    return match?.[1] ?? null;
   } catch (err) {
     console.error("Syntax highlighting error:", err);
     return null;
@@ -85,7 +86,7 @@ function normalizeFlattenedPipeTables(markdown: string): string {
 }
 
 const codeCopyBtn =
-  "code-copy-action absolute right-2 top-2 z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-[opacity,transform,color,background-color] duration-200 ease-out opacity-0 group-hover/codeblock:opacity-100 hover:bg-muted hover:text-foreground active:scale-[0.96] focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring";
+  "code-copy-action inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring";
 
 function CodeBlock({
   className,
@@ -170,24 +171,46 @@ function MarkdownPre({
     }
   };
 
+  const codeProps = isValidElement<ComponentPropsWithoutRef<"code">>(children)
+    ? children.props
+    : undefined;
+  const source =
+    typeof codeProps?.children === "string"
+      ? codeProps.children.replace(/\n$/, "")
+      : "";
+  const singleLine = !source.includes("\n");
+  const language =
+    /language-([^ ]+)/.exec(codeProps?.className ?? "")?.[1] ?? "Code";
+  const copyButton = (
+    <button
+      type="button"
+      onClick={() => void copyBlock()}
+      className={codeCopyBtn}
+      title={copied ? "Copied" : "Copy code"}
+      aria-label={copied ? "Copied" : "Copy code"}
+    >
+      {copied ? <Check size={15} /> : <Copy size={15} />}
+      {!singleLine && <span>{copied ? "Copied" : "Copy"}</span>}
+    </button>
+  );
+
   return (
-    <div className="markdown-code-block group/codeblock relative">
-      <button
-        type="button"
-        onClick={() => void copyBlock()}
-        className={codeCopyBtn}
-        title={copied ? "Copied" : "Copy"}
-        aria-label={copied ? "Copied" : "Copy code"}
-      >
-        {copied ? (
-          <Check size={12} strokeWidth={2} />
-        ) : (
-          <Copy size={12} strokeWidth={2} />
-        )}
-      </button>
+    <div
+      className={cx(
+        "markdown-code-block",
+        singleLine && "markdown-code-single",
+      )}
+    >
+      {!singleLine && (
+        <div className="code-block-header">
+          <span>{language}</span>
+          {copyButton}
+        </div>
+      )}
       <pre ref={preRef} {...rest} className={rest.className}>
         {children}
       </pre>
+      {singleLine && copyButton}
     </div>
   );
 }

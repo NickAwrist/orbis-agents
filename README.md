@@ -165,6 +165,27 @@ Restart the backend after loading the profile because it caches the sandbox
 capability check. Then run the sandbox tests above; workspace writes and network
 isolation tests should run rather than skip.
 
+## Message UI demo and browser checks
+
+Run `bun run dev:ui` and open `/dev/messages` on the Vite server. The demo uses
+real message components with in-memory examples for single-line, multiline, and
+scrolling code. Hold a user message for its actions; tap the dots beside an assistant reply.
+Copy, edit, retry confirmation, and trace viewing work without a
+backend or model. Reload to reset the examples. The route and fixtures are
+excluded from production builds.
+
+To check the layout on a headless server:
+
+```bash
+bunx playwright install chromium --no-shell
+bun run test:browser
+```
+
+The browser checks start a temporary Vite server on port 5199, exercise mobile
+and desktop interactions, and save conversation and popover screenshots in
+`.cache/browser-results/`. No display server is needed. Files use `.pw.ts` so
+Bun's unit-test discovery does not run the Playwright suite.
+
 ## Project Structure
 
 - `src/` - backend server, agent loop, tools, and session storage
