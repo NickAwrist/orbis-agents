@@ -176,3 +176,27 @@
     font-size: 16px;
   }
 }
+
+/* Keep message controls visible on touch devices, including hybrid laptops. */
+@media (hover: none), (any-pointer: coarse) {
+  .message-actions,
+  .code-copy-action {
+    opacity: 1;
+  }
+
+  .message-action,
+  .code-copy-action {
+    width: 44px;
+    height: 44px;
+  }
+
+  .message-action svg,
+  .code-copy-action svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .markdown-code-block pre {
+    padding-top: 60px;
+  }
+}

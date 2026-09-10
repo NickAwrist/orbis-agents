@@ -85,7 +85,7 @@ function normalizeFlattenedPipeTables(markdown: string): string {
 }
 
 const codeCopyBtn =
-  "absolute right-2 top-2 z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-[opacity,transform,color,background-color] duration-200 ease-out opacity-0 group-hover/codeblock:opacity-100 hover:bg-muted hover:text-foreground active:scale-[0.96] focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring";
+  "code-copy-action absolute right-2 top-2 z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-[opacity,transform,color,background-color] duration-200 ease-out opacity-0 group-hover/codeblock:opacity-100 hover:bg-muted hover:text-foreground active:scale-[0.96] focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring";
 
 function CodeBlock({
   className,
@@ -171,7 +171,7 @@ function MarkdownPre({
   };
 
   return (
-    <div className="group/codeblock relative">
+    <div className="markdown-code-block group/codeblock relative">
       <button
         type="button"
         onClick={() => void copyBlock()}
