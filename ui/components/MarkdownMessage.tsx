@@ -1,28 +1,80 @@
 import { Check, Copy } from "lucide-react";
-import { type ComponentProps, useRef, useState } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import ReactMarkdown, {
-  MarkdownHooks,
   type Components,
   type ExtraProps,
 } from "react-markdown";
-import rehypePrettyCode from "rehype-pretty-code";
 import remarkGfm from "remark-gfm";
+import { bundledLanguages, createHighlighter } from "shiki";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import { cx } from "../styles";
 
-const prettyCodeOptions = {
-  theme: "github-dark-dimmed",
-  keepBackground: false,
-  grid: false,
-  bypassInlineCode: true,
-} as const;
+const remarkPlugins = [remarkGfm];
 
-const rehypePrettyCodePlugins: ComponentProps<
-  typeof MarkdownHooks
->["rehypePlugins"] = [[rehypePrettyCode, prettyCodeOptions]];
-const remarkPlugins: ComponentProps<typeof MarkdownHooks>["remarkPlugins"] = [
-  remarkGfm,
-];
+type HighlighterInstance = Awaited<ReturnType<typeof createHighlighter>>;
+let highlighterPromise: Promise<HighlighterInstance> | null = null;
+
+function getHighlighter(): Promise<HighlighterInstance> {
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({
+      themes: ["github-dark-dimmed"],
+      langs: [
+        "javascript",
+        "typescript",
+        "tsx",
+        "jsx",
+        "json",
+        "html",
+        "css",
+        "python",
+        "bash",
+        "sh",
+        "yaml",
+        "markdown",
+        "sql",
+        "rust",
+        "go",
+      ],
+    });
+  }
+  return highlighterPromise;
+}
+
+async function highlightCode(
+  code: string,
+  lang: string,
+): Promise<string | null> {
+  try {
+    const highlighter = await getHighlighter();
+    const cleanLang = lang.toLowerCase();
+    if (
+      cleanLang in bundledLanguages &&
+      !highlighter.getLoadedLanguages().includes(cleanLang)
+    ) {
+      await highlighter.loadLanguage(
+        cleanLang as keyof typeof bundledLanguages,
+      );
+    }
+    const targetLang = highlighter.getLoadedLanguages().includes(cleanLang)
+      ? cleanLang
+      : "text";
+
+    const fullHtml = highlighter.codeToHtml(code, {
+      lang: targetLang,
+      theme: "github-dark-dimmed",
+    });
+    const match = /<code>([\s\S]*?)<\/code>/.exec(fullHtml);
+    return match ? match[1] : null;
+  } catch (err) {
+    console.error("Syntax highlighting error:", err);
+    return null;
+  }
+}
 
 /** GFM tables need newline-separated rows; streamed/model text often uses a single line. */
 function normalizeFlattenedPipeTables(markdown: string): string {
@@ -35,10 +87,74 @@ function normalizeFlattenedPipeTables(markdown: string): string {
 const codeCopyBtn =
   "absolute right-2 top-2 z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-[opacity,transform,color,background-color] duration-200 ease-out opacity-0 group-hover/codeblock:opacity-100 hover:bg-muted hover:text-foreground active:scale-[0.96] focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring";
 
+function CodeBlock({
+  className,
+  children,
+  ...rest
+}: ComponentPropsWithoutRef<"code"> & ExtraProps) {
+  const match = /language-(\w+)/.exec(className || "");
+  const lang = match?.[1] || "text";
+  const rawCode = String(children).replace(/\n$/, "");
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void highlightCode(rawCode, lang).then((html) => {
+      if (!cancelled && html) {
+        setHighlightedHtml(html);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rawCode, lang]);
+
+  if (highlightedHtml) {
+    return (
+      <code
+        {...rest}
+        className={className}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki generated code spans
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+      />
+    );
+  }
+
+  return (
+    <code {...rest} className={className}>
+      {children}
+    </code>
+  );
+}
+
+function MarkdownCode({
+  className,
+  children,
+  ...rest
+}: ComponentPropsWithoutRef<"code"> & ExtraProps) {
+  const match = /language-(\w+)/.exec(className || "");
+  const isCodeBlock =
+    Boolean(match) || (typeof children === "string" && children.includes("\n"));
+
+  if (!isCodeBlock) {
+    return (
+      <code {...rest} className={className}>
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <CodeBlock className={className} {...rest}>
+      {children}
+    </CodeBlock>
+  );
+}
+
 function MarkdownPre({
   children,
   ...rest
-}: React.ComponentPropsWithoutRef<"pre"> & ExtraProps) {
+}: ComponentPropsWithoutRef<"pre"> & ExtraProps) {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -149,7 +265,7 @@ function MarkdownImg({
   src,
   alt,
   ...rest
-}: React.ComponentPropsWithoutRef<"img"> & ExtraProps) {
+}: ComponentPropsWithoutRef<"img"> & ExtraProps) {
   if (isComfyUIImage(src)) {
     return <ComfyUIImageCard src={src!} alt={alt} />;
   }
@@ -193,6 +309,7 @@ function convertComfyUIUrls(markdown: string): string {
 
 const markdownComponents: Components = {
   pre: MarkdownPre,
+  code: MarkdownCode,
   img: MarkdownImg,
 };
 
@@ -204,23 +321,15 @@ export function MarkdownMessage({
   className,
 }: { children: string; className?: string }) {
   const source = convertComfyUIUrls(normalizeFlattenedPipeTables(children));
+
   return (
     <div className={cx(markdownProseClass, className)}>
-      <MarkdownHooks
+      <ReactMarkdown
         remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePrettyCodePlugins}
         components={markdownComponents}
-        fallback={
-          <ReactMarkdown
-            remarkPlugins={remarkPlugins}
-            components={markdownComponents}
-          >
-            {source}
-          </ReactMarkdown>
-        }
       >
         {source}
-      </MarkdownHooks>
+      </ReactMarkdown>
     </div>
   );
 }

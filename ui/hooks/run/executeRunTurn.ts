@@ -214,9 +214,12 @@ export async function executeRunTurn(
       }
 
       const completed = await fetchSession(turnSessionId);
-      if (viewingThisTurn() && completed?.history?.length) {
-        p.setMessages(completed.history);
-        p.modelMessagesRef.current = completed.modelMessages ?? null;
+      if (viewingThisTurn()) {
+        clearStreamingUi();
+        if (completed?.history?.length) {
+          p.setMessages(completed.history);
+          p.modelMessagesRef.current = completed.modelMessages ?? null;
+        }
       }
       await p.refreshSessions();
     };
@@ -268,8 +271,8 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_done") {
           terminalEventReceived = true;
-          if (viewingThisTurn()) clearStreamingUi();
           if (ephemeral) {
+            if (viewingThisTurn()) clearStreamingUi();
             const assistantContent =
               typeof data.result === "string" ? data.result : "";
             const steps = (
@@ -300,11 +303,13 @@ export async function executeRunTurn(
             try {
               const stored = await fetchSession(turnSessionId);
               if (viewingThisTurn()) {
+                clearStreamingUi();
                 if (stored?.history?.length) p.setMessages(stored.history);
                 p.modelMessagesRef.current = stored?.modelMessages ?? null;
               }
             } catch (error) {
               console.error(error);
+              if (viewingThisTurn()) clearStreamingUi();
               const assistantContent =
                 typeof data.result === "string" ? data.result : "";
               const steps = (

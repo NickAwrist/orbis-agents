@@ -28,14 +28,18 @@ export function RunArea({
     });
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
-  const hasRenderedHistoryRef = useRef(false);
-  const animateMessageEntries = hasRenderedHistoryRef.current;
+  const initialRenderedCountRef = useRef<number | null>(null);
+
+  if (initialRenderedCountRef.current === null && messages.length > 0) {
+    initialRenderedCountRef.current = messages.length;
+  }
 
   useLayoutEffect(() => {
-    if (messages.length === 0 || hasRenderedHistoryRef.current) return;
+    if (messages.length === 0) return;
     const scrollElement = scrollRef.current;
-    if (scrollElement) scrollElement.scrollTop = scrollElement.scrollHeight;
-    hasRenderedHistoryRef.current = true;
+    if (scrollElement && scrollElement.scrollTop === 0) {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+    }
   }, [messages.length, scrollRef]);
 
   useLayoutEffect(() => {
@@ -46,6 +50,8 @@ export function RunArea({
       });
     }
   }, [footerInset, isAtBottom, scrollToBottom]);
+
+  const initialCount = initialRenderedCountRef.current ?? 0;
 
   return (
     <div className="relative h-full min-h-0 flex-1 overflow-x-hidden">
@@ -67,11 +73,10 @@ export function RunArea({
 
           {messages.map((message, index) => (
             <MessageItem
-              key={`${message.role}:${message.content.slice(0, 80)}:${message.steps?.length ?? 0}`}
+              key={`${index}:${message.role}:${message.content.slice(0, 80)}`}
               messageIndex={index}
               message={message}
-              animateEntry={animateMessageEntries}
-              animDelayMs={Math.min(index, 10) * 32}
+              animateEntry={index >= initialCount}
               onViewSteps={
                 message.steps && traceStepsForDisplay(message.steps).length > 0
                   ? () => onViewSteps(message.steps!)

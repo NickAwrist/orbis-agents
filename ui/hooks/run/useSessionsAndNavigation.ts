@@ -266,16 +266,6 @@ export function useSessionsAndNavigation(p: Args) {
       p.setEditingUserIndex(null);
       p.setTruncateConfirm(null);
       p.modelMessagesRef.current = null;
-      try {
-        const stored = await fetchSession(id);
-        if (gen !== loadGenRef.current) return;
-        if (stored?.history?.length) p.setMessages(stored.history);
-        p.modelMessagesRef.current = stored?.modelMessages ?? null;
-        setWorkspace(stored?.workspace ?? { kind: "sandbox" });
-      } catch (e) {
-        if (gen !== loadGenRef.current) return;
-        console.error(e);
-      }
 
       try {
         const statusRes = await userScopedFetch(
@@ -288,18 +278,21 @@ export function useSessionsAndNavigation(p: Args) {
         };
         if (status.active && status.requestId) {
           p.runFlightRef.current?.reconnectToStream(id, status.requestId);
-        } else {
-          // The run may have completed between the first session read and the
-          // active-run check. Read once more after the server has confirmed
-          // there is no live job so reopening the app cannot show stale,
-          // user-message-only history.
-          const completed = await fetchSession(id);
-          if (gen !== loadGenRef.current) return;
-          if (completed?.history?.length) p.setMessages(completed.history);
-          p.modelMessagesRef.current = completed?.modelMessages ?? null;
+          return;
         }
       } catch {
-        /* no active generation - normal case */
+        /* no active generation */
+      }
+
+      try {
+        const stored = await fetchSession(id);
+        if (gen !== loadGenRef.current) return;
+        if (stored?.history?.length) p.setMessages(stored.history);
+        p.modelMessagesRef.current = stored?.modelMessages ?? null;
+        setWorkspace(stored?.workspace ?? { kind: "sandbox" });
+      } catch (e) {
+        if (gen !== loadGenRef.current) return;
+        console.error(e);
       }
     },
     [
