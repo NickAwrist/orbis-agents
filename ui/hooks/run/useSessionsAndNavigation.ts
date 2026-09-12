@@ -684,9 +684,6 @@ export function useSessionsAndNavigation(p: Args) {
   const renameTarget = renameSessionId
     ? sessions.find((s) => s.id === renameSessionId)
     : null;
-  const sidebarCols = sidebarCollapsed
-    ? "72px minmax(0, 1fr)"
-    : "260px minmax(0, 1fr)";
 
   return {
     sessions,
@@ -721,7 +718,6 @@ export function useSessionsAndNavigation(p: Args) {
     goToHome,
     saveSessionTitle,
     renameTarget,
-    sidebarCols,
     requestDeleteSession,
     performDeleteSession,
   };

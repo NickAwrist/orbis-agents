@@ -216,6 +216,5 @@ export function useRunApp() {
     canAttachImages: stream.canAttachImages,
     attachImageDisabledReason: stream.attachImageDisabledReason,
     attachmentsSendReady: stream.attachmentsSendReady,
-    sidebarCols: sessions.sidebarCols,
   };
 }

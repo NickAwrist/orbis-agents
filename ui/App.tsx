@@ -87,23 +87,26 @@ export default function App() {
           app.noProviderAvailable && "pt-9",
         )}
       >
-        <div
-          className="grid h-full max-[900px]:grid-cols-1 min-[901px]:overflow-hidden min-[901px]:transition-[grid-template-columns] min-[901px]:duration-300 min-[901px]:ease-[cubic-bezier(0.22,1,0.36,1)] min-[901px]:[grid-template-columns:var(--app-sidebar-cols)]"
-          style={
-            {
-              ["--app-sidebar-cols" as string]: app.sidebarCols,
-            } as CSSProperties
-          }
-        >
+        <div className="relative flex h-full w-full overflow-hidden">
           <aside
             id="app-sidebar"
             className={cx(
-              "min-h-0 min-w-0 border-r border-border-subtle bg-background min-[901px]:w-full",
-              "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)]",
-              "max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background",
+              // Mobile <= 900px: overlay drawer
+              "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
               app.sidebarOpen
                 ? "max-[900px]:translate-x-0"
                 : "max-[900px]:-translate-x-full",
+              // Medium desktop 901px - 1319px: moves chat over so sidebar never covers chat
+              "min-[901px]:max-[1319px]:relative min-[901px]:max-[1319px]:transition-[margin-left] min-[901px]:max-[1319px]:duration-300 min-[901px]:max-[1319px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+              app.sidebarCollapsed
+                ? "min-[901px]:max-[1319px]:pointer-events-none min-[901px]:max-[1319px]:-ml-[260px] min-[901px]:max-[1319px]:border-r-0"
+                : "min-[901px]:max-[1319px]:pointer-events-auto min-[901px]:max-[1319px]:ml-0 min-[901px]:max-[1319px]:border-r min-[901px]:max-[1319px]:border-border-subtle",
+              // Wide desktop >= 1320px: screen has plenty of gutter space, slides in without moving the chat
+              "min-[1320px]:absolute min-[1320px]:inset-y-0 min-[1320px]:left-0 min-[1320px]:z-20 min-[1320px]:transition-transform min-[1320px]:duration-300 min-[1320px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+              app.sidebarCollapsed
+                ? "min-[1320px]:pointer-events-none min-[1320px]:-translate-x-full min-[1320px]:border-r-0"
+                : "min-[1320px]:pointer-events-auto min-[1320px]:translate-x-0 min-[1320px]:border-r min-[1320px]:border-border-subtle",
             )}
           >
             <Sidebar
@@ -125,7 +128,6 @@ export default function App() {
               onRenameSession={(id) => app.setRenameSessionId(id)}
               onDeleteSession={app.requestDeleteSession}
               isLoading={app.isLoading}
-              collapsed={app.sidebarCollapsed}
               onToggleCollapsed={() =>
                 app.setSidebarCollapsed((value) => !value)
               }
@@ -145,7 +147,7 @@ export default function App() {
             onClose={() => app.setSidebarOpen(false)}
           />
 
-          <main className="relative min-h-0 min-w-0 bg-background">
+          <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             {currentView === "agents" ? (
               <AgentsPage
                 defaultRunAgent={app.serverDefaultRunAgent}
@@ -178,7 +180,14 @@ export default function App() {
                 <RunAppHeader
                   activeSessionId={app.activeSessionId}
                   sidebarOpen={app.sidebarOpen}
-                  onOpenSidebar={() => app.setSidebarOpen(true)}
+                  sidebarCollapsed={app.sidebarCollapsed}
+                  onOpenSidebar={() => {
+                    if (window.innerWidth <= 900) {
+                      app.setSidebarOpen(true);
+                    } else {
+                      app.setSidebarCollapsed(false);
+                    }
+                  }}
                   ollamaModels={app.ollamaModels}
                   ollamaConnected={app.ollamaConnected}
                   modelsLoadError={app.modelsLoadError}

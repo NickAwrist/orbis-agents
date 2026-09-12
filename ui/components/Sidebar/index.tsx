@@ -1,8 +1,7 @@
 import {
-  ChevronLeft,
-  ChevronRight,
   EyeOff,
   Loader2,
+  PanelLeft,
   Plus,
   Settings,
   SlidersHorizontal,
@@ -21,7 +20,6 @@ export function Sidebar({
   onRenameSession,
   onDeleteSession,
   isLoading,
-  collapsed,
   onToggleCollapsed,
   onCustomization,
   onSettings,
@@ -32,53 +30,46 @@ export function Sidebar({
   } | null>(null);
 
   return (
-    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3 pt-3">
+    <div className="grid h-full w-[260px] min-w-[260px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3 pt-3">
       <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
         <div className="min-w-0">
-          {!collapsed && (
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[0.9375rem] font-semibold text-foreground">
-                Recent
-              </span>
-            </div>
-          )}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[0.9375rem] font-semibold text-foreground">
+              Recent
+            </span>
+          </div>
         </div>
         <button
           type="button"
-          className={cx(iconButton, "max-[900px]:hidden")}
+          className={cx(iconButton, "shrink-0 max-[900px]:hidden")}
           onClick={onToggleCollapsed}
-          aria-label="Toggle sidebar width"
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <PanelLeft size={16} />
         </button>
       </div>
 
       <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-        <div className={cx("flex gap-2", collapsed ? "flex-col" : "flex-row")}>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onNewSession}
             disabled={isLoading}
-            className={cx(
-              "inline-flex items-center justify-center gap-2 rounded-lg border border-border-subtle bg-surface px-2.5 py-2 text-[0.8125rem] font-semibold text-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted active:scale-[0.99] active:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100",
-              collapsed ? "w-full" : "flex-1",
-            )}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle bg-surface px-2.5 py-2 text-[0.8125rem] font-semibold text-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted active:scale-[0.99] active:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
           >
             {isLoading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <Plus size={16} />
             )}
-            {!collapsed && <span>New chat</span>}
+            <span>New chat</span>
           </button>
           <button
             type="button"
             onClick={onNewEphemeralSession}
             title="Ephemeral chat - not saved"
-            className={cx(
-              "inline-flex items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[0.8125rem] font-semibold text-amber-400 transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-amber-500/35 hover:bg-amber-500/10 active:scale-[0.99] active:bg-amber-500/15",
-              collapsed ? "w-full shrink-0" : "shrink-0",
-            )}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[0.8125rem] font-semibold text-amber-400 transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-amber-500/35 hover:bg-amber-500/10 active:scale-[0.99] active:bg-amber-500/15"
           >
             <EyeOff size={16} />
           </button>
@@ -88,18 +79,12 @@ export function Sidebar({
           className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto border-t border-border-subtle pt-1"
           onScroll={() => setOpenMenu(null)}
         >
-          {/* Fixed width matches expanded column minus px-2.5 so titles don't reflow during width animation */}
-          <div
-            className={
-              collapsed ? undefined : "w-[calc(260px-1.25rem)] shrink-0"
-            }
-          >
+          <div className="w-[calc(260px-1.25rem)] min-w-[calc(260px-1.25rem)] shrink-0">
             {sessions.map((session) => (
               <SessionListItem
                 key={session.id}
                 session={session}
                 active={session.id === activeSessionId}
-                collapsed={collapsed}
                 openMenu={openMenu}
                 setOpenMenu={setOpenMenu}
                 onSelectSession={onSelectSession}
@@ -110,9 +95,7 @@ export function Sidebar({
 
             {sessions.length === 0 && (
               <div className="mt-1 border-t border-border-subtle px-2.5 py-3 text-[0.8125rem] leading-[1.5] text-muted-foreground">
-                {!collapsed
-                  ? "No chats yet. Start one from the button above."
-                  : "Empty"}
+                No chats yet. Start one from the button above.
               </div>
             )}
           </div>
@@ -123,18 +106,18 @@ export function Sidebar({
         <button
           type="button"
           onClick={onCustomization}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+          className="flex w-full items-center justify-start gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
         >
-          <SlidersHorizontal size={15} />
-          {!collapsed && <span>Customization</span>}
+          <SlidersHorizontal size={15} className="shrink-0" />
+          <span>Customization</span>
         </button>
         <button
           type="button"
           onClick={onSettings}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+          className="flex w-full items-center justify-start gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
         >
-          <Settings size={15} />
-          {!collapsed && <span>Settings</span>}
+          <Settings size={15} className="shrink-0" />
+          <span>Settings</span>
         </button>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { ModelSelectBar } from "./ModelSelectBar";
 type RunAppHeaderProps = {
   activeSessionId: string | null;
   sidebarOpen: boolean;
+  sidebarCollapsed?: boolean;
   onOpenSidebar: () => void;
   ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
@@ -31,6 +32,7 @@ type RunAppHeaderProps = {
 export function RunAppHeader({
   activeSessionId,
   sidebarOpen,
+  sidebarCollapsed = false,
   onOpenSidebar,
   ollamaModels,
   ollamaConnected,
@@ -61,6 +63,8 @@ export function RunAppHeader({
     <div
       className={cx(
         "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between gap-3 px-4 max-[640px]:h-[52px] max-[640px]:px-3.5",
+        "min-[1320px]:transition-[padding-left] min-[1320px]:duration-300 min-[1320px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+        !sidebarCollapsed && "min-[1320px]:pl-[calc(260px+1rem)]",
         activeSessionId &&
           "border-b border-border-subtle/60 bg-background/[0.16] shadow-[0_1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125",
       )}
@@ -69,9 +73,13 @@ export function RunAppHeader({
         <button
           type="button"
           onClick={onOpenSidebar}
-          className={cx(iconButton, "shrink-0 min-[901px]:hidden")}
-          title="Open chats"
-          aria-expanded={sidebarOpen}
+          className={cx(
+            iconButton,
+            "shrink-0",
+            !sidebarCollapsed && "min-[901px]:hidden",
+          )}
+          title={sidebarCollapsed ? "Expand sidebar" : "Open chats"}
+          aria-expanded={sidebarOpen || !sidebarCollapsed}
           aria-controls="app-sidebar"
         >
           <PanelLeft size={18} />
@@ -118,10 +126,10 @@ export function RunAppHeader({
             type="button"
             onClick={onToggleDebug}
             className={cx(iconButton)}
-            title="Debug"
-            aria-pressed={debugOpen}
+            title={debugOpen ? "Hide debug inspector" : "Debug inspector"}
+            aria-label={debugOpen ? "Hide debug inspector" : "Debug inspector"}
           >
-            {debugOpen ? <X size={18} /> : <Bug size={18} />}
+            <Bug size={18} />
           </button>
         )}
       </div>

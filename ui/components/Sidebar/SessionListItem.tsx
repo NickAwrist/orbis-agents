@@ -6,7 +6,6 @@ import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 type Props = {
   session: SessionSummary;
   active: boolean;
-  collapsed: boolean;
   openMenu: { id: string; anchorRect: DOMRect } | null;
   setOpenMenu: (menu: { id: string; anchorRect: DOMRect } | null) => void;
   onSelectSession: (id: string) => void;
@@ -17,7 +16,6 @@ type Props = {
 export function SessionListItem({
   session,
   active,
-  collapsed,
   openMenu,
   setOpenMenu,
   onSelectSession,
@@ -25,30 +23,6 @@ export function SessionListItem({
   onDeleteSession,
 }: Props) {
   const menuOpen = openMenu?.id === session.id;
-
-  if (collapsed) {
-    return (
-      <button
-        type="button"
-        onClick={() => onSelectSession(session.id)}
-        className={cx(
-          "relative flex w-full justify-center rounded-md px-2 py-2 text-left transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98]",
-          active &&
-            "before:pointer-events-none before:absolute before:left-1 before:top-1/2 before:h-5 before:w-px before:-translate-y-1/2 before:rounded-full before:bg-foreground/45 before:content-['']",
-        )}
-        title={session.preview || "Chat"}
-      >
-        <div className="min-w-0">
-          <div
-            className={cx(
-              "size-1.5 rounded-full bg-muted-foreground/55 transition-[background-color,opacity] duration-150",
-              active && "bg-foreground/50",
-            )}
-          />
-        </div>
-      </button>
-    );
-  }
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_32px] items-stretch border-b border-border-subtle last:border-b-0">
@@ -59,20 +33,20 @@ export function SessionListItem({
           onSelectSession(session.id);
         }}
         className={cx(
-          "relative block w-full rounded-none border-l-2 border-transparent bg-transparent px-2 py-2.5 pr-1 text-left transition-[color,background-color,border-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.995]",
+          "relative block w-full rounded-none border-l-2 border-transparent bg-transparent px-2 py-2 pr-1 text-left transition-[color,background-color,border-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.995]",
           active && "border-l-foreground/35 bg-muted/20 hover:bg-muted/35",
         )}
       >
         <div className="min-w-0">
-          <div className="overflow-hidden text-[0.8125rem] leading-[1.4] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+          <div className="overflow-hidden text-[0.8125rem] leading-[1.35] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
             {session.preview || "New chat"}
           </div>
-          <div className="mt-1 text-[0.6875rem] text-muted-foreground">
+          <div className="mt-0.5 text-[0.6875rem] text-muted-foreground">
             {new Date(session.updatedAt).toLocaleString()}
           </div>
         </div>
       </button>
-      <div className="relative flex items-start justify-center pr-0.5 pt-2">
+      <div className="relative flex items-start justify-center pr-0.5 pt-1.5">
         <button
           type="button"
           className={cx(
