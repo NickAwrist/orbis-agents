@@ -7,3 +7,5 @@ export type RunFlightApi = {
   hydrateStreaming: () => void;
   reconnectToStream: (sessionId: string, requestId: string) => void;
 };
+
+export type SessionLoadState = "loading" | "loaded" | "empty" | "error";

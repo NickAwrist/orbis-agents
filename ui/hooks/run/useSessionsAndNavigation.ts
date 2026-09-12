@@ -30,7 +30,7 @@ import type {
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
-import type { RunFlightApi } from "./runTypes";
+import type { RunFlightApi, SessionLoadState } from "./runTypes";
 import { effectiveDefaultRunModel } from "./sessionUtils";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
@@ -87,6 +87,13 @@ export function useSessionsAndNavigation(p: Args) {
   );
   const [isEphemeral, setIsEphemeral] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionLoadState, setSessionLoadState] =
+    useState<SessionLoadState>("loading");
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [runStatusState, setRunStatusState] = useState<
+    "pending" | "resolved" | "error"
+  >("pending");
+  const statusControllerRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
@@ -102,6 +109,10 @@ export function useSessionsAndNavigation(p: Args) {
     kind: "sandbox",
   });
 
+  const [sessionModel, setSessionModel] = useState<string | null>(null);
+
+  const messagesRef = useRef(p.messages);
+  messagesRef.current = p.messages;
   const loadGenRef = useRef(0);
   const restoreDoneRef = useRef(false);
   const returningToSandboxRef = useRef(false);
@@ -137,31 +148,20 @@ export function useSessionsAndNavigation(p: Args) {
       setSelectedModel(next);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const stored = await fetchSession(activeSessionId);
-      if (cancelled) return;
-      const preference =
-        stored?.model?.trim() ||
-        effectiveDefaultRunModel(
-          p.userSettingsRef.current,
-          p.serverDefaultModel,
-        );
-      const names = new Set(p.ollamaModels.map((m) => m.id));
-      let next = preference;
-      if (names.size > 0 && !names.has(next)) {
-        next = names.has(p.serverDefaultModel)
-          ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.id ?? next);
-      }
-      setSelectedModel(next);
-      setWorkspace(stored?.workspace ?? { kind: "sandbox" });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const preference =
+      sessionModel?.trim() ||
+      effectiveDefaultRunModel(p.userSettingsRef.current, p.serverDefaultModel);
+    const names = new Set(p.ollamaModels.map((m) => m.id));
+    let next = preference;
+    if (names.size > 0 && !names.has(next)) {
+      next = names.has(p.serverDefaultModel)
+        ? p.serverDefaultModel
+        : (p.ollamaModels[0]?.id ?? next);
+    }
+    setSelectedModel(next);
   }, [
     activeSessionId,
+    sessionModel,
     isEphemeral,
     p.ollamaModels,
     p.serverDefaultModel,
@@ -224,6 +224,7 @@ export function useSessionsAndNavigation(p: Args) {
   const handleModelChange = useCallback(
     async (model: string) => {
       setSelectedModel(model);
+      setSessionModel(model);
       if (p.isEphemeralRef.current) return;
       const sid = p.activeSessionIdRef.current;
       if (sid) {
@@ -238,64 +239,115 @@ export function useSessionsAndNavigation(p: Args) {
     [p.activeSessionIdRef, p.isEphemeralRef, refreshSessions],
   );
 
+  const canDiscardEmptySession =
+    p.messages.length === 0 &&
+    sessionLoadState === "empty" &&
+    runStatusState === "resolved" &&
+    !p.runFlightRef.current?.shouldPreserveMessages(activeSessionId ?? "");
+
   const loadSession = useCallback(
     async (id: string) => {
       const gen = ++loadGenRef.current;
+      statusControllerRef.current?.abort();
+      const controller = new AbortController();
+      statusControllerRef.current = controller;
+      const previousId = p.activeSessionIdRef.current;
+      p.activeSessionIdRef.current = id;
       setActiveSessionId(id);
+      setSessionLoadState("loading");
+      setSessionError(null);
+      setRunStatusState("pending");
       const cf = p.runFlightRef.current;
-      if (cf?.shouldPreserveMessages(id)) {
-        p.resetStreamingUi();
-        p.setMessages(cf.getTurnSnapshot() ?? []);
-        p.setEditingUserIndex(null);
-        p.setTruncateConfirm(null);
+      const preserve = cf?.shouldPreserveMessages(id) ?? false;
+      const initialHistory = preserve
+        ? (cf?.getTurnSnapshot() ??
+          (previousId === id ? messagesRef.current : []))
+        : [];
+      const preserveHistory = preserve && initialHistory.length > 0;
+      p.setMessages(initialHistory);
+      // A local stream owns its buffers and may already have newer content.
+      if (preserve) cf?.hydrateStreaming();
+      else p.resetStreamingUi();
+      p.setEditingUserIndex(null);
+      p.setTruncateConfirm(null);
+      const initialModelMessages = preserve ? p.modelMessagesRef.current : null;
+      p.modelMessagesRef.current = initialModelMessages;
+
+      const historyRequest = (async () => {
         try {
           const stored = await fetchSession(id);
           if (gen !== loadGenRef.current) return;
-          p.modelMessagesRef.current = stored?.modelMessages ?? null;
-          setWorkspace(stored?.workspace ?? { kind: "sandbox" });
-        } catch (e) {
+          if (!stored) throw new Error("Conversation not found.");
+          setSessionModel(stored.model ?? null);
+          setWorkspace(stored.workspace ?? { kind: "sandbox" });
+          if (!preserveHistory) {
+            // Streaming completion or another writer may have updated history
+            // while this snapshot was in flight. Never replace that newer state.
+            p.setMessages((current) =>
+              gen === loadGenRef.current && current === initialHistory
+                ? stored.history
+                : current,
+            );
+            if (p.modelMessagesRef.current === initialModelMessages) {
+              p.modelMessagesRef.current = stored.modelMessages ?? null;
+            }
+          }
+          setSessionLoadState(
+            stored.history.length > 0 || initialHistory.length > 0
+              ? "loaded"
+              : "empty",
+          );
+        } catch (error) {
           if (gen !== loadGenRef.current) return;
-          console.error(e);
+          setSessionError(
+            error instanceof Error
+              ? error.message
+              : "Could not load conversation.",
+          );
+          setSessionLoadState("error");
         }
-        cf.hydrateStreaming();
-        return;
-      }
+      })();
 
-      p.setMessages([]);
-      p.resetStreamingUi();
-      p.setEditingUserIndex(null);
-      p.setTruncateConfirm(null);
-      p.modelMessagesRef.current = null;
-
-      try {
-        const statusRes = await userScopedFetch(
-          `/api/runs/active/${encodeURIComponent(id)}`,
-        );
-        if (gen !== loadGenRef.current) return;
-        const status = (await statusRes.json()) as {
-          active?: boolean;
-          requestId?: string;
-        };
-        if (status.active && status.requestId) {
-          p.runFlightRef.current?.reconnectToStream(id, status.requestId);
-          return;
+      // Run discovery controls sending and stream reconciliation, never history display.
+      void (async () => {
+        try {
+          const response = await userScopedFetch(
+            `/api/runs/active/${encodeURIComponent(id)}`,
+            { signal: controller.signal },
+          );
+          if (!response.ok) throw new Error("Could not check the active run.");
+          const status = (await response.json()) as {
+            active?: boolean;
+            requestId?: string;
+          };
+          if (
+            typeof status.active !== "boolean" ||
+            (status.active && !status.requestId)
+          )
+            throw new Error("Invalid run status.");
+          if (gen !== loadGenRef.current) return;
+          if (
+            status.active &&
+            status.requestId &&
+            !p.runFlightRef.current?.shouldPreserveMessages(id)
+          ) {
+            p.runFlightRef.current?.reconnectToStream(id, status.requestId);
+          }
+          setRunStatusState("resolved");
+        } catch (error) {
+          if (gen !== loadGenRef.current || controller.signal.aborted) return;
+          setRunStatusState("error");
+          setSessionError(
+            error instanceof Error
+              ? error.message
+              : "Could not check the active run.",
+          );
         }
-      } catch {
-        /* no active generation */
-      }
-
-      try {
-        const stored = await fetchSession(id);
-        if (gen !== loadGenRef.current) return;
-        if (stored?.history?.length) p.setMessages(stored.history);
-        p.modelMessagesRef.current = stored?.modelMessages ?? null;
-        setWorkspace(stored?.workspace ?? { kind: "sandbox" });
-      } catch (e) {
-        if (gen !== loadGenRef.current) return;
-        console.error(e);
-      }
+      })();
+      await historyRequest;
     },
     [
+      p.activeSessionIdRef,
       p.runFlightRef,
       p.setMessages,
       p.resetStreamingUi,
@@ -306,34 +358,21 @@ export function useSessionsAndNavigation(p: Args) {
   );
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        await refreshSessions();
-        if (cancelled) return;
-        const restoredId =
-          sessionIdFromUrl() ||
-          sessionStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
-        if (restoredId) {
-          const stored = await fetchSession(restoredId);
-          if (cancelled) return;
-          if (stored) {
-            await loadSession(restoredId);
-            replaceSessionUrl(restoredId);
-          } else {
-            setActiveSessionId(null);
-            sessionStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
-            replaceSessionUrl(null);
-          }
-        }
-      } finally {
-        if (!cancelled) restoreDoneRef.current = true;
-      }
-    })();
+    void refreshSessions();
+    const restoredId =
+      sessionIdFromUrl() || sessionStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+    if (restoredId) void loadSession(restoredId);
+    restoreDoneRef.current = true;
     return () => {
-      cancelled = true;
+      loadGenRef.current++;
+      statusControllerRef.current?.abort();
     };
   }, [refreshSessions, loadSession]);
+
+  const retrySessionLoad = useCallback(() => {
+    const id = p.activeSessionIdRef.current;
+    if (id) void loadSession(id);
+  }, [loadSession, p.activeSessionIdRef]);
 
   useEffect(() => {
     if (activeSessionId && !isEphemeral) {
@@ -361,15 +400,10 @@ export function useSessionsAndNavigation(p: Args) {
       const curId = p.activeSessionIdRef.current;
       const wasEphemeral = p.isEphemeralRef.current;
       if (curId && wasEphemeral) {
-        await deleteTemporarySessionApi(curId).catch(() => {});
+        void deleteTemporarySessionApi(curId).catch(() => {});
       }
-      if (curId && curId !== id && !wasEphemeral && p.messages.length === 0) {
-        try {
-          await deleteSessionApi(curId);
-        } catch (e) {
-          console.error(e);
-        }
-        await refreshSessions();
+      if (curId && curId !== id && !wasEphemeral && canDiscardEmptySession) {
+        void deleteSessionApi(curId).then(refreshSessions).catch(console.error);
       }
       setIsEphemeral(false);
       pushSessionUrl(id);
@@ -379,7 +413,7 @@ export function useSessionsAndNavigation(p: Args) {
       loadSession,
       p.activeSessionIdRef,
       p.isEphemeralRef,
-      p.messages.length,
+      canDiscardEmptySession,
       refreshSessions,
     ],
   );
@@ -391,7 +425,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (curId && p.isEphemeralRef.current) {
         await deleteTemporarySessionApi(curId);
       }
-      if (curId && !p.isEphemeralRef.current && p.messages.length === 0) {
+      if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
         try {
           await deleteSessionApi(curId);
         } catch (e) {
@@ -427,7 +461,7 @@ export function useSessionsAndNavigation(p: Args) {
     loadSession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
-    p.messages.length,
+    canDiscardEmptySession,
     p.ollamaModels,
     p.serverDefaultRunAgent,
     p.serverDefaultModel,
@@ -437,7 +471,7 @@ export function useSessionsAndNavigation(p: Args) {
 
   const createEphemeralSession = useCallback(async () => {
     const curId = p.activeSessionIdRef.current;
-    if (curId && !p.isEphemeralRef.current && p.messages.length === 0) {
+    if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
       try {
         await deleteSessionApi(curId);
       } catch (e) {
@@ -449,6 +483,11 @@ export function useSessionsAndNavigation(p: Args) {
       await deleteTemporarySessionApi(curId).catch(() => {});
     }
     const { id } = await createTemporarySessionApi();
+    loadGenRef.current++;
+    statusControllerRef.current?.abort();
+    setSessionLoadState("empty");
+    setRunStatusState("resolved");
+    setSessionError(null);
     setActiveSessionId(id);
     p.setMessages([]);
     p.resetStreamingUi();
@@ -463,7 +502,7 @@ export function useSessionsAndNavigation(p: Args) {
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
-    p.messages.length,
+    canDiscardEmptySession,
     p.modelMessagesRef,
     p.serverDefaultRunAgent,
     p.setMessages,
@@ -493,6 +532,9 @@ export function useSessionsAndNavigation(p: Args) {
         setIsEphemeral(false);
         void loadSession(urlId);
       } else {
+        loadGenRef.current++;
+        statusControllerRef.current?.abort();
+        p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setIsEphemeral(false);
         setWorkspace({ kind: "sandbox" });
@@ -515,11 +557,13 @@ export function useSessionsAndNavigation(p: Args) {
   ]);
 
   const goToHome = useCallback(async () => {
+    loadGenRef.current++;
+    statusControllerRef.current?.abort();
     const curId = p.activeSessionIdRef.current;
     if (curId && p.isEphemeralRef.current) {
       await deleteTemporarySessionApi(curId).catch(() => {});
     }
-    if (curId && !p.isEphemeralRef.current && p.messages.length === 0) {
+    if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
       try {
         await deleteSessionApi(curId);
       } catch (e) {
@@ -543,7 +587,7 @@ export function useSessionsAndNavigation(p: Args) {
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
-    p.messages.length,
+    canDiscardEmptySession,
     p.serverDefaultRunAgent,
     p.setDebugData,
     p.setDebugOpen,
@@ -563,6 +607,9 @@ export function useSessionsAndNavigation(p: Args) {
         console.error(e);
       }
       if (activeSessionId === id) {
+        loadGenRef.current++;
+        statusControllerRef.current?.abort();
+        p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setWorkspace({ kind: "sandbox" });
         p.setMessages([]);
@@ -588,7 +635,7 @@ export function useSessionsAndNavigation(p: Args) {
   const requestDeleteSession = useCallback(
     async (id: string) => {
       if (id === activeSessionId) {
-        if (p.messages.length === 0) {
+        if (canDiscardEmptySession) {
           await dropSessionFromApp(id);
           return;
         }
@@ -607,7 +654,7 @@ export function useSessionsAndNavigation(p: Args) {
       }
       setPendingDeleteSessionId(id);
     },
-    [activeSessionId, dropSessionFromApp, p.messages.length],
+    [activeSessionId, dropSessionFromApp, canDiscardEmptySession],
   );
 
   const performDeleteSession = useCallback(async () => {
@@ -646,6 +693,12 @@ export function useSessionsAndNavigation(p: Args) {
     activeSessionId,
     isEphemeral,
     isLoading,
+    sessionLoadState,
+    sessionError,
+    retrySessionLoad,
+    sessionSendReady:
+      (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
+      runStatusState === "resolved",
     sidebarOpen,
     setSidebarOpen,
     sidebarCollapsed,
