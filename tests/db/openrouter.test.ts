@@ -1,113 +1,135 @@
 import "../setup";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import {
-  createOpenRouterModel,
-  deleteOpenRouterModel,
-  getOpenRouterApiKey,
-  listOpenRouterModels,
-  setOpenRouterApiKey,
-} from "../../src/db";
+import { Database } from "bun:sqlite";
+import { describe, expect, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
-import { seedDefaultOpenRouterModels } from "../../src/db/openrouter";
+import { migrateOpenRouterCatalog } from "../../src/db/migrations";
+import {
+  applyPublisherSubscriptions,
+  listModelFavorites,
+  listOpenRouterModels,
+  listOpenRouterPublishers,
+  refreshRegistryMetadata,
+  removeOpenRouterPublisher,
+  setModelFavorite,
+  setOpenRouterModelEnabled,
+  setPublisherSubscription,
+  trackOpenRouterPublisher,
+} from "../../src/db/openrouter";
+import {
+  getOpenRouterApiKey,
+  setOpenRouterApiKey,
+} from "../../src/db/settings";
+import { normalizeCatalog } from "../../src/openRouterModels";
 
-describe("OpenRouter Database Integration", () => {
-  beforeEach(() => {
-    const db = getDb();
-    // Clear openrouter_models and app_settings to ensure a clean state
-    db.run("DELETE FROM openrouter_models");
-    db.run("DELETE FROM app_settings");
+const model = (route = "openai/test", created = 101) =>
+  normalizeCatalog({
+    data: [
+      {
+        id: route,
+        name: "Test",
+        created,
+        architecture: {
+          input_modalities: ["text"],
+          output_modalities: ["text"],
+        },
+      },
+    ],
+  })[0]!;
+
+describe("OpenRouter preferences", () => {
+  test("fresh database has common publishers and no selections", () => {
+    expect(listOpenRouterPublishers()).toHaveLength(9);
+    expect(listOpenRouterModels()).toEqual([]);
   });
-
-  afterEach(() => {
-    const db = getDb();
-    db.run("DELETE FROM openrouter_models");
-    db.run("DELETE FROM app_settings");
-    seedDefaultOpenRouterModels(db);
-  });
-
-  test("should seed default models transactionally", () => {
-    const db = getDb();
-    // Seed default models again since we cleared the table
-    seedDefaultOpenRouterModels(db);
-
-    const models = listOpenRouterModels();
-    expect(models).toHaveLength(7);
-
-    const routes = models.map((m) => m.route);
-    expect(routes).toContain("openai/gpt-5.6-terra");
-    expect(routes).toContain("openai/gpt-5.6-luna");
-    expect(routes).toContain("anthropic/claude-opus-4.8");
-    expect(routes).toContain("anthropic/claude-sonnet-5");
-    expect(routes).toContain("anthropic/claude-fable-5");
-    expect(routes).toContain("google/gemini-3.5-flash");
-    expect(routes).toContain("google/gemini-3.1-pro-preview");
-
-    // Re-seeding does not recreate a model the user deliberately removed.
-    deleteOpenRouterModel(models[0]!.id);
-    seedDefaultOpenRouterModels(db);
-    const modelsAfterReSeed = listOpenRouterModels();
-    expect(modelsAfterReSeed).toHaveLength(6);
-  });
-
-  test("should support CRUD operations on OpenRouter models", () => {
-    // 1. Initially empty (cleared in beforeEach)
-    let models = listOpenRouterModels();
-    expect(models).toHaveLength(0);
-
-    // 2. Create a model using object style
-    const createdObj = createOpenRouterModel({
-      name: "DeepSeek V3",
-      route: "deepseek/deepseek-chat",
-      ai_lab: "DeepSeek",
+  test("migration replaces legacy registry once and preserves unrelated data", () => {
+    const db = new Database(":memory:");
+    db.run(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT);
+      INSERT INTO app_settings VALUES ('openrouter_api_key', 'secret'), ('openrouter_models_seeded_v3', '1'), ('other', 'keep');
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, model TEXT);
+      INSERT INTO sessions VALUES ('session', 'openrouter:openai/old');
+      CREATE TABLE openrouter_models (id INTEGER PRIMARY KEY, route TEXT, name TEXT, ai_lab TEXT);
+      INSERT INTO openrouter_models VALUES (1, 'openai/old', 'Old', 'OpenAI');`);
+    migrateOpenRouterCatalog(db);
+    expect(db.query("SELECT * FROM openrouter_models").all()).toEqual([]);
+    expect(db.query("SELECT * FROM app_settings ORDER BY key").all()).toEqual([
+      { key: "openrouter_api_key", value: "secret" },
+      { key: "other", value: "keep" },
+    ]);
+    db.run(
+      "INSERT INTO openrouter_models VALUES ('openai/new', 'openai', 'New', 0, 100)",
+    );
+    db.run("INSERT INTO model_favorites VALUES ('ollama', 'local')");
+    migrateOpenRouterCatalog(db);
+    expect(db.query("SELECT enabled FROM openrouter_models").get()).toEqual({
+      enabled: 0,
     });
-    expect(createdObj.id).toBeInteger();
-    expect(createdObj.name).toBe("DeepSeek V3");
-    expect(createdObj.route).toBe("deepseek/deepseek-chat");
-    expect(createdObj.ai_lab).toBe("DeepSeek");
-
-    // 3. Create a second model
-    const createdPos = createOpenRouterModel({
-      name: "Llama 3 70B Instruct",
-      route: "meta-llama/llama-3-70b-instruct",
-      ai_lab: "Meta",
+    expect(db.query("SELECT * FROM model_favorites").all()).toHaveLength(1);
+    expect(db.query("SELECT model FROM sessions").get()).toEqual({
+      model: "openrouter:openai/old",
     });
-    expect(createdPos.id).toBeInteger();
-    expect(createdPos.name).toBe("Llama 3 70B Instruct");
-    expect(createdPos.route).toBe("meta-llama/llama-3-70b-instruct");
-    expect(createdPos.ai_lab).toBe("Meta");
-
-    // 4. List models (should be ordered by name ASC: DeepSeek V3, Llama 3 70B Instruct)
-    models = listOpenRouterModels();
-    expect(models).toHaveLength(2);
-    expect(models[0]?.name).toBe("DeepSeek V3");
-    expect(models[1]?.name).toBe("Llama 3 70B Instruct");
-
-    // 5. Delete a model
-    const deleteResult = deleteOpenRouterModel(createdObj.id);
-    expect(deleteResult).toBeTrue();
-
-    // 6. List models after deletion
-    models = listOpenRouterModels();
-    expect(models).toHaveLength(1);
-    expect(models[0]?.name).toBe("Llama 3 70B Instruct");
-
-    // 7. Delete non-existing model
-    const deleteNonExisting = deleteOpenRouterModel(99999);
-    expect(deleteNonExisting).toBeFalse();
+    db.close();
   });
-
-  test("should set and get OpenRouter API key with env fallback", () => {
-    expect(getOpenRouterApiKey()).toBe("");
-
-    // 2. Set API key in settings
-    const testKey = "sk-or-test-key-12345";
-    setOpenRouterApiKey(testKey);
-
-    // 3. Retrieve API key (should now get the value from database settings)
-    expect(getOpenRouterApiKey()).toBe(testKey);
-
-    // 4. Setting empty/whitespace key
-    setOpenRouterApiKey("   ");
-    expect(getOpenRouterApiKey()).toBe("");
+  test("subscription transitions preserve timestamps and never backfill existing additions", () => {
+    setPublisherSubscription("openai", true, 100);
+    setPublisherSubscription("openai", true, 200);
+    expect(
+      listOpenRouterPublishers().find((p) => p.id === "openai")?.subscribed_at,
+    ).toBe(100);
+    applyPublisherSubscriptions([model("openai/old", 100), model()]);
+    expect(listOpenRouterModels().map((m) => m.route)).toEqual(["openai/test"]);
+    setPublisherSubscription("openai", false, 250);
+    expect(listOpenRouterModels()).toHaveLength(1);
+    setPublisherSubscription("openai", true, 300);
+    expect(
+      listOpenRouterPublishers().find((p) => p.id === "openai")?.subscribed_at,
+    ).toBe(300);
+  });
+  test("disabled choices survive repeated sync and metadata updates; batch is excluded", () => {
+    setPublisherSubscription("openai", true, 100);
+    setOpenRouterModelEnabled(model(), false);
+    const additions = [model(), model("openai/new"), model("openai/new:batch")];
+    applyPublisherSubscriptions(additions);
+    applyPublisherSubscriptions(additions);
+    refreshRegistryMetadata([{ ...model(), name: "Updated" }]);
+    expect(listOpenRouterModels()).toHaveLength(2);
+    expect(
+      listOpenRouterModels().find((m) => m.route === "openai/test"),
+    ).toMatchObject({ enabled: 0, name: "Updated" });
+  });
+  test("removing a publisher stops auto-enable and preserves opt-outs and favorites across startup", () => {
+    setOpenRouterModelEnabled(model(), true);
+    setModelFavorite("openrouter", "openai/test", true);
+    setPublisherSubscription("openai", true, 100);
+    expect(removeOpenRouterPublisher("openai")).toBeTrue();
+    applyPublisherSubscriptions([model("openai/new")]);
+    expect(listOpenRouterModels()).toHaveLength(1);
+    expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+    expect(listModelFavorites()).toHaveLength(1);
+    migrateOpenRouterCatalog(getDb());
+    expect(
+      listOpenRouterPublishers().some((p) => p.id === "openai"),
+    ).toBeFalse();
+    trackOpenRouterPublisher("openai");
+    expect(
+      listOpenRouterPublishers().find((p) => p.id === "openai")?.subscribed,
+    ).toBe(0);
+    expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+  });
+  test("favorites persist independently of activation and execution provider", () => {
+    setModelFavorite("openrouter", "openai/test", true);
+    setModelFavorite("ollama", "openai/test", true);
+    setModelFavorite("ollama", "openai/test", true);
+    expect(listOpenRouterModels()).toEqual([]);
+    expect(listModelFavorites()).toHaveLength(2);
+    setOpenRouterModelEnabled(model(), false);
+    expect(listModelFavorites()).toHaveLength(2);
+    setModelFavorite("openrouter", "openai/test", false);
+    expect(listModelFavorites()).toEqual([
+      { provider: "ollama", model_id: "openai/test" },
+    ]);
+    migrateOpenRouterCatalog(getDb());
+    expect(listModelFavorites()).toHaveLength(1);
+    setOpenRouterApiKey("secret");
+    expect(getOpenRouterApiKey()).toBe("secret");
   });
 });

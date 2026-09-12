@@ -3,7 +3,6 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DB_PATH } from "./constants";
 import { runMigrations } from "./migrations";
-import { seedDefaultOpenRouterModels } from "./openrouter";
 
 let dbSingleton: Database | null = null;
 
@@ -109,17 +108,7 @@ export function getDb(): Database {
     );
   `);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS openrouter_models (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      route TEXT UNIQUE NOT NULL,
-      ai_lab TEXT NOT NULL
-    );
-  `);
-
   runMigrations(db);
-  seedDefaultOpenRouterModels(db);
 
   dbSingleton = db;
   return db;

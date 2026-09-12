@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search, Star } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -7,8 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { compareModels } from "../../src/modelSort";
+import { modelSettingsRequest } from "../lib/modelSettingsRequest";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
+import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
 import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
 function isMonochromeProviderIcon(url: string): boolean {
@@ -20,7 +23,7 @@ function isMonochromeProviderIcon(url: string): boolean {
   );
 }
 
-function ProviderIcon({ provider }: { provider: ModelProvider }) {
+export function ProviderIcon({ provider }: { provider: ModelProvider }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   if (provider.iconUrl && failedUrl !== provider.iconUrl) {
     return (
@@ -67,13 +70,51 @@ export function ModelSelectBar({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [providerId, setProviderId] = useState("");
-  const providers = useMemo(
-    () => groupModelProviders(ollamaModels),
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [favoritePending, setFavoritePending] = useState<Set<string>>(
+    new Set(),
+  );
+  const [favoriteOverrides, setFavoriteOverrides] = useState<
+    Record<string, boolean>
+  >({});
+  useEffect(
+    () =>
+      setFavoriteOverrides((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(
+            ([id, value]) =>
+              ollamaModels.find((model) => model.id === id)?.favorite !== value,
+          ),
+        ),
+      ),
     [ollamaModels],
   );
-  const selectedProvider = providers.find((provider) =>
-    provider.models.some((model) => model.id === selectedModel),
+  const displayModels = useMemo(
+    () =>
+      ollamaModels.map((model) => ({
+        ...model,
+        favorite: favoriteOverrides[model.id] ?? model.favorite,
+      })),
+    [ollamaModels, favoriteOverrides],
   );
+  const providers = useMemo(
+    () => [
+      {
+        id: "favorites",
+        name: "Favorites",
+        models: displayModels
+          .filter((model) => model.favorite && model.configured !== false)
+          .sort(compareModels),
+      },
+      ...groupModelProviders(displayModels),
+    ],
+    [displayModels],
+  );
+  const selectedProvider = providers
+    .slice(1)
+    .find((provider) =>
+      provider.models.some((model) => model.id === selectedModel),
+    );
   const selected = ollamaModels.find((model) => model.id === selectedModel);
   const provider =
     providers.find((item) => item.id === providerId) ??
@@ -93,12 +134,12 @@ export function ModelSelectBar({
         : "No models found";
   const label =
     selected?.name ??
-    (selectedModel && providers.length > 0
+    (selectedModel
       ? `${selectedModel.replace(/^openrouter:/, "")} (unavailable)`
       : statusLabel);
 
   useEffect(() => {
-    if (disabled || providers.length === 0) menuRef.current?.hidePopover();
+    if (disabled) menuRef.current?.hidePopover();
   }, [disabled, providers.length]);
 
   useLayoutEffect(() => {
@@ -145,7 +186,7 @@ export function ModelSelectBar({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={menuId}
-        disabled={disabled || providers.length === 0}
+        disabled={disabled}
         title={modelsLoadError ?? label}
         className="flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-45"
       >
@@ -171,7 +212,9 @@ export function ModelSelectBar({
           setOpen(isOpen);
           if (isOpen) {
             setQuery("");
-            setProviderId(selectedProvider?.id ?? providers[0]?.id ?? "");
+            setProviderId(
+              (current) => current || selectedProvider?.id || "favorites",
+            );
           }
         }}
         onKeyDown={(event) => {
@@ -185,7 +228,7 @@ export function ModelSelectBar({
         <div className="flex h-full min-h-0">
           <div
             role="tablist"
-            aria-label="Model providers"
+            aria-label="Model groups"
             aria-orientation="vertical"
             className="flex w-14 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border-subtle p-1.5"
           >
@@ -201,7 +244,7 @@ export function ModelSelectBar({
                 tabIndex={item.id === provider?.id ? 0 : -1}
                 title={item.name}
                 className={cx(
-                  "flex min-h-11 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring",
+                  "relative flex min-h-11 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring",
                   item.id === provider?.id
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -233,7 +276,15 @@ export function ModelSelectBar({
                   }
                 }}
               >
-                <ProviderIcon provider={item} />
+                {item.id === "favorites" ? (
+                  <Star
+                    size={20}
+                    className="fill-[#c6ad65] text-[#c6ad65]"
+                    aria-hidden
+                  />
+                ) : (
+                  <ProviderIcon provider={item} />
+                )}
               </button>
             ))}
           </div>
@@ -274,71 +325,144 @@ export function ModelSelectBar({
               <span>{models.length}</span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+              {favoriteError && (
+                <p role="alert" className="px-3 py-2 text-sm text-destructive">
+                  {favoriteError}
+                </p>
+              )}
               {models.map((model) => (
-                <button
-                  key={model.id}
-                  type="button"
-                  data-model-option
-                  aria-pressed={selectedModel === model.id}
-                  disabled={
-                    disabled ||
-                    (model.provider === "openrouter" &&
-                      model.configured === false)
-                  }
-                  className={cx(
-                    "flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-40",
-                    selectedModel === model.id
-                      ? "bg-muted text-foreground"
-                      : "hover:bg-muted/60",
-                  )}
-                  onClick={() => {
-                    onModelChange(model.id);
-                    menuRef.current?.hidePopover();
-                    triggerRef.current?.focus();
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "ArrowDown" && event.key !== "ArrowUp")
-                      return;
-                    event.preventDefault();
-                    const options = Array.from(
-                      menuRef.current?.querySelectorAll<HTMLButtonElement>(
-                        "[data-model-option]:not(:disabled)",
-                      ) ?? [],
-                    );
-                    const index = options.indexOf(event.currentTarget);
-                    options[
-                      (index +
-                        (event.key === "ArrowDown" ? 1 : -1) +
-                        options.length) %
-                        options.length
-                    ]?.focus();
-                  }}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className="block truncate text-sm font-medium"
-                      title={model.name}
-                    >
-                      {model.name}
+                <div key={model.id} className="flex items-center">
+                  <button
+                    type="button"
+                    data-model-option
+                    aria-pressed={selectedModel === model.id}
+                    disabled={
+                      disabled ||
+                      (model.provider === "openrouter" &&
+                        model.configured === false)
+                    }
+                    className={cx(
+                      "flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-40",
+                      selectedModel === model.id
+                        ? "bg-muted text-foreground"
+                        : "hover:bg-muted/60",
+                    )}
+                    onClick={() => {
+                      onModelChange(model.id);
+                      menuRef.current?.hidePopover();
+                      triggerRef.current?.focus();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "ArrowDown" && event.key !== "ArrowUp")
+                        return;
+                      event.preventDefault();
+                      const options = Array.from(
+                        menuRef.current?.querySelectorAll<HTMLButtonElement>(
+                          "[data-model-option]:not(:disabled)",
+                        ) ?? [],
+                      );
+                      const index = options.indexOf(event.currentTarget);
+                      options[
+                        (index +
+                          (event.key === "ArrowDown" ? 1 : -1) +
+                          options.length) %
+                          options.length
+                      ]?.focus();
+                    }}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className="block truncate text-sm font-medium"
+                        title={model.name}
+                      >
+                        {model.name}
+                        {model.isNew && (
+                          <NewBadge className="ml-2 inline-block align-middle" />
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {model.provider === "ollama"
+                          ? "Ollama"
+                          : model.configured === false
+                            ? "OpenRouter · Setup required"
+                            : "OpenRouter"}
+                        {model.provider === "openrouter" &&
+                          (model.availability === "unverified"
+                            ? " · Availability unverified"
+                            : model.supportsTools === false
+                              ? " · Chat only"
+                              : "")}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {model.provider === "ollama"
-                        ? "Ollama"
-                        : model.configured === false
-                          ? "OpenRouter · Setup required"
-                          : "OpenRouter"}
-                    </span>
-                  </span>
-                  {selectedModel === model.id && (
-                    <Check size={15} className="shrink-0" aria-hidden />
-                  )}
-                </button>
+                    {selectedModel === model.id && (
+                      <Check size={15} className="shrink-0" aria-hidden />
+                    )}
+                  </button>
+                  <FavoriteButton
+                    name={model.name}
+                    favorite={model.favorite === true}
+                    disabled={favoritePending.has(model.id)}
+                    onClick={async () => {
+                      setFavoritePending((current) =>
+                        new Set(current).add(model.id),
+                      );
+                      setFavoriteError(null);
+                      setFavoriteOverrides((current) => ({
+                        ...current,
+                        [model.id]: !model.favorite,
+                      }));
+                      try {
+                        await modelSettingsRequest("models/favorite", "PUT", {
+                          provider: model.provider,
+                          modelId:
+                            model.provider === "openrouter"
+                              ? (model.route ??
+                                model.id.replace(/^openrouter:/, ""))
+                              : model.id,
+                          favorite: !model.favorite,
+                        });
+                        window.dispatchEvent(
+                          new Event("model-preferences-changed"),
+                        );
+                      } catch {
+                        setFavoriteOverrides((current) => ({
+                          ...current,
+                          [model.id]: model.favorite === true,
+                        }));
+                        setFavoriteError("Couldn't save favorite. Try again.");
+                      } finally {
+                        setFavoritePending((current) => {
+                          const next = new Set(current);
+                          next.delete(model.id);
+                          return next;
+                        });
+                      }
+                    }}
+                  />
+                </div>
               ))}
               {models.length === 0 && (
                 <p className="px-2.5 py-6 text-center text-sm text-muted-foreground">
-                  No matching models
+                  {provider?.id === "favorites"
+                    ? "Favorite enabled models to find them here."
+                    : "No matching models"}
                 </p>
               )}
+              <button
+                type="button"
+                className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
+                onClick={() => {
+                  menuRef.current?.hidePopover();
+                  window.history.replaceState(
+                    window.history.state,
+                    "",
+                    "#settings/openrouter",
+                  );
+                  window.dispatchEvent(new HashChangeEvent("hashchange"));
+                }}
+              >
+                Choose models
+              </button>
             </div>
           </div>
         </div>

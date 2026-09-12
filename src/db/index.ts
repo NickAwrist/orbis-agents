@@ -62,8 +62,6 @@ export {
 export {
   listOpenRouterModels,
   getOpenRouterModelByRoute,
-  createOpenRouterModel,
-  deleteOpenRouterModel,
 } from "./openrouter";
 export {
   createImageAttachment,

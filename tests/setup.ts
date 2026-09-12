@@ -193,16 +193,31 @@ const originalFetch = globalThis.fetch;
             {
               id: "example/test-model",
               name: "Example AI: Test Model",
+              created: 1700000000,
+              architecture: {
+                input_modalities: ["text"],
+                output_modalities: ["text"],
+              },
             },
             {
               id: "openai/gpt-5.4-mini",
               name: "OpenAI: GPT-5.4 Mini",
+              created: 1700000000,
+              architecture: {
+                input_modalities: ["text"],
+                output_modalities: ["text"],
+              },
             },
             {
               id: "openai/gpt-5.6-terra",
               name: "OpenAI: GPT-5.6 Terra",
+              created: 1700000000,
+              supported_parameters: ["tools"],
+              context_length: 128000,
+              pricing: { prompt: "0", completion: "0.000002" },
               architecture: {
                 input_modalities: ["text", "image", "future-input"],
+                output_modalities: ["text"],
               },
             },
           ],

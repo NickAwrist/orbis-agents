@@ -1,3 +1,4 @@
+import { compareModels } from "../../src/modelSort";
 import type { ModelOption } from "../types";
 
 export type ModelProvider = {
@@ -8,7 +9,7 @@ export type ModelProvider = {
 };
 
 // Major AI lab icons mapped by route organization slug or normalized lab name.
-const providerIcons: Record<string, string> = {
+export const providerIcons: Record<string, string> = {
   anthropic: "/icons/providers/claude.svg",
   openai: "/icons/providers/openai.svg",
   google: "/icons/providers/gemini.svg",
@@ -29,7 +30,10 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
   for (const model of models) {
     const name =
       model.provider === "ollama" ? "Ollama" : model.lab.trim() || "OpenRouter";
-    const id = `${model.provider}:${name.toLowerCase()}`;
+    const id =
+      model.provider === "ollama"
+        ? "ollama"
+        : `openrouter:${model.publisherId ?? (model.route ?? model.id.replace(/^openrouter:/, "")).split("/")[0]}`;
     let group = groups.get(id);
     if (!group) {
       const route = model.route ?? model.id.replace(/^openrouter:/, "");
@@ -53,5 +57,6 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
     }
     group.models.push(model);
   }
+  for (const group of groups.values()) group.models.sort(compareModels);
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

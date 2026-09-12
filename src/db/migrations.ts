@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
 import { isBuiltinToolName } from "../tools/builtinTools";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
 
@@ -306,7 +307,64 @@ export function migrateAgentsInlinePlaceholders(db: Database) {
   }
 }
 
+export function migrateOpenRouterCatalog(db: Database) {
+  db.transaction(() => {
+    const columns = db.query("PRAGMA table_info(openrouter_models)").all() as {
+      name: string;
+    }[];
+    // The old schema is the one-time migration marker. Never reset the new table.
+    if (
+      columns.length &&
+      !columns.some((column) => column.name === "enabled")
+    ) {
+      db.run("DROP TABLE openrouter_models");
+    }
+    db.run(`
+      CREATE TABLE IF NOT EXISTS openrouter_publishers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        subscribed INTEGER NOT NULL DEFAULT 0 CHECK (subscribed IN (0, 1)),
+        subscribed_at INTEGER,
+        CHECK (subscribed = 0 OR subscribed_at IS NOT NULL)
+      );
+      CREATE TABLE IF NOT EXISTS openrouter_models (
+        route TEXT PRIMARY KEY,
+        publisher_id TEXT NOT NULL REFERENCES openrouter_publishers(id),
+        name TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+        catalog_created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_openrouter_models_publisher_enabled
+        ON openrouter_models(publisher_id, enabled);
+      CREATE TABLE IF NOT EXISTS model_favorites (
+        provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama')),
+        model_id TEXT NOT NULL,
+        PRIMARY KEY (provider, model_id)
+      );
+    `);
+    const publisherColumns = db
+      .query("PRAGMA table_info(openrouter_publishers)")
+      .all() as { name: string }[];
+    if (!publisherColumns.some((column) => column.name === "tracked")) {
+      db.run(
+        "ALTER TABLE openrouter_publishers ADD COLUMN tracked INTEGER NOT NULL DEFAULT 1 CHECK (tracked IN (0, 1))",
+      );
+    }
+    if (tableExists(db, "app_settings")) {
+      db.run(
+        "DELETE FROM app_settings WHERE key IN ('openrouter_models_seeded_v1', 'openrouter_models_seeded_v2', 'openrouter_models_seeded_v3')",
+      );
+    }
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO openrouter_publishers (id, name) VALUES (?, ?)",
+    );
+    for (const publisher of POPULAR_PUBLISHERS)
+      insert.run(publisher.id, publisher.name);
+  })();
+}
+
 export function runMigrations(db: Database) {
+  migrateOpenRouterCatalog(db);
   migrateSessionsAgentColumn(db);
   migrateSessionsDirectoryColumn(db);
   migrateSessionsWorkspaceKindColumn(db);

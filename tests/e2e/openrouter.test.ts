@@ -1,11 +1,21 @@
 import "../setup";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import {
   getOpenRouterApiKey,
   listOpenRouterModels,
   setOllamaHost,
   setOpenRouterApiKey,
 } from "../../src/db";
+import {
+  listModelFavorites,
+  setModelFavorite,
+  setOpenRouterModelEnabled,
+} from "../../src/db/openrouter";
+import {
+  type CatalogResult,
+  normalizeCatalog,
+  openRouterCatalog,
+} from "../../src/openRouterModels";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
 
@@ -47,6 +57,12 @@ describe("OpenRouter API integration", () => {
         }),
         body: JSON.stringify({ apiKey: "sk-or-api-test" }),
       });
+      await fetch(`${url}/api/settings/openrouter/catalog`);
+      await fetch(`${url}/api/settings/openrouter/models`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ route: "openai/gpt-5.6-terra", enabled: true }),
+      });
       response = await fetch(`${url}/api/models`);
       body = await response.json();
       expect(
@@ -64,58 +80,190 @@ describe("OpenRouter API integration", () => {
     }
   });
 
-  test("manages registry entries through the real settings routes", async () => {
+  test("manages activation and independent favorites through settings", async () => {
     const { url, close } = await startTestServer();
+    const request = (path: string, method: string, body: unknown) =>
+      fetch(`${url}/api/settings/${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
     try {
-      const create = await fetch(`${url}/api/settings/openrouter/models`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ route: "example/test-model" }),
-      });
-      expect(create.status).toBe(201);
-      const created = (await create.json()) as {
-        id: number;
-        name: string;
-        ai_lab: string;
-      };
-      expect(created.name).toBe("Test Model");
-      expect(created.ai_lab).toBe("Example AI");
-
-      const lookup = await fetch(
-        `${url}/api/settings/openrouter/models/lookup`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ route: "openai/gpt-5.4-mini" }),
-        },
+      const route = "example/test-model";
+      await fetch(`${url}/api/settings/openrouter/catalog`);
+      expect(
+        (
+          await request("models/favorite", "PUT", {
+            provider: "openrouter",
+            modelId: route,
+            favorite: true,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await request("models/favorite", "PUT", {
+            provider: "openrouter",
+            modelId: `openrouter:${route}`,
+            favorite: true,
+          })
+        ).status,
+      ).toBe(400);
+      expect(listOpenRouterModels()).toHaveLength(0);
+      expect(
+        (await request("openrouter/models", "PATCH", { route, enabled: false }))
+          .status,
+      ).toBe(200);
+      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+      expect(
+        (await request("openrouter/models", "PATCH", { route, enabled: true }))
+          .status,
+      ).toBe(200);
+      const response = await fetch(
+        `${url}/api/settings/openrouter/publishers/example/models`,
       );
-      expect(lookup.status).toBe(200);
-      expect(await lookup.json()).toMatchObject({
-        name: "GPT-5.4 Mini",
-        ai_lab: "OpenAI",
-        found: true,
+      expect(await response.json()).toMatchObject({
+        models: [{ route, enabled: true, favorite: true }],
       });
-
-      const duplicate = await fetch(`${url}/api/settings/openrouter/models`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ route: "example/test-model" }),
-      });
-      expect(duplicate.status).toBe(409);
-
-      const remove = await fetch(
-        `${url}/api/settings/openrouter/models/${created.id}`,
+      expect(
+        (
+          await request("openrouter/models", "PATCH", {
+            route: "unknown/model",
+            enabled: true,
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await request("openrouter/publishers", "POST", {
+            publisherId: "invented",
+          })
+        ).status,
+      ).toBe(400);
+      const removed = await fetch(
+        `${url}/api/settings/openrouter/publishers/example`,
         { method: "DELETE" },
       );
-      expect(remove.status).toBe(200);
+      expect(removed.status).toBe(200);
+      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
       expect(
-        listOpenRouterModels().some((model) => model.id === created.id),
-      ).toBeFalse();
+        listModelFavorites().some((favorite) => favorite.model_id === route),
+      ).toBeTrue();
+      expect(
+        (
+          await request("openrouter/publishers", "POST", {
+            publisherId: "example",
+          })
+        ).status,
+      ).toBe(200);
+      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
     } finally {
+      await close();
+    }
+  });
+
+  test("outages allow local changes and successful removal only affects composer availability", async () => {
+    const model = normalizeCatalog({
+      data: [
+        {
+          id: "openai/test",
+          name: "Test",
+          created: 100,
+          architecture: {
+            input_modalities: ["text"],
+            output_modalities: ["text"],
+          },
+        },
+      ],
+    })[0]!;
+    setOpenRouterModelEnabled(model, true);
+    setModelFavorite("openrouter", model.route, true);
+    setOpenRouterApiKey("key");
+    let catalog: CatalogResult = {
+      status: "unavailable",
+      models: null,
+      lastSuccessfulFetchAt: null,
+      error: "offline",
+    };
+    const lookup = spyOn(openRouterCatalog, "get").mockImplementation(
+      async () => catalog,
+    );
+    const cachedLookup = spyOn(openRouterCatalog, "peek").mockImplementation(
+      () => catalog,
+    );
+    const { url, close } = await startTestServer();
+    const update = (path: string, method: string, body: unknown) =>
+      fetch(`${url}/api/settings/${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    try {
+      let response = await fetch(`${url}/api/models`);
+      let body = (await response.json()) as {
+        models: { id: string; availability?: string }[];
+      };
+      expect(
+        body.models.find((m) => m.id === "openrouter:openai/test")
+          ?.availability,
+      ).toBe("unverified");
+      expect(
+        (
+          await update("openrouter/models", "PATCH", {
+            route: "unknown/model",
+            enabled: true,
+          })
+        ).status,
+      ).toBe(503);
+      lookup.mockClear();
+      expect(
+        (
+          await update("openrouter/models", "PATCH", {
+            route: model.route,
+            enabled: false,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await update("models/favorite", "PUT", {
+            provider: "openrouter",
+            modelId: model.route,
+            favorite: false,
+          })
+        ).status,
+      ).toBe(200);
+      expect(lookup).not.toHaveBeenCalled();
+      setOpenRouterModelEnabled(model, true);
+      setModelFavorite("openrouter", model.route, true);
+      catalog = {
+        status: "fresh",
+        models: [],
+        lastSuccessfulFetchAt: Date.now(),
+        error: null,
+      };
+      response = await fetch(`${url}/api/models`);
+      body = await response.json();
+      expect(
+        body.models.some((m) => m.id === "openrouter:openai/test"),
+      ).toBeFalse();
+      expect(listOpenRouterModels()[0]?.enabled).toBe(1);
+      expect(listModelFavorites()).toHaveLength(1);
+      catalog = {
+        ...catalog,
+        models: [{ ...model, route: "openai/test:batch" }],
+      };
+      expect(
+        (
+          await update("openrouter/models", "PATCH", {
+            route: "openai/test:batch",
+            enabled: true,
+          })
+        ).status,
+      ).toBe(400);
+    } finally {
+      lookup.mockRestore();
+      cachedLookup.mockRestore();
       await close();
     }
   });
@@ -146,7 +294,8 @@ describe("OpenRouter API integration", () => {
         }),
         body: JSON.stringify(runBody("openrouter:missing/model")),
       });
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(200);
+      await response.text();
 
       response = await fetch(`${url}/api/runs`, {
         method: "POST",

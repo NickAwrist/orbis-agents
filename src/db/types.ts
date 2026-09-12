@@ -28,8 +28,9 @@ export type SessionSummaryRow = {
 };
 
 export type OpenRouterModel = {
-  id: number;
-  name: string;
   route: string;
-  ai_lab: string;
+  publisher_id: string;
+  name: string;
+  enabled: number;
+  catalog_created_at: number;
 };
