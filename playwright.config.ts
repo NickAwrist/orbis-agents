@@ -15,7 +15,7 @@ export default defineConfig({
   projects: [
     {
       name: "mobile",
-      grep: /mobile message actions and code layout$|sheet dismissal, busy actions, and retry confirmation$/,
+      grep: /mobile message actions and code layout$|sheet dismissal, busy actions, and retry confirmation$|composer selectors mobile/,
       use: {
         // Keep touch media queries stable while Chromium captures screenshots.
         launchOptions: {
@@ -28,7 +28,7 @@ export default defineConfig({
     },
     {
       name: "desktop",
-      grep: /desktop hover|attachment image loading|session loading/,
+      grep: /desktop hover|attachment image loading|session loading|composer selectors desktop/,
     },
   ],
   webServer: {

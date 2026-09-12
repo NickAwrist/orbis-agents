@@ -81,16 +81,10 @@ export function useAppKeybinds(opts: UseAppKeybindsOptions) {
         if (o.headerRunBusy || !o.activeSessionId) return;
         suppress(e);
         queueMicrotask(() => {
-          const el = document.getElementById(
-            "run-model",
-          ) as HTMLSelectElement | null;
-          if (!el || el.disabled) return;
+          const el = document.getElementById("run-model");
+          if (!(el instanceof HTMLButtonElement) || el.disabled) return;
           el.focus();
-          try {
-            el.showPicker?.();
-          } catch {
-            /* showPicker may throw or be unavailable */
-          }
+          el.click();
         });
         return;
       }

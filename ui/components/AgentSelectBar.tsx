@@ -1,7 +1,7 @@
-import { ChevronDown } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 
 const selectClass =
-  "max-w-[min(100%,14rem)] cursor-pointer appearance-none rounded-lg border border-transparent bg-transparent py-1.5 pl-2 pr-8 text-[0.8125rem] font-medium text-foreground outline-none transition-[border-color,background-color,color] duration-150 hover:bg-muted/60 focus-visible:border-border focus-visible:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-45";
+  "w-full max-w-[14rem] cursor-pointer appearance-none rounded-lg border border-transparent bg-transparent py-1 pl-8 pr-7 text-[0.8125rem] font-medium text-muted-foreground outline-none transition-[border-color,background-color,color] duration-150 hover:bg-muted/60 focus-visible:border-border focus-visible:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-45";
 
 export function AgentSelectBar({
   agents,
@@ -20,7 +20,12 @@ export function AgentSelectBar({
   );
 
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0 max-w-[40%]">
+      <Bot
+        size={16}
+        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+        aria-hidden
+      />
       <label htmlFor="run-agent" className="sr-only">
         Agent
       </label>

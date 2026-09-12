@@ -17,8 +17,9 @@ import {
 } from "react";
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx, iconButton, primaryButton } from "../styles";
-import type { MessageStep } from "../types";
-import type { SessionWorkspace } from "../types";
+import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
+import { AgentSelectBar } from "./AgentSelectBar";
+import { ModelSelectBar } from "./ModelSelectBar";
 import {
   type RunCommandName,
   exactRunCommand,
@@ -31,6 +32,14 @@ import {
 } from "./skillPicker";
 
 export function RunInputDock({
+  ollamaModels,
+  ollamaConnected,
+  modelsLoadError,
+  selectedModel,
+  onModelChange,
+  runAgents,
+  selectedSessionAgent,
+  onSessionAgentChange,
   input,
   setInput,
   onSendMessage,
@@ -52,6 +61,14 @@ export function RunInputDock({
   onRunCommand,
   onFooterHeightChange,
 }: {
+  ollamaModels: ModelOption[];
+  ollamaConnected: boolean | null;
+  modelsLoadError: string | null;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  runAgents: { name: string }[];
+  selectedSessionAgent: string;
+  onSessionAgentChange: (name: string) => void;
   input: string;
   setInput: (v: string) => void;
   onSendMessage: (e: React.FormEvent) => void;
@@ -226,7 +243,7 @@ export function RunInputDock({
           addPendingImages(files);
         }}
         className={cx(
-          "pointer-events-auto relative flex w-full max-w-3xl flex-col gap-1 rounded-xl border bg-surface px-[10px] py-[6px] transition-[border-color,background-color,box-shadow] duration-150 ease-out focus-within:border-border focus-within:shadow-[0_0_0_1px_var(--color-accent-ring)]",
+          "pointer-events-auto relative flex w-full max-w-3xl flex-col gap-1 rounded-xl border bg-surface px-[10px] py-1 transition-[border-color,background-color,box-shadow] duration-150 ease-out focus-within:border-border focus-within:shadow-[0_0_0_1px_var(--color-accent-ring)]",
           isFileDragActive
             ? "border-accent/60 bg-accent-soft-strong shadow-[0_0_0_3px_var(--color-accent-ring)]"
             : "border-border-subtle",
@@ -467,7 +484,11 @@ export function RunInputDock({
           {isBusy ? (
             <button
               type="button"
-              onClick={onStopGeneration}
+              onClick={(event) => {
+                // Stopping can turn this same DOM button into the submit button.
+                event.preventDefault();
+                onStopGeneration();
+              }}
               className={cx(
                 iconButton,
                 "mb-0.5 size-9 shrink-0 p-0 hover:border-red-500/20 hover:bg-red-500/[0.06] hover:text-red-300",
@@ -489,6 +510,29 @@ export function RunInputDock({
               <ArrowUp size={18} />
             </button>
           )}
+        </div>
+        <div
+          className="flex min-w-0 items-center gap-1 border-t border-border-subtle pt-1"
+          aria-label="Chat settings"
+        >
+          <ModelSelectBar
+            ollamaModels={ollamaModels}
+            ollamaConnected={ollamaConnected}
+            modelsLoadError={modelsLoadError}
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            disabled={isBusy}
+          />
+          <span
+            className="mx-1 h-4 w-px shrink-0 bg-border-subtle"
+            aria-hidden
+          />
+          <AgentSelectBar
+            agents={runAgents}
+            selectedAgent={selectedSessionAgent}
+            onAgentChange={onSessionAgentChange}
+            disabled={isBusy}
+          />
         </div>
       </form>
     </div>

@@ -188,15 +188,6 @@ export default function App() {
                       app.setSidebarCollapsed(false);
                     }
                   }}
-                  ollamaModels={app.ollamaModels}
-                  ollamaConnected={app.ollamaConnected}
-                  modelsLoadError={app.modelsLoadError}
-                  selectedModel={app.selectedModel}
-                  onModelChange={app.handleModelChange}
-                  runAgents={app.runAgents}
-                  selectedSessionAgent={app.selectedSessionAgent}
-                  onSessionAgentChange={app.handleSessionAgentChange}
-                  headerRunBusy={app.runPending}
                   debugOpen={app.debugOpen}
                   onToggleDebug={app.toggleDebug}
                   onCopyEntireRun={
@@ -268,6 +259,14 @@ export default function App() {
                 {app.activeSessionId && (
                   <RunInputDock
                     key={app.activeSessionId}
+                    ollamaModels={app.ollamaModels}
+                    ollamaConnected={app.ollamaConnected}
+                    modelsLoadError={app.modelsLoadError}
+                    selectedModel={app.selectedModel}
+                    onModelChange={app.handleModelChange}
+                    runAgents={app.runAgents}
+                    selectedSessionAgent={app.selectedSessionAgent}
+                    onSessionAgentChange={app.handleSessionAgentChange}
                     input={app.input}
                     setInput={app.setInput}
                     onSendMessage={app.sendMessage}

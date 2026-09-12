@@ -1,8 +1,42 @@
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { cx } from "../styles";
 import type { ModelOption } from "../types";
+import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
-const selectClass =
-  "max-w-[min(100%,18rem)] cursor-pointer appearance-none rounded-lg border border-transparent bg-transparent py-1.5 pl-2 pr-8 text-[0.8125rem] font-medium text-foreground outline-none transition-[border-color,background-color,color] duration-150 hover:bg-muted/60 focus-visible:border-border focus-visible:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-45";
+function ProviderIcon({ provider }: { provider: ModelProvider }) {
+  const [failedUrl, setFailedUrl] = useState<string>();
+  if (provider.iconUrl && failedUrl !== provider.iconUrl) {
+    return (
+      <img
+        src={provider.iconUrl}
+        alt=""
+        className={cx(
+          "size-5 shrink-0 object-contain",
+          (provider.iconUrl.endsWith("/OpenAI.svg") ||
+            provider.iconUrl === "/icons/ollama.svg") &&
+            "invert",
+        )}
+        onError={() => setFailedUrl(provider.iconUrl)}
+      />
+    );
+  }
+  return (
+    <span
+      className="flex size-5 shrink-0 items-center justify-center text-xs font-semibold"
+      aria-hidden
+    >
+      {provider.name.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
 
 export function ModelSelectBar({
   ollamaModels,
@@ -19,78 +53,289 @@ export function ModelSelectBar({
   onModelChange: (model: string) => void;
   disabled: boolean;
 }) {
-  const modelNames = new Set(ollamaModels.map((m) => m.id));
-  const showSelectedNotListed = Boolean(
-    selectedModel &&
-      !selectedModel.startsWith("openrouter:") &&
-      ollamaModels.length > 0 &&
-      !modelNames.has(selectedModel),
+  const menuId = useId();
+  const menuRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [providerId, setProviderId] = useState("");
+  const providers = useMemo(
+    () => groupModelProviders(ollamaModels),
+    [ollamaModels],
   );
-  const hasModels = ollamaModels.length > 0;
-  const placeholderValue = "__model_status__";
-  const statusLabel =
-    ollamaConnected === null
-      ? "Checking Ollama..."
+  const selectedProvider = providers.find((provider) =>
+    provider.models.some((model) => model.id === selectedModel),
+  );
+  const selected = ollamaModels.find((model) => model.id === selectedModel);
+  const provider =
+    providers.find((item) => item.id === providerId) ??
+    selectedProvider ??
+    providers[0];
+  const models = (provider?.models ?? []).filter((model) =>
+    `${model.name} ${model.route ?? model.id}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
+  const statusLabel = modelsLoadError
+    ? "Models unavailable"
+    : ollamaConnected === null
+      ? "Checking models..."
       : ollamaConnected === false
         ? "Model provider disconnected"
-        : modelsLoadError
-          ? "Models unavailable"
-          : "No models found";
+        : "No models found";
+  const label =
+    selected?.name ??
+    (selectedModel && providers.length > 0
+      ? `${selectedModel.replace(/^openrouter:/, "")} (unavailable)`
+      : statusLabel);
+
+  useEffect(() => {
+    if (disabled || providers.length === 0) menuRef.current?.hidePopover();
+  }, [disabled, providers.length]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const trigger = triggerRef.current;
+    if (!menu || !trigger) return;
+    const position = () => {
+      const rect = trigger.getBoundingClientRect();
+      const anchorTop =
+        trigger.closest("form")?.getBoundingClientRect().top ?? rect.top;
+      const viewport = window.visualViewport;
+      const left = (viewport?.offsetLeft ?? 0) + 8;
+      const top = (viewport?.offsetTop ?? 0) + 8;
+      const right = left + (viewport?.width ?? window.innerWidth) - 16;
+      const bottom = top + (viewport?.height ?? window.innerHeight) - 16;
+      menu.style.maxHeight = `${bottom - top}px`;
+      menu.style.left = `${Math.max(left, Math.min(rect.left, right - menu.offsetWidth))}px`;
+      menu.style.top = `${Math.max(top, Math.min(anchorTop - menu.offsetHeight - 8, bottom - menu.offsetHeight))}px`;
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(menu);
+    window.addEventListener("resize", position);
+    window.visualViewport?.addEventListener("resize", position);
+    window.visualViewport?.addEventListener("scroll", position);
+    if (window.matchMedia("(hover: hover)").matches) searchRef.current?.focus();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", position);
+      window.visualViewport?.removeEventListener("resize", position);
+      window.visualViewport?.removeEventListener("scroll", position);
+    };
+  }, [open]);
 
   return (
-    <div className="relative min-w-0">
-      <label htmlFor="run-model" className="sr-only">
-        Model
-      </label>
-      <select
+    <div className="min-w-0 max-w-[60%]">
+      <button
+        ref={triggerRef}
         id="run-model"
-        value={hasModels ? selectedModel : placeholderValue}
-        onChange={(e) => onModelChange(e.target.value)}
-        disabled={disabled || !hasModels}
-        className={selectClass}
-        title={modelsLoadError ? modelsLoadError : undefined}
+        type="button"
+        popoverTarget={menuId}
+        aria-label={`Model: ${label}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={menuId}
+        disabled={disabled || providers.length === 0}
+        title={modelsLoadError ?? label}
+        className="flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-45"
       >
-        {!hasModels ? (
-          <option value={placeholderValue}>{statusLabel}</option>
-        ) : (
-          <>
-            {showSelectedNotListed && (
-              <option value={selectedModel}>{selectedModel} (offline)</option>
-            )}
-            {(["ollama", "openrouter"] as const).map((provider) => {
-              const options = ollamaModels.filter(
-                (model) => model.provider === provider,
-              );
-              if (options.length === 0) return null;
-              return (
-                <optgroup
-                  key={provider}
-                  label={provider === "ollama" ? "Ollama" : "OpenRouter"}
+        {selectedProvider && <ProviderIcon provider={selectedProvider} />}
+        <span className="truncate">{label}</span>
+        <ChevronDown
+          size={12}
+          className={cx(
+            "shrink-0 transition-transform duration-150",
+            open && "rotate-180",
+          )}
+          aria-hidden
+        />
+      </button>
+      <dialog
+        ref={menuRef}
+        id={menuId}
+        popover="auto"
+        aria-label="Choose model"
+        className="model-picker"
+        onToggle={(event) => {
+          const isOpen = event.newState === "open";
+          setOpen(isOpen);
+          if (isOpen) {
+            setQuery("");
+            setProviderId(selectedProvider?.id ?? providers[0]?.id ?? "");
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            menuRef.current?.hidePopover();
+            triggerRef.current?.focus();
+          }
+        }}
+      >
+        <div className="flex h-full min-h-0">
+          <div
+            role="tablist"
+            aria-label="Model providers"
+            aria-orientation="vertical"
+            className="flex w-14 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border-subtle p-1.5"
+          >
+            {providers.map((item, index) => (
+              <button
+                key={item.id}
+                id={`${menuId}-provider-${index}`}
+                type="button"
+                role="tab"
+                aria-label={item.name}
+                aria-selected={item.id === provider?.id}
+                aria-controls={`${menuId}-models`}
+                tabIndex={item.id === provider?.id ? 0 : -1}
+                title={item.name}
+                className={cx(
+                  "flex min-h-11 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring",
+                  item.id === provider?.id
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                )}
+                onClick={() => {
+                  setProviderId(item.id);
+                  setQuery("");
+                }}
+                onKeyDown={(event) => {
+                  const nextIndex =
+                    event.key === "ArrowDown"
+                      ? (index + 1) % providers.length
+                      : event.key === "ArrowUp"
+                        ? (index - 1 + providers.length) % providers.length
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? providers.length - 1
+                            : null;
+                  if (nextIndex === null) return;
+                  event.preventDefault();
+                  const next = providers[nextIndex];
+                  if (next) {
+                    setProviderId(next.id);
+                    setQuery("");
+                    document
+                      .getElementById(`${menuId}-provider-${nextIndex}`)
+                      ?.focus();
+                  }
+                }}
+              >
+                <ProviderIcon provider={item} />
+              </button>
+            ))}
+          </div>
+          <div
+            id={`${menuId}-models`}
+            role="tabpanel"
+            aria-labelledby={`${menuId}-provider-${provider ? providers.indexOf(provider) : 0}`}
+            className="flex min-w-0 flex-1 flex-col"
+          >
+            <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
+              <Search
+                size={16}
+                className="shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label={`Search ${provider?.name ?? "provider"} models`}
+                placeholder="Search models..."
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    menuRef.current
+                      ?.querySelector<HTMLButtonElement>(
+                        "[data-model-option]:not(:disabled)",
+                      )
+                      ?.focus();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between px-3 pb-1 pt-3 text-xs text-muted-foreground">
+              <span>{provider?.name}</span>
+              <span>{models.length}</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+              {models.map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  data-model-option
+                  aria-pressed={selectedModel === model.id}
+                  disabled={
+                    disabled ||
+                    (model.provider === "openrouter" &&
+                      model.configured === false)
+                  }
+                  className={cx(
+                    "flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-40",
+                    selectedModel === model.id
+                      ? "bg-muted text-foreground"
+                      : "hover:bg-muted/60",
+                  )}
+                  onClick={() => {
+                    onModelChange(model.id);
+                    menuRef.current?.hidePopover();
+                    triggerRef.current?.focus();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowDown" && event.key !== "ArrowUp")
+                      return;
+                    event.preventDefault();
+                    const options = Array.from(
+                      menuRef.current?.querySelectorAll<HTMLButtonElement>(
+                        "[data-model-option]:not(:disabled)",
+                      ) ?? [],
+                    );
+                    const index = options.indexOf(event.currentTarget);
+                    options[
+                      (index +
+                        (event.key === "ArrowDown" ? 1 : -1) +
+                        options.length) %
+                        options.length
+                    ]?.focus();
+                  }}
                 >
-                  {options.map((model) => (
-                    <option
-                      key={model.id}
-                      value={model.id}
-                      disabled={
-                        model.provider === "openrouter" &&
-                        model.configured === false
-                      }
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className="block truncate text-sm font-medium"
+                      title={model.name}
                     >
                       {model.name}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </>
-        )}
-      </select>
-      <span
-        className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      >
-        <ChevronDown size={12} strokeWidth={1.75} />
-      </span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {model.provider === "ollama"
+                        ? "Ollama"
+                        : model.configured === false
+                          ? "OpenRouter · Setup required"
+                          : "OpenRouter"}
+                    </span>
+                  </span>
+                  {selectedModel === model.id && (
+                    <Check size={15} className="shrink-0" aria-hidden />
+                  )}
+                </button>
+              ))}
+              {models.length === 0 && (
+                <p className="px-2.5 py-6 text-center text-sm text-muted-foreground">
+                  No matching models
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }
