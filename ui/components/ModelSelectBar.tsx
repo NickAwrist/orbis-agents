@@ -11,6 +11,15 @@ import { cx } from "../styles";
 import type { ModelOption } from "../types";
 import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
+function isMonochromeProviderIcon(url: string): boolean {
+  return (
+    url.endsWith("/openai.svg") ||
+    url.endsWith("/xai.svg") ||
+    url.endsWith("/moonshot.svg") ||
+    url === "/icons/ollama.svg"
+  );
+}
+
 function ProviderIcon({ provider }: { provider: ModelProvider }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   if (provider.iconUrl && failedUrl !== provider.iconUrl) {
@@ -20,9 +29,7 @@ function ProviderIcon({ provider }: { provider: ModelProvider }) {
         alt=""
         className={cx(
           "size-5 shrink-0 object-contain",
-          (provider.iconUrl.endsWith("/OpenAI.svg") ||
-            provider.iconUrl === "/icons/ollama.svg") &&
-            "invert",
+          isMonochromeProviderIcon(provider.iconUrl) && "invert",
         )}
         onError={() => setFailedUrl(provider.iconUrl)}
       />

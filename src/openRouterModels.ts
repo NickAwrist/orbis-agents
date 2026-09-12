@@ -37,6 +37,8 @@ const LAB_NAMES: Record<string, string> = {
   meta: "Meta",
   "meta-llama": "Meta",
   mistralai: "Mistral AI",
+  moonshot: "Moonshot AI",
+  moonshotai: "Moonshot AI",
   openai: "OpenAI",
   qwen: "Qwen",
   xai: "xAI",

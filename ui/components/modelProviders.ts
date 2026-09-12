@@ -7,16 +7,21 @@ export type ModelProvider = {
   models: ModelOption[];
 };
 
-// Icon filenames published on https://openrouter.ai/providers.
+// Major AI lab icons mapped by route organization slug or normalized lab name.
 const providerIcons: Record<string, string> = {
-  openai: "OpenAI.svg",
-  anthropic: "Anthropic.svg",
-  google: "GoogleAIStudio.svg",
-  deepseek: "DeepSeek.png",
-  mistralai: "Mistral.png",
-  cohere: "Cohere.png",
-  perplexity: "Perplexity.svg",
-  inception: "Inception.svg",
+  anthropic: "/icons/providers/claude.svg",
+  openai: "/icons/providers/openai.svg",
+  google: "/icons/providers/gemini.svg",
+  deepseek: "/icons/providers/deepseek.svg",
+  xai: "/icons/providers/xai.svg",
+  "x-ai": "/icons/providers/xai.svg",
+  moonshot: "/icons/providers/moonshot.svg",
+  moonshotai: "/icons/providers/moonshot.svg",
+  meta: "/icons/providers/meta.svg",
+  "meta-llama": "/icons/providers/meta.svg",
+  mistral: "/icons/providers/mistral.svg",
+  mistralai: "/icons/providers/mistral.svg",
+  qwen: "/icons/providers/qwen.svg",
 };
 
 export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
@@ -28,19 +33,20 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
     let group = groups.get(id);
     if (!group) {
       const route = model.route ?? model.id.replace(/^openrouter:/, "");
+      const routeOrg =
+        route.replace(/^~/, "").split("/")[0]?.toLowerCase() ?? "";
+      const labKey = model.lab
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "");
       const icon =
         model.provider === "openrouter"
-          ? providerIcons[route.replace(/^~/, "").split("/")[0] ?? ""]
+          ? (providerIcons[routeOrg] ?? providerIcons[labKey])
           : undefined;
       group = {
         id,
         name,
-        iconUrl:
-          model.provider === "ollama"
-            ? "/icons/ollama.svg"
-            : icon
-              ? `https://openrouter.ai/images/icons/${icon}`
-              : undefined,
+        iconUrl: model.provider === "ollama" ? "/icons/ollama.svg" : icon,
         models: [],
       };
       groups.set(id, group);
