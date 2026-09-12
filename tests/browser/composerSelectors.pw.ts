@@ -45,10 +45,31 @@ for (const device of ["desktop", "mobile"] as const) {
     page.on("pageerror", (error) => errors.push(error.message));
     let sessionModel = "openrouter:anthropic/claude-sonnet";
     let catalog = models;
+    let sessionReads = 0;
     const runs: { model: string; agentName: string; message: string }[] = [];
     const finishRun = Promise.withResolvers<void>();
     await page.route("**/api/**", async (route) => {
       const path = new URL(route.request().url()).pathname;
+      if (
+        path === "/api/sessions/selector" &&
+        route.request().method() === "GET"
+      )
+        sessionReads++;
+      if (path === "/api/settings/openrouter")
+        return route.fulfill({ json: { hasKey: true } });
+      if (path === "/api/settings/openrouter/catalog")
+        return route.fulfill({
+          json: {
+            publishers: [],
+            modelsByPublisher: {},
+            discoveredPublishers: [],
+            catalog: {
+              status: "fresh",
+              lastSuccessfulFetchAt: Date.now(),
+              error: null,
+            },
+          },
+        });
       if (path === "/api/runs" && route.request().method() === "POST") {
         runs.push(route.request().postDataJSON());
         await finishRun.promise;
@@ -218,11 +239,27 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(model).toBeEnabled();
       finishRun.resolve();
 
+      // A refreshed catalog must not silently replace the selected model.
+      catalog = models.filter((entry) => entry.provider === "openrouter");
+      await page.evaluate(() =>
+        window.dispatchEvent(new Event("model-preferences-changed")),
+      );
+      await expect(model).toHaveAccessibleName(
+        "Model: gemma4:e4b (unavailable)",
+      );
+      await input.fill("Explicit replacement required");
+      await expect(
+        page.getByRole("button", { name: "Send message" }),
+      ).toBeDisabled();
+      expect(sessionModel).toBe("gemma4:e4b");
+
       sessionModel = "missing-model";
       catalog = [];
       await page.reload();
-      await expect(model).toBeDisabled();
-      await expect(model).toHaveAccessibleName("Model: No models found");
+      await expect(model).toBeEnabled();
+      await expect(model).toHaveAccessibleName(
+        "Model: missing-model (unavailable)",
+      );
       await input.fill("Keep this unsent draft");
       await expect(
         page.getByRole("button", { name: "Send message" }),
@@ -231,6 +268,15 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(input).toHaveValue("Keep this unsent draft");
       expect(runs).toHaveLength(1);
 
+      const readsBeforeSettings = sessionReads;
+      await model.click();
+      await menu.getByRole("button", { name: "Choose models" }).click();
+      await expect(
+        page.getByRole("heading", { name: "Publishers", exact: true }),
+      ).toBeVisible();
+      expect(sessionReads).toBe(readsBeforeSettings);
+      await page.getByRole("button", { name: "Back to chat" }).click();
+      await expect(input).toHaveValue("Keep this unsent draft");
       expect(errors).toEqual([]);
     } finally {
       finishRun.resolve();

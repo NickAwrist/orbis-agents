@@ -49,7 +49,9 @@ export function useSettingsPageState({
   searxngConnected,
   onSave,
 }: Args) {
-  const [tab, setTab] = useState<SettingsTab>("general");
+  const [tab, setTab] = useState<SettingsTab>(() =>
+    window.location.hash === "#settings/openrouter" ? "openrouter" : "general",
+  );
   const [settings, setSettings] = useState<UserSettings>(currentSettings);
   const [ollamaUri, setOllamaUri] = useState(ollamaHost);
   const [isSaving, setIsSaving] = useState(false);

@@ -1,0 +1,376 @@
+import { Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { comparePublisherModels } from "../../../src/modelSort";
+import type { CatalogFreshness } from "../../../src/openRouterModels";
+import {
+  modalCloseButton,
+  modalHeader,
+  modalShell,
+  primaryButton,
+  secondaryButton,
+} from "../../styles";
+import {
+  EnableSwitch,
+  FavoriteButton,
+  NewBadge,
+  PreferenceNotice,
+} from "../ModelPreferenceControls";
+import { ProviderIcon } from "../ModelSelectBar";
+import { providerIcons } from "../modelProviders";
+import { inputClass } from "./constants";
+import type {
+  CatalogSettings,
+  PreferenceChange,
+  Publisher,
+} from "./useOpenRouterCatalog";
+
+export function CatalogStatus({ catalog }: { catalog: CatalogFreshness }) {
+  return (
+    <output className="text-xs text-muted-foreground">
+      {catalog.status === "stale" &&
+        "Refresh failed. Showing the last known catalog. "}
+      {catalog.status === "unavailable" &&
+        "Catalog unavailable. Saved models have unverified availability. "}
+      {catalog.lastSuccessfulFetchAt !== null &&
+        `Last updated ${new Date(catalog.lastSuccessfulFetchAt).toLocaleString()}.`}
+    </output>
+  );
+}
+function rate(value: number | null) {
+  return value === null
+    ? "Unknown"
+    : `$${value.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
+}
+export function PublisherDialog({
+  publisher,
+  data,
+  onClose,
+  onChange,
+}: {
+  publisher: Publisher | "add";
+  data: CatalogSettings;
+  onClose: () => void;
+  onChange: (change: PreferenceChange) => Promise<void>;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [query, setQuery] = useState("");
+  const [slug, setSlug] = useState("");
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const busy = pending.has("remove");
+  const [notice, setNotice] = useState<string | null>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  useEffect(() => {
+    const trigger = document.activeElement;
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      if (trigger instanceof HTMLElement) trigger.focus();
+    };
+  }, []);
+  const mutate = async (change: PreferenceChange) => {
+    const key =
+      change.kind === "favorite" || change.kind === "enabled"
+        ? `${change.kind}:${change.route}`
+        : change.kind === "track"
+          ? `track:${change.publisherId}`
+          : change.kind;
+    setPending((current) => new Set(current).add(key));
+    setNotice(null);
+    try {
+      await onChange(change);
+      if (change.kind === "remove") onClose();
+      if (change.kind === "add-model") setSlug("");
+    } catch (cause) {
+      setNotice(
+        change.kind === "add-model" && cause instanceof Error
+          ? cause.message
+          : change.kind === "remove"
+            ? "Couldn't remove publisher. Try again."
+            : "Couldn't save change. Try again.",
+      );
+    } finally {
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+  const search = query.trim().toLowerCase();
+  const models =
+    publisher === "add" ? [] : (data.modelsByPublisher[publisher.id] ?? []);
+  const visible = models
+    .filter((model) =>
+      `${model.name} ${model.route}`.toLowerCase().includes(search),
+    )
+    .sort(comparePublisherModels);
+  const publishers =
+    data.discoveredPublishers
+      ?.filter((item) =>
+        `${item.name} ${item.id}`.toLowerCase().includes(search),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
+  return (
+    <dialog
+      ref={ref}
+      className={modalShell}
+      aria-labelledby="publisher-dialog-title"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onClose();
+      }}
+    >
+      <div className="relative flex h-[min(42rem,85dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border-subtle bg-background shadow-xl">
+        <header className={modalHeader}>
+          <h2 id="publisher-dialog-title" className="font-semibold">
+            {publisher === "add" ? "Add publisher" : publisher.name}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close publisher dialog"
+            className={modalCloseButton}
+          >
+            <X size={18} />
+          </button>
+        </header>
+        <div className="shrink-0 space-y-3 border-b border-border-subtle p-4">
+          {publisher !== "add" && (
+            <div>
+              <div className="flex items-center gap-2">
+                <EnableSwitch
+                  label="Auto-enable new models"
+                  checked={publisher.subscribed}
+                  disabled={busy || pending.has("subscription")}
+                  onChange={(value) =>
+                    void mutate({
+                      kind: "subscription",
+                      publisherId: publisher.id,
+                      value,
+                    })
+                  }
+                />
+                <span className="text-sm">Auto-enable new models</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Automatically enable future OpenRouter listings. Models you
+                disable stay disabled.
+              </p>
+            </div>
+          )}
+          {publisher === "add" && (
+            <form
+              className="space-y-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const route = slug.trim();
+                if (!route || pending.has("add-model")) return;
+                void mutate({
+                  kind: "add-model",
+                  publisherId: route.split("/")[0]!,
+                  route,
+                });
+              }}
+            >
+              <label
+                htmlFor="openrouter-model-slug"
+                className="text-sm font-medium"
+              >
+                Add model by slug
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="openrouter-model-slug"
+                  className={`${inputClass} min-w-0 flex-1`}
+                  value={slug}
+                  onChange={(event) => setSlug(event.target.value)}
+                  placeholder="cohere/command-a"
+                  required
+                />
+                <button
+                  type="submit"
+                  className={`${primaryButton} shrink-0`}
+                  disabled={!slug.trim() || pending.has("add-model")}
+                >
+                  Add model
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Adds its publisher and enables this model.
+              </p>
+            </form>
+          )}
+          <input
+            type="search"
+            aria-label={
+              publisher === "add" ? "Search publishers" : "Search models"
+            }
+            className={inputClass}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={
+              publisher === "add"
+                ? "Search publishers..."
+                : "Search model name or route..."
+            }
+          />
+          {data.catalog.status !== "fresh" && (
+            <CatalogStatus catalog={data.catalog} />
+          )}
+          {publisher !== "add" && (
+            <p className="text-xs text-muted-foreground">
+              Catalog base token rates per million tokens. Total cost may vary.
+            </p>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {publisher === "add" ? (
+            <div className="space-y-2">
+              {publishers.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={
+                    busy || pending.has(`track:${item.id}`) || item.tracked
+                  }
+                  className={`${secondaryButton} w-full`}
+                  onClick={() =>
+                    void mutate({ kind: "track", publisherId: item.id })
+                  }
+                >
+                  <ProviderIcon
+                    provider={{
+                      ...item,
+                      iconUrl: providerIcons[item.id],
+                      models: [],
+                    }}
+                  />
+                  {item.name}
+                  <span className="ml-auto">
+                    {item.tracked ? "Added" : "Add"}
+                  </span>
+                </button>
+              ))}
+              {publishers.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {data.catalog.status === "unavailable"
+                    ? "Publishers unavailable. Refresh the catalog from settings."
+                    : "No matching publishers."}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visible.map((model) => (
+                <article
+                  key={model.route}
+                  className="relative rounded-lg border border-border-subtle p-4 transition-colors duration-200 motion-reduce:transition-none"
+                >
+                  {model.isNew && (
+                    <NewBadge className="absolute -top-2.5 left-3" />
+                  )}
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium">{model.name}</h3>
+                      <p className="break-all text-xs text-muted-foreground">
+                        {model.route}
+                      </p>
+                    </div>
+                    <FavoriteButton
+                      name={model.name}
+                      favorite={model.favorite}
+                      disabled={busy || pending.has(`favorite:${model.route}`)}
+                      onClick={() =>
+                        void mutate({
+                          kind: "favorite",
+                          publisherId: publisher.id,
+                          route: model.route,
+                          value: !model.favorite,
+                        })
+                      }
+                    />
+                    <div className="flex h-9 items-center">
+                      <EnableSwitch
+                        label={`Enable ${model.name}`}
+                        checked={model.enabled}
+                        disabled={
+                          busy ||
+                          pending.has(`enabled:${model.route}`) ||
+                          (!model.enabled && model.availability !== "available")
+                        }
+                        onChange={(value) =>
+                          void mutate({
+                            kind: "enabled",
+                            publisherId: publisher.id,
+                            route: model.route,
+                            value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {model.availability !== "available" && (
+                      <span>
+                        {model.availability === "unavailable"
+                          ? "Unavailable"
+                          : "Availability unverified"}
+                      </span>
+                    )}
+                    <span>
+                      {model.availability === "available"
+                        ? model.supportsTools
+                          ? "Tools supported"
+                          : "Chat only · No tool support"
+                        : "Tool support unverified"}
+                    </span>
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Context:{" "}
+                    {model.contextLength?.toLocaleString() ?? "Unknown"} ·
+                    Input: {rate(model.promptPricePerMillion)} · Output:{" "}
+                    {rate(model.completionPricePerMillion)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Added to OpenRouter:{" "}
+                    {new Date(model.created * 1000).toLocaleDateString()}
+                  </p>
+                </article>
+              ))}
+              {visible.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {data.catalog.status === "unavailable"
+                    ? "Catalog unavailable. No saved selections for this publisher."
+                    : "No matching interactive models."}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        {publisher !== "add" && (
+          <footer className="flex shrink-0 items-center gap-4 border-t border-border-subtle px-4 py-3">
+            <button
+              type="button"
+              disabled={pending.size > 0}
+              className="flex shrink-0 items-center gap-2 rounded py-1 text-xs text-muted-foreground hover:text-destructive focus-visible:outline-2 focus-visible:outline-accent-ring"
+              onClick={() =>
+                void mutate({ kind: "remove", publisherId: publisher.id })
+              }
+            >
+              <Trash2 size={13} />
+              Remove publisher
+            </button>
+            <p className="text-xs text-muted-foreground">
+              Disables its models and stops auto-enable. Favorites are kept.
+            </p>
+          </footer>
+        )}
+        <PreferenceNotice message={notice} onDismiss={dismissNotice} />
+      </div>
+    </dialog>
+  );
+}

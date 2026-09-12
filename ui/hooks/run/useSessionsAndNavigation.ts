@@ -133,37 +133,16 @@ export function useSessionsAndNavigation(p: Args) {
 
   useEffect(() => {
     if (!activeSessionId) return;
-    if (isEphemeral) {
-      const names = new Set(p.ollamaModels.map((m) => m.id));
-      const pref = effectiveDefaultRunModel(
-        p.userSettingsRef.current,
-        p.serverDefaultModel,
-      );
-      let next = pref;
-      if (names.size > 0 && !names.has(next)) {
-        next = names.has(p.serverDefaultModel)
-          ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.id ?? next);
-      }
-      setSelectedModel(next);
-      return;
-    }
-    const preference =
+    setSelectedModel(
       sessionModel?.trim() ||
-      effectiveDefaultRunModel(p.userSettingsRef.current, p.serverDefaultModel);
-    const names = new Set(p.ollamaModels.map((m) => m.id));
-    let next = preference;
-    if (names.size > 0 && !names.has(next)) {
-      next = names.has(p.serverDefaultModel)
-        ? p.serverDefaultModel
-        : (p.ollamaModels[0]?.id ?? next);
-    }
-    setSelectedModel(next);
+        effectiveDefaultRunModel(
+          p.userSettingsRef.current,
+          p.serverDefaultModel,
+        ),
+    );
   }, [
     activeSessionId,
     sessionModel,
-    isEphemeral,
-    p.ollamaModels,
     p.serverDefaultModel,
     p.userSettingsRef,
     p.userSettingsDefaultModel,

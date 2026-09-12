@@ -1,143 +1,181 @@
+import { z } from "zod";
 import {
   InputCapability,
   type InputCapability as InputCapabilityValue,
   parseInputCapabilities,
 } from "./modelCapabilities";
 
-const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const TTL_MS = 2 * 60 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 15_000;
+const RemoteModel = z.object({
+  id: z.string().regex(/^[^/\s]+\/[^\s]+$/),
+  name: z.string().trim().min(1),
+  description: z.string().nullish(),
+  created: z.number().int().nonnegative(),
+  context_length: z.number().int().positive().nullish(),
+  top_provider: z
+    .object({ context_length: z.number().int().positive().nullish() })
+    .nullish(),
+  pricing: z.object({ prompt: z.unknown(), completion: z.unknown() }).nullish(),
+  architecture: z.object({
+    input_modalities: z.array(z.string()),
+    output_modalities: z.array(z.string()),
+  }),
+  supported_parameters: z.array(z.string()).nullish(),
+});
+const RemoteCatalog = z.object({ data: z.array(RemoteModel) });
 
-export type OpenRouterModelDetails = {
+export type CatalogModel = {
   route: string;
+  publisherId: string;
   name: string;
-  ai_lab: string;
-  found: boolean;
+  description: string;
+  created: number;
+  contextLength: number | null;
+  promptPricePerMillion: number | null;
+  completionPricePerMillion: number | null;
   inputCapabilities: InputCapabilityValue[];
+  supportsTools: boolean;
+  outputCapabilities: string[];
+};
+export type CatalogFreshness = {
+  status: "fresh" | "stale" | "unavailable";
+  lastSuccessfulFetchAt: number | null;
+  error: string | null;
+};
+export type CatalogResult = CatalogFreshness & {
+  models: readonly CatalogModel[] | null;
 };
 
-type OpenRouterCatalogModel = {
-  id?: unknown;
-  name?: unknown;
-  architecture?: { input_modalities?: unknown };
-};
-
-type OpenRouterModelsResponse = {
-  data?: OpenRouterCatalogModel[];
-};
-
-function inputCapabilities(value: unknown): InputCapabilityValue[] {
-  const parsed = parseInputCapabilities(value);
-  return parsed.length > 0 ? parsed : [InputCapability.Text];
+function price(value: unknown): number | null {
+  if ((typeof value !== "string" && typeof value !== "number") || value === "")
+    return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) &&
+    number >= 0 &&
+    Number.isFinite(number * 1_000_000)
+    ? number * 1_000_000
+    : null;
 }
-
-const LAB_NAMES: Record<string, string> = {
-  "aion-labs": "AionLabs",
-  anthropic: "Anthropic",
-  deepseek: "DeepSeek",
-  google: "Google",
-  meta: "Meta",
-  "meta-llama": "Meta",
-  mistralai: "Mistral AI",
-  moonshot: "Moonshot AI",
-  moonshotai: "Moonshot AI",
-  openai: "OpenAI",
-  qwen: "Qwen",
-  xai: "xAI",
-  "x-ai": "xAI",
-};
-
-function titleCase(value: string): string {
-  const initials: Record<string, string> = {
-    gpt: "GPT",
-    llm: "LLM",
-    r1: "R1",
-  };
-  return value
-    .split(/[-_.]+/)
-    .filter(Boolean)
-    .map(
-      (part) =>
-        initials[part.toLowerCase()] ??
-        `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`,
-    )
-    .join(" ");
+export function normalizeCatalog(payload: unknown): CatalogModel[] {
+  const { data } = RemoteCatalog.parse(payload);
+  if (new Set(data.map((model) => model.id)).size !== data.length)
+    throw new Error("Duplicate catalog routes");
+  return data.map((model) => ({
+    route: model.id,
+    publisherId: model.id.split("/")[0]!,
+    name: model.name.replace(/^[^:]+:\s*/, ""),
+    description: model.description ?? "",
+    created: model.created,
+    contextLength:
+      model.top_provider?.context_length ?? model.context_length ?? null,
+    promptPricePerMillion: price(model.pricing?.prompt),
+    completionPricePerMillion: price(model.pricing?.completion),
+    inputCapabilities: parseInputCapabilities(
+      model.architecture.input_modalities,
+    ),
+    outputCapabilities: model.architecture.output_modalities,
+    supportsTools: model.supported_parameters?.includes("tools") ?? false,
+  }));
 }
-
-export function parseOpenRouterRoute(route: string): OpenRouterModelDetails {
-  const normalized = route.trim();
-  const [rawLab = "", rawModel = ""] = normalized
-    .replace(/^~/, "")
-    .split("/", 2);
-  return {
-    route: normalized,
-    name: titleCase(rawModel),
-    ai_lab: LAB_NAMES[rawLab.toLowerCase()] ?? titleCase(rawLab),
-    found: false,
-    inputCapabilities: [InputCapability.Text],
-  };
-}
-
-export async function lookupOpenRouterModel(
-  route: string,
-): Promise<OpenRouterModelDetails> {
-  const fallback = parseOpenRouterRoute(route);
-  try {
-    const response = await fetch(OPENROUTER_MODELS_URL);
-    if (!response.ok) return fallback;
-    const payload = (await response.json()) as OpenRouterModelsResponse;
-    const match = payload.data?.find((model) => model.id === fallback.route);
-    if (!match || typeof match.name !== "string" || !match.name.trim()) {
-      return fallback;
-    }
-
-    const [labFromName, ...nameParts] = match.name.split(":");
-    const lab = labFromName?.trim() ?? "";
-    const name = nameParts.join(":").trim();
-    return {
-      route: fallback.route,
-      name: name || match.name.trim(),
-      ai_lab: lab || fallback.ai_lab,
-      found: true,
-      inputCapabilities: inputCapabilities(
-        match.architecture?.input_modalities,
-      ),
-    };
-  } catch {
-    return fallback;
-  }
-}
-
-export async function lookupOpenRouterModels(
-  routes: string[],
-): Promise<Map<string, OpenRouterModelDetails>> {
-  const fallbacks = new Map(
-    routes.map((route) => [route, parseOpenRouterRoute(route)]),
+/** The live catalog identifies asynchronous routes with the :batch variant. */
+export function isInteractiveModel(model: CatalogModel): boolean {
+  return (
+    !model.route.split(":").slice(1).includes("batch") &&
+    model.inputCapabilities.includes(InputCapability.Text) &&
+    model.outputCapabilities.includes("text")
   );
-  try {
-    const response = await fetch(OPENROUTER_MODELS_URL);
-    if (!response.ok) return fallbacks;
-    const payload = (await response.json()) as OpenRouterModelsResponse;
-    const byId = new Map(
-      (payload.data ?? [])
-        .filter(
-          (model): model is OpenRouterCatalogModel & { id: string } =>
-            typeof model.id === "string",
-        )
-        .map((model) => [model.id, model]),
-    );
-    for (const route of routes) {
-      const match = byId.get(route);
-      if (!match) continue;
-      const fallback = fallbacks.get(route)!;
-      fallbacks.set(route, {
-        ...fallback,
-        found: true,
-        inputCapabilities: inputCapabilities(
-          match.architecture?.input_modalities,
-        ),
-      });
-    }
-  } catch {
-    // Keep text-only fallbacks when the remote catalog is unavailable.
-  }
-  return fallbacks;
 }
+export function isNewModel(created: number, now = Date.now()): boolean {
+  const age = now / 1000 - created;
+  return age >= 0 && age <= 21 * 24 * 60 * 60;
+}
+export function catalogFreshness(result: CatalogResult): CatalogFreshness {
+  return {
+    status: result.status,
+    lastSuccessfulFetchAt: result.lastSuccessfulFetchAt,
+    error: result.error,
+  };
+}
+
+export class OpenRouterCatalog {
+  private snapshot: {
+    models: readonly CatalogModel[];
+    fetchedAt: number;
+  } | null = null;
+  private lastError: string | null = null;
+  private inFlight: Promise<CatalogResult> | null = null;
+  constructor(
+    private readonly request: (
+      url: string,
+      init: RequestInit,
+    ) => Promise<Response> = (url, init) => fetch(url, init),
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  peek(): CatalogResult {
+    return {
+      models: this.snapshot?.models ?? null,
+      status: !this.snapshot
+        ? "unavailable"
+        : this.lastError || this.now() - this.snapshot.fetchedAt >= TTL_MS
+          ? "stale"
+          : "fresh",
+      lastSuccessfulFetchAt: this.snapshot?.fetchedAt ?? null,
+      error: this.lastError,
+    };
+  }
+
+  async get(force = false): Promise<CatalogResult> {
+    if (this.inFlight) return this.inFlight;
+    if (
+      !force &&
+      this.snapshot &&
+      this.now() - this.snapshot.fetchedAt < TTL_MS
+    ) {
+      return {
+        models: this.snapshot.models,
+        status: this.lastError ? "stale" : "fresh",
+        lastSuccessfulFetchAt: this.snapshot.fetchedAt,
+        error: this.lastError,
+      };
+    }
+    this.inFlight = this.refresh();
+    try {
+      return await this.inFlight;
+    } finally {
+      this.inFlight = null;
+    }
+  }
+  private async refresh(): Promise<CatalogResult> {
+    try {
+      const response = await this.request(
+        "https://openrouter.ai/api/v1/models",
+        { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+      );
+      if (!response.ok)
+        throw new Error(
+          `OpenRouter catalog request failed (${response.status})`,
+        );
+      const models = normalizeCatalog(await response.json());
+      this.snapshot = { models, fetchedAt: this.now() };
+      this.lastError = null;
+      return {
+        models,
+        status: "fresh",
+        lastSuccessfulFetchAt: this.snapshot.fetchedAt,
+        error: null,
+      };
+    } catch {
+      this.lastError = "Could not refresh the OpenRouter catalog. Try again.";
+      return {
+        models: this.snapshot?.models ?? null,
+        status: this.snapshot ? "stale" : "unavailable",
+        lastSuccessfulFetchAt: this.snapshot?.fetchedAt ?? null,
+        error: this.lastError,
+      };
+    }
+  }
+}
+export const openRouterCatalog = new OpenRouterCatalog();

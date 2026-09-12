@@ -27,6 +27,15 @@ export default function App() {
   const app = useRunApp();
   const [runFooterInset, setRunFooterInset] = useState(104);
   const [currentView, setCurrentView] = useState<AppView>("run");
+  useEffect(() => {
+    const navigate = () => {
+      if (window.location.hash === "#settings/openrouter")
+        setCurrentView("settings");
+    };
+    navigate();
+    window.addEventListener("hashchange", navigate);
+    return () => window.removeEventListener("hashchange", navigate);
+  }, []);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [directorySessionId, setDirectorySessionId] = useState<string | null>(
     null,
@@ -172,7 +181,7 @@ export default function App() {
                 searxngHost={app.searxngHost}
                 searxngConnected={app.searxngConnected}
                 onSave={app.saveUserSettings}
-                onModelsChanged={app.refreshModels}
+                onModelsChanged={() => app.refreshModels(true)}
                 onBack={() => setCurrentView("run")}
               />
             ) : (

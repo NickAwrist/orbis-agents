@@ -15,16 +15,24 @@ export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
 
+  const leave = () => {
+    if (window.location.hash === "#settings/openrouter")
+      history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    props.onBack();
+  };
   const handleBack = () => {
     if (p.isDirty) {
       setLeavePromptOpen(true);
       return;
     }
-    props.onBack();
+    leave();
   };
-
   const handleSaveAndLeave = async () => {
-    if (await p.handleSubmit()) props.onBack();
+    if (await p.handleSubmit()) leave();
   };
 
   const tabButtonClass = (t: SettingsTab) =>
@@ -171,7 +179,7 @@ export function SettingsPage(props: SettingsPageProps) {
         <UnsavedChangesModal
           saving={p.isSaving}
           onStay={() => setLeavePromptOpen(false)}
-          onDiscard={props.onBack}
+          onDiscard={leave}
           onSaveAndLeave={() => void handleSaveAndLeave()}
         />
       )}

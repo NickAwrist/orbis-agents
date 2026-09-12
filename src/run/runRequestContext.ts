@@ -6,7 +6,6 @@ import {
   type SessionRow,
   getAgentByName,
   getOpenRouterApiKey,
-  getOpenRouterModelByRoute,
   getSessionAttachments,
   getSessionById,
 } from "../db/index";
@@ -80,7 +79,7 @@ export async function buildTurnContext(
   if (resolvedModel.provider === "openrouter") {
     if (
       !resolvedModel.model ||
-      !getOpenRouterModelByRoute(resolvedModel.model)
+      !/^[^/\s]+\/[^\s]+$/.test(resolvedModel.model)
     ) {
       sendApiError(res, 400, "BAD_REQUEST", "Unknown OpenRouter model");
       return null;

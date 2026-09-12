@@ -1,149 +1,144 @@
-import type { Database } from "bun:sqlite";
+import { type CatalogModel, isInteractiveModel } from "../openRouterModels";
+import { publisherName } from "../openRouterPublishers";
 import { getDb } from "./connection";
-import {
-  LEGACY_OPENROUTER_MODELS_SEEDED_KEYS,
-  OPENROUTER_MODELS_SEEDED_KEY,
-} from "./constants";
 import type { OpenRouterModel } from "./types";
 
-export const DEFAULT_OPENROUTER_MODELS = [
-  {
-    name: "GPT-5.6 Terra",
-    route: "openai/gpt-5.6-terra",
-    ai_lab: "OpenAI",
-  },
-  {
-    name: "GPT-5.6 Luna",
-    route: "openai/gpt-5.6-luna",
-    ai_lab: "OpenAI",
-  },
-  {
-    name: "Claude Opus 4.8",
-    route: "anthropic/claude-opus-4.8",
-    ai_lab: "Anthropic",
-  },
-  {
-    name: "Claude Sonnet 5",
-    route: "anthropic/claude-sonnet-5",
-    ai_lab: "Anthropic",
-  },
-  {
-    name: "Claude Fable 5",
-    route: "anthropic/claude-fable-5",
-    ai_lab: "Anthropic",
-  },
-  {
-    name: "Gemini 3.5 Flash",
-    route: "google/gemini-3.5-flash",
-    ai_lab: "Google",
-  },
-  {
-    name: "Gemini 3.1 Pro Preview",
-    route: "google/gemini-3.1-pro-preview",
-    ai_lab: "Google",
-  },
-];
+export type OpenRouterPublisher = {
+  id: string;
+  name: string;
+  subscribed: number;
+  subscribed_at: number | null;
+};
+export type ModelFavorite = {
+  provider: "openrouter" | "ollama";
+  model_id: string;
+};
 
-const LEGACY_DEFAULT_OPENROUTER_ROUTES = [
-  "anthropic/claude-3.5-sonnet",
-  "anthropic/claude-sonnet-4.6",
-  "openai/gpt-4o",
-  "openai/gpt-4o-mini",
-  "openai/gpt-5.4-mini",
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-pro",
-  "google/gemini-3.5-flash",
-  "google/gemini-3.1-pro-preview",
-];
-
-/**
- * Inserts the starter registry exactly once. A marker keeps deleted defaults
- * from reappearing on later app starts.
- */
-export function seedDefaultOpenRouterModels(db: Database): void {
-  const seeded = db
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(OPENROUTER_MODELS_SEEDED_KEY) as { value: string } | null;
-  if (seeded) return;
-
-  const legacySeeded = db
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(LEGACY_OPENROUTER_MODELS_SEEDED_KEYS[0]) as { value: string } | null;
-  const legacySeededV2 = db
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(LEGACY_OPENROUTER_MODELS_SEEDED_KEYS[1]) as { value: string } | null;
-
-  const insert = db.prepare(
-    "INSERT OR IGNORE INTO openrouter_models (name, route, ai_lab) VALUES (?, ?, ?)",
-  );
-
-  const tx = db.transaction(() => {
-    if (legacySeeded || legacySeededV2) {
-      const removeLegacyDefaults = db.prepare(
-        "DELETE FROM openrouter_models WHERE route = ?",
-      );
-      for (const route of LEGACY_DEFAULT_OPENROUTER_ROUTES) {
-        removeLegacyDefaults.run(route);
-      }
-    }
-    for (const model of DEFAULT_OPENROUTER_MODELS) {
-      insert.run(model.name, model.route, model.ai_lab);
-    }
-    db.run("INSERT INTO app_settings (key, value) VALUES (?, '1')", [
-      OPENROUTER_MODELS_SEEDED_KEY,
-    ]);
-  });
-  tx();
-}
-
-/**
- * Returns all registered OpenRouter models sorted by name.
- */
 export function listOpenRouterModels(): OpenRouterModel[] {
   return getDb()
-    .query(
-      "SELECT id, name, route, ai_lab FROM openrouter_models ORDER BY name ASC",
-    )
+    .query("SELECT * FROM openrouter_models ORDER BY name")
     .all() as OpenRouterModel[];
 }
-
 export function getOpenRouterModelByRoute(
   route: string,
 ): OpenRouterModel | null {
-  const row = getDb()
+  return getDb()
+    .query("SELECT * FROM openrouter_models WHERE route = ?")
+    .get(route) as OpenRouterModel | null;
+}
+export function listOpenRouterPublishers(): OpenRouterPublisher[] {
+  return getDb()
     .query(
-      "SELECT id, name, route, ai_lab FROM openrouter_models WHERE route = ?",
+      "SELECT * FROM openrouter_publishers WHERE tracked = 1 ORDER BY name",
     )
-    .get(route.trim()) as OpenRouterModel | null;
-  return row ?? null;
+    .all() as OpenRouterPublisher[];
+}
+export function trackOpenRouterPublisher(id: string): void {
+  getDb().run(
+    "INSERT INTO openrouter_publishers (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET tracked = 1",
+    [id, publisherName(id)],
+  );
+}
+export function setPublisherSubscription(
+  id: string,
+  subscribed: boolean,
+  now = Math.floor(Date.now() / 1000),
+): boolean {
+  return (
+    getDb()
+      .query(`UPDATE openrouter_publishers SET
+    subscribed_at = CASE WHEN ? = 1 AND subscribed = 0 THEN ? ELSE subscribed_at END,
+    subscribed = ? WHERE id = ? AND tracked = 1`)
+      .run(Number(subscribed), now, Number(subscribed), id).changes > 0
+  );
+}
+export function setOpenRouterModelEnabled(
+  model: Pick<CatalogModel, "route" | "publisherId" | "name" | "created">,
+  enabled: boolean,
+): void {
+  getDb().transaction(() => {
+    if (enabled) trackOpenRouterPublisher(model.publisherId);
+    else
+      getDb().run(
+        "INSERT OR IGNORE INTO openrouter_publishers (id, name) VALUES (?, ?)",
+        [model.publisherId, publisherName(model.publisherId)],
+      );
+    getDb().run(
+      `INSERT INTO openrouter_models (route, publisher_id, name, enabled, catalog_created_at)
+      VALUES (?, ?, ?, ?, ?) ON CONFLICT(route) DO UPDATE SET
+      name = excluded.name, catalog_created_at = excluded.catalog_created_at, enabled = excluded.enabled`,
+      [
+        model.route,
+        model.publisherId,
+        model.name,
+        Number(enabled),
+        model.created,
+      ],
+    );
+  })();
+}
+export function listModelFavorites(): ModelFavorite[] {
+  return getDb()
+    .query("SELECT * FROM model_favorites")
+    .all() as ModelFavorite[];
+}
+export function setModelFavorite(
+  provider: ModelFavorite["provider"],
+  modelId: string,
+  favorite: boolean,
+): void {
+  getDb().run(
+    favorite
+      ? "INSERT OR IGNORE INTO model_favorites (provider, model_id) VALUES (?, ?)"
+      : "DELETE FROM model_favorites WHERE provider = ? AND model_id = ?",
+    [provider, modelId],
+  );
+}
+export function refreshRegistryMetadata(models: readonly CatalogModel[]): void {
+  getDb().transaction(() => {
+    const update = getDb().prepare(
+      "UPDATE openrouter_models SET name = ?, catalog_created_at = ? WHERE route = ?",
+    );
+    for (const model of models)
+      update.run(model.name, model.created, model.route);
+  })();
+}
+/** Network work must finish before entering this transaction. Re-read subscriptions here. */
+export function applyPublisherSubscriptions(
+  models: readonly CatalogModel[],
+): void {
+  getDb().transaction(() => {
+    const subscriptions = listOpenRouterPublishers().filter(
+      (publisher) => publisher.subscribed === 1,
+    );
+    const insert = getDb().prepare(`INSERT OR IGNORE INTO openrouter_models
+      (route, publisher_id, name, enabled, catalog_created_at) VALUES (?, ?, ?, 1, ?)`);
+    for (const publisher of subscriptions) {
+      for (const model of models) {
+        if (
+          isInteractiveModel(model) &&
+          model.publisherId === publisher.id &&
+          model.created > (publisher.subscribed_at ?? Number.POSITIVE_INFINITY)
+        ) {
+          insert.run(model.route, model.publisherId, model.name, model.created);
+        }
+      }
+    }
+  })();
 }
 
-/**
- * Registers a new OpenRouter model.
- */
-export function createOpenRouterModel(model: {
-  name: string;
-  route: string;
-  ai_lab: string;
-}): OpenRouterModel {
-  const db = getDb();
-  const result = db
-    .query(
-      "INSERT INTO openrouter_models (name, route, ai_lab) VALUES (?, ?, ?) RETURNING id, name, route, ai_lab",
-    )
-    .get(
-      model.name.trim(),
-      model.route.trim(),
-      model.ai_lab.trim(),
-    ) as OpenRouterModel;
-  return result;
-}
-
-/**
- * Deletes an OpenRouter model by ID.
- */
-export function deleteOpenRouterModel(id: number): boolean {
-  const db = getDb();
-  const info = db.prepare("DELETE FROM openrouter_models WHERE id = ?").run(id);
-  return info.changes > 0;
+export function removeOpenRouterPublisher(id: string): boolean {
+  return getDb().transaction(() => {
+    const result = getDb()
+      .query(
+        "UPDATE openrouter_publishers SET tracked = 0, subscribed = 0 WHERE id = ? AND tracked = 1",
+      )
+      .run(id);
+    if (!result.changes) return false;
+    getDb().run(
+      "UPDATE openrouter_models SET enabled = 0 WHERE publisher_id = ?",
+      [id],
+    );
+    return true;
+  })();
 }
