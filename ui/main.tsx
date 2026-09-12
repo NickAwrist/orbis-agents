@@ -6,7 +6,9 @@ import App from "./App";
 const Root =
   import.meta.env.DEV && window.location.pathname === "/dev/messages"
     ? lazy(() => import("./dev/MessageDemo"))
-    : App;
+    : import.meta.env.DEV && window.location.pathname === "/dev/images"
+      ? lazy(() => import("./dev/ImageLoadingDemo"))
+      : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

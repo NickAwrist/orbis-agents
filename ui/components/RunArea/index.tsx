@@ -9,6 +9,10 @@ import type { RunAreaProps } from "./types";
 
 export function RunArea({
   messages,
+  sessionLoadState,
+  sessionError,
+  sessionSendReady,
+  onRetryLoad,
   streamingSteps,
   streamingStep,
   streamingContent,
@@ -27,7 +31,10 @@ export function RunArea({
       initial: "instant",
     });
   const isBusy =
-    runPending || streamingStep !== null || streamingSteps.length > 0;
+    !sessionSendReady ||
+    runPending ||
+    streamingStep !== null ||
+    streamingSteps.length > 0;
   const initialRenderedCountRef = useRef<number | null>(null);
 
   if (initialRenderedCountRef.current === null && messages.length > 0) {
@@ -64,7 +71,30 @@ export function RunArea({
           ref={contentRef}
           className="mx-auto flex min-h-min w-full max-w-3xl flex-col"
         >
-          {messages.length === 0 && (
+          {sessionError && (
+            <div
+              className="py-4 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
+              <p>{sessionError}</p>
+              <button
+                type="button"
+                onClick={onRetryLoad}
+                className="mt-2 underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {sessionLoadState === "loading" && messages.length === 0 && (
+            <p
+              className="py-8 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
+              Loading conversation…
+            </p>
+          )}
+          {sessionLoadState === "empty" && messages.length === 0 && !isBusy && (
             <div className="flex items-center gap-2 bg-transparent py-8 text-[0.875rem] text-muted-foreground">
               <Bot size={14} />
               <p>Start the session with a message below.</p>

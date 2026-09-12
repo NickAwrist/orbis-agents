@@ -263,7 +263,7 @@ export function useRunStreaming(p: Args) {
     p.setTruncateConfirm(null);
     p.setEditingUserIndex(null);
     const sessionId = p.activeSessionId;
-    if (!confirmation || !sessionId) return;
+    if (!confirmation || !sessionId || !p.modelSendReady) return;
     const row = p.messages[confirmation.userIndex];
     if (!row || row.role !== "user") return;
     const message =

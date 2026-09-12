@@ -91,7 +91,7 @@ export function useRunFlight(
               d.setStreamingThinking("");
             }
             try {
-              const s = await fetchSession(sessionId);
+              const s = await fetchSession(sessionId, { fresh: true });
               if (viewing()) {
                 if (s?.history?.length) d.setMessages(s.history);
                 d.modelMessagesRef.current = s?.modelMessages ?? null;
@@ -190,7 +190,9 @@ export function useRunFlight(
               if (status.active && status.requestId) {
                 retryRequestId = status.requestId;
               } else {
-                const completed = await fetchSession(sessionId);
+                const completed = await fetchSession(sessionId, {
+                  fresh: true,
+                });
                 if (viewing()) {
                   if (completed?.history?.length) {
                     d.setMessages(completed.history);

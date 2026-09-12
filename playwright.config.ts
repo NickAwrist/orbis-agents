@@ -26,7 +26,10 @@ export default defineConfig({
         },
       },
     },
-    { name: "desktop", grep: /desktop hover/ },
+    {
+      name: "desktop",
+      grep: /desktop hover|attachment image loading|session loading/,
+    },
   ],
   webServer: {
     command: "bun run dev:ui --port 5199 --strictPort",

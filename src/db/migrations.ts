@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { isBuiltinToolName } from "../tools/builtinTools";
+import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
 
 function tableExists(db: Database, name: string): boolean {
   return (
@@ -316,4 +317,5 @@ export function runMigrations(db: Database) {
   migrateAgentDelegations(db);
   migrateSeededComputerAgentName(db);
   migrateMessagesAttachmentsColumn(db);
+  if (tableExists(db, "messages")) migrateAttachmentMetadata(db);
 }

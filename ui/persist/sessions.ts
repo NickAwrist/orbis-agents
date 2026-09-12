@@ -37,9 +37,27 @@ export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export async function fetchSession(
+const inFlightSessionFetches = new Map<
+  string,
+  Promise<StoredRunSession | null>
+>();
+
+// Stream completion must bypass any navigation snapshot requested before the run finished.
+export function fetchSession(
   id: string,
+  options?: { fresh?: boolean },
 ): Promise<StoredRunSession | null> {
+  const pending = inFlightSessionFetches.get(id);
+  if (pending && !options?.fresh) return pending;
+  const request = fetchSessionData(id).finally(() => {
+    if (inFlightSessionFetches.get(id) === request)
+      inFlightSessionFetches.delete(id);
+  });
+  inFlightSessionFetches.set(id, request);
+  return request;
+}
+
+async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
   const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(await readApiError(res));

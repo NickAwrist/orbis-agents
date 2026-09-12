@@ -1,47 +1,111 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
-import { fetchAttachmentImage } from "../../persist/attachments";
+import {
+  fetchAttachmentImage,
+  invalidateAttachmentImage,
+  releaseAttachmentImage,
+  retainAttachmentImage,
+} from "../../persist/attachments";
 
 export function AttachmentImage({
   attachment,
-}: {
-  attachment: ImageAttachment;
-}) {
+}: { attachment: ImageAttachment }) {
+  return <AttachmentPreview key={attachment.id} attachment={attachment} />;
+}
+
+function AttachmentPreview({ attachment }: { attachment: ImageAttachment }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string | null>(null);
+  const [errored, setErrored] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    void fetchAttachmentImage(attachment.id)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-      })
-      .catch(() => {
-        if (active) setUrl(null);
-      });
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    const controller = new AbortController();
+    let retainedUrl: string | undefined;
+    let observer: IntersectionObserver | undefined;
+    const load = () => {
+      observer?.disconnect();
+      setErrored(false);
+      void Promise.resolve(
+        fetchAttachmentImage(attachment.id, controller.signal),
+      )
+        .then((objectUrl) => {
+          if (!controller.signal.aborted) {
+            retainAttachmentImage(objectUrl);
+            retainedUrl = objectUrl;
+            setUrl(objectUrl);
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setErrored(true);
+        });
     };
-  }, [attachment.id]);
-
-  if (!url) {
-    return (
-      <div className="flex h-32 w-44 items-center justify-center rounded-lg border border-border-subtle bg-background/30 px-3 text-center text-xs text-muted-foreground">
-        {attachment.name}
-      </div>
-    );
-  }
+    // RunArea first mounts at the top, then scrolls to the latest message.
+    const frame = requestAnimationFrame(() => {
+      if (attempt > 0 || typeof IntersectionObserver === "undefined") {
+        load();
+        return;
+      }
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) load();
+        },
+        { rootMargin: "350px 0px" },
+      );
+      if (containerRef.current) observer.observe(containerRef.current);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      controller.abort();
+      if (retainedUrl) releaseAttachmentImage(retainedUrl);
+    };
+  }, [attachment.id, attempt]);
 
   return (
-    <a href={url} target="_blank" rel="noreferrer" title={attachment.name}>
-      <img
-        src={url}
-        alt={attachment.name}
-        className="max-h-72 max-w-full rounded-lg border border-border-subtle object-contain"
-      />
-    </a>
+    <div
+      ref={containerRef}
+      className="flex h-48 w-72 max-w-full items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-background/30 text-center text-xs text-muted-foreground"
+    >
+      {errored ? (
+        <div
+          className="flex flex-col items-center gap-2 px-3"
+          aria-live="polite"
+        >
+          <span>Failed to load {attachment.name}</span>
+          <button
+            type="button"
+            className="rounded px-3 py-1 underline hover:text-foreground"
+            onClick={() => {
+              setUrl(null);
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={attachment.name}
+          className="block h-full w-full"
+        >
+          <img
+            src={url}
+            alt={attachment.name}
+            decoding="async"
+            onError={() => {
+              invalidateAttachmentImage(attachment.id);
+              setErrored(true);
+            }}
+            className="h-full w-full object-contain"
+          />
+        </a>
+      ) : (
+        <span className="px-3">{attachment.name}</span>
+      )}
+    </div>
   );
 }

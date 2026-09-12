@@ -218,6 +218,10 @@ export default function App() {
                     >
                       <RunArea
                         messages={app.messages}
+                        sessionLoadState={app.sessionLoadState}
+                        sessionError={app.sessionError}
+                        sessionSendReady={app.sessionSendReady}
+                        onRetryLoad={app.retrySessionLoad}
                         streamingSteps={app.streamingSteps}
                         streamingStep={app.streamingStep}
                         streamingContent={app.streamingContent}

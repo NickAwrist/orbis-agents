@@ -149,6 +149,7 @@ router.get(
         return;
       }
 
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
       const contentType = upstream.headers.get("content-type");
       if (contentType) res.setHeader("Content-Type", contentType);
 

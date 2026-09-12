@@ -254,27 +254,29 @@ function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
     <div className="my-3 inline-block max-w-full">
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-background shadow-sm">
         {errored ? (
-          <div className="flex h-48 w-80 flex-col items-center justify-center p-4 text-center text-[0.8125rem] text-muted-foreground">
+          <div className="flex h-48 w-80 max-w-full flex-col items-center justify-center p-4 text-center text-[0.8125rem] text-muted-foreground">
             <div className="mb-2">Failed to load image</div>
             <div className="break-all text-[0.7rem] opacity-70">
               {errorDetails}
             </div>
           </div>
         ) : (
-          <div className="relative block">
+          <div className="relative block h-48 w-80 max-w-full">
             {!loaded && (
-              <div className="flex h-48 w-80 items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-foreground" />
               </div>
             )}
             <img
               src={src}
+              loading="lazy"
+              decoding="async"
               alt={alt || "Generated image"}
               onLoad={() => setLoaded(true)}
               onError={handleError}
               className={cx(
-                "max-h-[512px] max-w-full object-contain",
-                loaded ? "block" : "hidden",
+                "block h-full w-full object-contain",
+                loaded ? "opacity-100" : "opacity-0",
               )}
             />
           </div>
@@ -292,7 +294,9 @@ function MarkdownImg({
   if (isComfyUIImage(src)) {
     return <ComfyUIImageCard src={src!} alt={alt} />;
   }
-  return <img {...rest} src={src} alt={alt ?? ""} />;
+  return (
+    <img {...rest} src={src} alt={alt ?? ""} loading="lazy" decoding="async" />
+  );
 }
 
 /**

@@ -264,7 +264,11 @@ export function persistSessionMessages(
           ? JSON.stringify(m.steps)
           : null;
       const attachmentsJson = m.attachments?.length
-        ? JSON.stringify(m.attachments)
+        ? JSON.stringify(
+            m.attachments.map((attachment) =>
+              MessageAttachmentSchema.parse(attachment),
+            ),
+          )
         : null;
       insert.run(sessionId, m.role, m.content, stepsJson, attachmentsJson, i);
     }
@@ -276,7 +280,11 @@ export function persistSessionMessages(
           ? JSON.stringify(last.steps)
           : null;
       const attachmentsJson = last.attachments?.length
-        ? JSON.stringify(last.attachments)
+        ? JSON.stringify(
+            last.attachments.map((attachment) =>
+              MessageAttachmentSchema.parse(attachment),
+            ),
+          )
         : null;
       db.run(
         "UPDATE messages SET content = ?, steps = ?, attachments = ? WHERE session_id = ? AND position = ?",
