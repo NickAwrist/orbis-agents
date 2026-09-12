@@ -1,8 +1,4 @@
-import { useEffect, useState } from "react";
-import {
-  type ShellCapability,
-  fetchShellCapability,
-} from "../../persist/tools";
+import { useState } from "react";
 import {
   getOrCreateUserId,
   normalizeUserId,
@@ -26,8 +22,6 @@ export function GeneralSettingsTab({
 }: Props) {
   const [currentUserId] = useState(getOrCreateUserId);
   const [userIdDraft, setUserIdDraft] = useState(currentUserId);
-  const [shellCapability, setShellCapability] =
-    useState<ShellCapability | null>(null);
   const normalizedDraft = normalizeUserId(userIdDraft);
   const canSwitch =
     normalizedDraft !== null && normalizedDraft !== currentUserId;
@@ -37,28 +31,6 @@ export function GeneralSettingsTab({
     window.history.replaceState({}, "", "/");
     window.location.reload();
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchShellCapability()
-      .then((capability) => {
-        if (!cancelled) setShellCapability(capability);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setShellCapability({
-            available: false,
-            diagnostic:
-              error instanceof Error
-                ? error.message
-                : "Shell containment status is unavailable",
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <div className="space-y-4">
@@ -101,26 +73,6 @@ export function GeneralSettingsTab({
             load another UUID&apos;s data.
           </p>
         </div>
-      </div>
-
-      <hr className="border-border-subtle" />
-
-      <div className="space-y-2">
-        <h2 className={cx(eyebrowText, "mb-2")}>Runtime Security</h2>
-        <p
-          className={cx(
-            "text-[0.75rem]",
-            shellCapability?.available
-              ? "text-emerald-500/90"
-              : "text-muted-foreground",
-          )}
-        >
-          {shellCapability === null
-            ? "Checking shell containment..."
-            : shellCapability.available
-              ? "Shell commands run in an isolated workspace with networking disabled."
-              : (shellCapability.diagnostic ?? "Shell tools are disabled.")}
-        </p>
       </div>
 
       <hr className="border-border-subtle" />
@@ -188,9 +140,6 @@ export function GeneralSettingsTab({
 
       <div className="space-y-2">
         <h2 className={cx(eyebrowText, "mb-2")}>Chat Defaults</h2>
-        <p className={hintClass}>
-          Choose the model used when you start a new conversation.
-        </p>
         <div className="space-y-2">
           <label htmlFor="defaultModel" className={labelClass}>
             Default Model
@@ -228,9 +177,6 @@ export function GeneralSettingsTab({
               );
             })}
           </select>
-          <p className={hintClass}>
-            This model will be used for new conversations.
-          </p>
         </div>
       </div>
     </div>
