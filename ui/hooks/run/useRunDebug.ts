@@ -1,74 +1,52 @@
 import { type MutableRefObject, useCallback } from "react";
-import {
-  CORE_DIRECTIVES,
-  type PromptContext,
-  renderSystemPrompt,
-} from "../../../src/prompts/render";
-import { getClientOs } from "../../lib/clientOs";
-import { type AgentData, fetchAgents } from "../../persist/agents";
 import { fetchSession } from "../../persist/sessions";
+import { userScopedFetch } from "../../persist/userIdentity";
+import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
 import type { DebugData } from "../../types";
 
 type Args = {
-  agentMapRef: MutableRefObject<Map<string, AgentData>>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  workspaceDisplayPath: string;
   userSettingsRef: MutableRefObject<UserSettings>;
   isEphemeralRef: MutableRefObject<boolean>;
   setDebugData: (data: DebugData | null) => void;
 };
 
 export function useRunDebug({
-  agentMapRef,
   selectedSessionAgentRef,
-  workspaceDisplayPath,
   userSettingsRef,
   isEphemeralRef,
   setDebugData,
 }: Args) {
-  const resolveAgentTemplate = useCallback(async (): Promise<string> => {
-    const name = selectedSessionAgentRef.current;
-    const cached = agentMapRef.current.get(name);
-    if (cached) return cached.system_prompt;
-
-    try {
-      const agents = await fetchAgents();
-      agentMapRef.current = new Map(agents.map((agent) => [agent.name, agent]));
-      return (
-        agentMapRef.current.get(name)?.system_prompt ??
-        agents[0]?.system_prompt ??
-        ""
-      );
-    } catch {
-      return "";
-    }
-  }, [agentMapRef, selectedSessionAgentRef]);
-
-  const renderCurrentSystemPrompt = useCallback(async (): Promise<string> => {
-    const settings = userSettingsRef.current;
-    const context: PromptContext = {
-      personalization: {
-        name: settings.name,
-        location: settings.location,
-        preferredFormats: settings.preferredFormats,
-      },
-      sessionDirectory: workspaceDisplayPath,
-      os: getClientOs(),
-    };
-    return renderSystemPrompt(await resolveAgentTemplate(), context);
-  }, [resolveAgentTemplate, userSettingsRef, workspaceDisplayPath]);
-
   return useCallback(
-    async (sessionId: string) => {
+    async (sessionId: string, message = "") => {
       try {
-        const rendered = await renderCurrentSystemPrompt();
-        const systemPrompt = rendered
-          ? `${rendered}\n\n${CORE_DIRECTIVES}`
-          : CORE_DIRECTIVES;
-        const stored = isEphemeralRef.current
-          ? null
-          : await fetchSession(sessionId);
+        const settings = userSettingsRef.current;
+        const metadata = buildRunMetadata(settings);
+
+        const [promptRes, stored] = await Promise.all([
+          userScopedFetch("/api/runs/debug-prompt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId,
+              agentName: selectedSessionAgentRef.current,
+              metadata,
+              message,
+              ephemeral: isEphemeralRef.current,
+            }),
+          }),
+          isEphemeralRef.current ? null : fetchSession(sessionId),
+        ]);
+
+        if (!promptRes.ok) {
+          throw new Error(
+            "Failed to load the system prompt preview. Try again.",
+          );
+        }
+        const promptData = (await promptRes.json()) as { systemPrompt: string };
+        const systemPrompt = promptData.systemPrompt;
+
         setDebugData({
           systemPrompt,
           history: stored?.history ?? [],
@@ -77,8 +55,15 @@ export function useRunDebug({
         });
       } catch (error) {
         console.error("Failed to load debug data", error);
+        setDebugData({
+          systemPrompt: "",
+          history: [],
+          customTitle: null,
+          error:
+            "Failed to load the debug preview. Close and reopen it to retry.",
+        });
       }
     },
-    [isEphemeralRef, renderCurrentSystemPrompt, setDebugData],
+    [isEphemeralRef, selectedSessionAgentRef, setDebugData, userSettingsRef],
   );
 }

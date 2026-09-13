@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
-import type { AgentData } from "../../persist/agents";
 import { patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
@@ -36,8 +35,6 @@ type Args = {
   isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
   selectedSessionAgentRef: MutableRefObject<string>;
-  agentMapRef: MutableRefObject<Map<string, AgentData>>;
-  workspaceDisplayPath: string;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
   debugOpen: boolean;
@@ -131,9 +128,7 @@ export function useRunStreaming(p: Args) {
   });
 
   const fetchDebugData = useRunDebug({
-    agentMapRef: p.agentMapRef,
     selectedSessionAgentRef: p.selectedSessionAgentRef,
-    workspaceDisplayPath: p.workspaceDisplayPath,
     userSettingsRef: p.userSettingsRef,
     isEphemeralRef: p.isEphemeralRef,
     setDebugData: p.setDebugData,
@@ -284,7 +279,7 @@ export function useRunStreaming(p: Args) {
   const toggleDebug = () => {
     if (!p.debugOpen && p.activeSessionId) {
       void p.fetchOllamaHealth();
-      void fetchDebugData(p.activeSessionId);
+      void fetchDebugData(p.activeSessionId, input);
     }
     p.setDebugOpen((open) => !open);
   };

@@ -48,6 +48,7 @@ export interface SessionSummary {
 }
 
 export interface DebugData {
+  error?: string;
   systemPrompt: string;
   history: Message[];
   customTitle?: string | null;

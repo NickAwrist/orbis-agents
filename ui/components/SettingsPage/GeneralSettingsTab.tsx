@@ -11,7 +11,10 @@ import { hintClass, inputClass, labelClass, selectClass } from "./constants";
 
 type Props = {
   settings: UserSettings;
-  onFieldChange: (field: keyof UserSettings, value: string) => void;
+  onFieldChange: <K extends keyof UserSettings>(
+    field: K,
+    value: UserSettings[K],
+  ) => void;
   availableModels: ModelOption[];
 };
 
@@ -133,6 +136,27 @@ export function GeneralSettingsTab({
           <p className={hintClass}>
             Specify how you prefer responses to be formatted.
           </p>
+        </div>
+
+        <div className="flex items-start gap-3 pt-1">
+          <input
+            type="checkbox"
+            id="includeCurrentDate"
+            checked={settings.includeCurrentDate}
+            onChange={(e) =>
+              onFieldChange("includeCurrentDate", e.target.checked)
+            }
+            className="mt-0.5 h-4 w-4 rounded border-border-subtle bg-surface text-primary focus:ring-primary"
+          />
+          <div className="space-y-0.5">
+            <label htmlFor="includeCurrentDate" className={labelClass}>
+              Include current date
+            </label>
+            <p className={hintClass}>
+              Include today&apos;s date in the system prompt so models know what
+              day it is.
+            </p>
+          </div>
         </div>
       </div>
 

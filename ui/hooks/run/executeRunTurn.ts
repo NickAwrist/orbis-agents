@@ -7,6 +7,7 @@ import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
+import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
 import type { Message, MessageStep } from "../../types";
 import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
@@ -147,14 +148,7 @@ export async function executeRunTurn(
     let response: Response;
     try {
       const settings = p.userSettingsRef.current;
-      const metadata: Record<string, string> = {};
-      if (settings.name?.trim()) metadata.name = settings.name.trim();
-      if (settings.location?.trim()) {
-        metadata.location = settings.location.trim();
-      }
-      if (settings.preferredFormats?.trim()) {
-        metadata.preferredFormats = settings.preferredFormats.trim();
-      }
+      const metadata = buildRunMetadata(settings);
       const body: Record<string, unknown> = {
         message,
         history: priorMessages,
@@ -164,7 +158,7 @@ export async function executeRunTurn(
         ...(attachments.length > 0
           ? { attachmentIds: attachments.map((attachment) => attachment.id) }
           : {}),
-        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+        metadata,
         sessionId: turnSessionId,
         ...(ephemeral ? { ephemeral: true } : {}),
       };

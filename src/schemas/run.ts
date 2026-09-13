@@ -21,6 +21,7 @@ export const RunMetadataSchema = z.object({
   name: z.string().optional(),
   location: z.string().optional(),
   preferredFormats: z.string().optional(),
+  includeCurrentDate: z.boolean().optional(),
 });
 
 export const RunBodySchema = z.object({
@@ -42,3 +43,12 @@ export const AbortRunBodySchema = z.object({
 });
 
 export type AbortRunBody = z.infer<typeof AbortRunBodySchema>;
+
+/** Preview using current configuration, optionally including a draft message. */
+export const DebugPromptBodySchema = z.object({
+  sessionId: z.string().trim().min(1).optional(),
+  agentName: z.string().trim().min(1).optional(),
+  metadata: RunMetadataSchema.optional(),
+  ephemeral: z.boolean().optional(),
+  message: z.string().optional(),
+});

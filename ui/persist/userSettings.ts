@@ -1,3 +1,5 @@
+import type { RunBody } from "../../src/schemas/run";
+
 const STORAGE_KEY = "agents:userSettings";
 
 export interface UserSettings {
@@ -5,6 +7,7 @@ export interface UserSettings {
   preferredFormats: string;
   location: string;
   defaultModel: string;
+  includeCurrentDate: boolean;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -12,6 +15,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   preferredFormats: "",
   location: "",
   defaultModel: "",
+  includeCurrentDate: true,
 };
 
 export function loadUserSettings(): UserSettings {
@@ -25,6 +29,7 @@ export function loadUserSettings(): UserSettings {
       preferredFormats: parsed.preferredFormats || "",
       location: parsed.location || "",
       defaultModel: parsed.defaultModel || "",
+      includeCurrentDate: parsed.includeCurrentDate ?? true,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -33,11 +38,12 @@ export function loadUserSettings(): UserSettings {
 
 function saveUserSettings(settings: UserSettings): void {
   try {
-    const toSave = {
+    const toSave: UserSettings = {
       name: settings.name || "",
       preferredFormats: settings.preferredFormats || "",
       location: settings.location || "",
       defaultModel: settings.defaultModel || "",
+      includeCurrentDate: settings.includeCurrentDate ?? true,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch {
@@ -52,4 +58,15 @@ export function updateUserSettings(
   const updated = { ...current, ...updates };
   saveUserSettings(updated);
   return updated;
+}
+
+export function buildRunMetadata(
+  settings: UserSettings,
+): NonNullable<RunBody["metadata"]> {
+  return {
+    name: settings.name.trim() || undefined,
+    location: settings.location.trim() || undefined,
+    preferredFormats: settings.preferredFormats.trim() || undefined,
+    includeCurrentDate: settings.includeCurrentDate,
+  };
 }

@@ -11,6 +11,8 @@ export type PersonalizationFields = {
   preferredFormats?: string;
   /** Optional date override; defaults to the current date at render time. */
   now?: Date;
+  /** Whether to include the current date in the rendered block; defaults to true. */
+  includeCurrentDate?: boolean;
 };
 
 export type PromptContext = {
@@ -22,8 +24,7 @@ export type PromptContext = {
 /**
  * Invariant suffix appended to every agent's final system prompt. These
  * directives must always be present regardless of the user-authored template.
- * Lives in the browser-safe renderer module so the UI can append it locally
- * when showing the debug prompt (same string the server appends server-side).
+ * Appended by BaseAgent after rendering the template and assigned skills.
  */
 export const CORE_DIRECTIVES = [
   "<tool_format>",
@@ -63,7 +64,7 @@ export const PROMPT_PLACEHOLDER_LIST: Array<{
   {
     key: "OS",
     token: PROMPT_PLACEHOLDERS.OS,
-    description: "Operating system of the machine running the run client.",
+    description: "Operating system of the server running the agent.",
   },
 ];
 
@@ -77,14 +78,18 @@ function formatPersonalizationBlock(fields: PersonalizationFields): string {
   if (preferredFormats)
     lines.push(`Preferred response format: ${preferredFormats}`);
 
-  const now = fields.now ?? new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  lines.push(`Current date: ${dateStr}`);
+  if (fields.includeCurrentDate !== false) {
+    const now = fields.now ?? new Date();
+    const dateStr = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    lines.push(`Current date: ${dateStr}`);
+  }
+
+  if (lines.length === 0) return "";
 
   return ["--- User personalization ---", ...lines].join("\n");
 }

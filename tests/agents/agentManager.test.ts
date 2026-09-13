@@ -2,7 +2,10 @@ import "../setup";
 import { describe, expect, test } from "bun:test";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
-import { agentManager } from "../../src/agents/agentManager";
+import {
+  agentManager,
+  buildServerRunPromptContext,
+} from "../../src/agents/agentManager";
 import {
   createAgentRow,
   createSkillRow,
@@ -127,6 +130,28 @@ describe("agent capability runtime", () => {
         (tool) => tool instanceof AgentTool && tool.target.name === "unrouted",
       ),
     ).toBeFalse();
+  });
+
+  test("buildServerRunPromptContext includes current date by default when metadata is omitted", () => {
+    ensureUserData(RUNTIME_USER_ID);
+    const ctx = buildServerRunPromptContext({});
+    const agent = agentManager.createAgent("general_agent", {
+      ownerUuid: RUNTIME_USER_ID,
+      promptContext: ctx,
+    });
+    expect(agent.systemPrompt).toContain("Current date:");
+  });
+
+  test("buildServerRunPromptContext respects includeCurrentDate: false", () => {
+    ensureUserData(RUNTIME_USER_ID);
+    const ctx = buildServerRunPromptContext({
+      metadata: { includeCurrentDate: false },
+    });
+    const agent = agentManager.createAgent("general_agent", {
+      ownerUuid: RUNTIME_USER_ID,
+      promptContext: ctx,
+    });
+    expect(agent.systemPrompt).not.toContain("Current date:");
   });
 });
 

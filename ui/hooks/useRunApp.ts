@@ -104,11 +104,6 @@ export function useRunApp() {
     isEphemeralRef,
     userSettingsRef: settings.userSettingsRef,
     selectedSessionAgentRef,
-    agentMapRef: agents.agentMapRef,
-    workspaceDisplayPath:
-      sessions.workspace.kind === "local"
-        ? sessions.workspace.path
-        : "/workspace",
     modelMessagesRef,
     debugOpenRef,
     debugOpen,

@@ -60,18 +60,22 @@ export function DebugModal({
             </button>
           </div>
 
-          {data ? (
+          {data?.error ? (
+            <p role="alert" className="p-4 text-sm text-red-400">
+              {data.error}
+            </p>
+          ) : data ? (
             <div className="flex max-h-[min(70vh,640px)] flex-col overflow-y-auto px-[18px] pb-5 pt-4 sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
               <section className="flex flex-col gap-2">
-                <div className={eyebrowText}>System prompt</div>
+                <div className={eyebrowText}>System prompt preview</div>
                 <pre className={debugBlock}>{data.systemPrompt}</pre>
               </section>
 
               <section className="mt-[18px] flex flex-col gap-2">
-                <div className={eyebrowText}>Next call (system + history)</div>
+                <div className={eyebrowText}>Preview with stored history</div>
                 <p className="mb-1 text-[0.75rem] leading-[1.45] text-muted-foreground">
-                  Your next message is added when you send; this is what goes to
-                  the model before that.
+                  Uses current agent settings, date, and draft skill references.
+                  This is not a record of a previous request.
                 </p>
                 <pre
                   className={cx(

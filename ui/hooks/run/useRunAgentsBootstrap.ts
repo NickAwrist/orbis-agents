@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type AgentData,
   fetchAgents,
@@ -9,11 +9,7 @@ export function useRunAgentsBootstrap() {
   const [runAgents, setRunAgents] = useState<AgentData[]>([]);
   const [serverDefaultRunAgent, setServerDefaultRunAgent] =
     useState("general_agent");
-  /** Keeps the full agent records (including `system_prompt`) for client-side rendering. */
-  const agentMapRef = useRef<Map<string, AgentData>>(new Map());
-
   const apply = useCallback((list: AgentData[], def: string) => {
-    agentMapRef.current = new Map(list.map((a) => [a.name, a]));
     setRunAgents(list);
     setServerDefaultRunAgent(def);
   }, []);
@@ -56,6 +52,5 @@ export function useRunAgentsBootstrap() {
     serverDefaultRunAgent,
     setServerDefaultRunAgent,
     refreshAgentDefaults,
-    agentMapRef,
   };
 }

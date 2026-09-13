@@ -112,7 +112,7 @@ export function useSettingsPageState({
   }, [comfyuiConnected]);
 
   const handleChange = useCallback(
-    (field: keyof UserSettings, value: string) => {
+    <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
       setSettings((prev) => ({ ...prev, [field]: value }));
     },
     [],
@@ -233,7 +233,8 @@ export function useSettingsPageState({
       settings.name !== currentSettings.name ||
       settings.preferredFormats !== currentSettings.preferredFormats ||
       settings.location !== currentSettings.location ||
-      settings.defaultModel !== currentSettings.defaultModel
+      settings.defaultModel !== currentSettings.defaultModel ||
+      settings.includeCurrentDate !== currentSettings.includeCurrentDate
     ) {
       return true;
     }

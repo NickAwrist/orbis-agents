@@ -48,7 +48,7 @@ function serverPromptContext(
   toolSessionDir: string | undefined,
 ): PromptContext {
   return {
-    personalization: base?.personalization,
+    personalization: base?.personalization ?? {},
     sessionDirectory: base?.sessionDirectory ?? toolSessionDir,
     os: base?.os ?? `${os.platform()} ${os.arch()} (${os.release()})`,
   };
@@ -60,23 +60,23 @@ export function buildServerRunPromptContext(opts: {
     name?: string | undefined;
     location?: string | undefined;
     preferredFormats?: string | undefined;
+    includeCurrentDate?: boolean | undefined;
   };
   toolSessionDir?: string;
 }): PromptContext {
-  let personalization: PersonalizationFields | undefined;
+  const personalization: PersonalizationFields = {};
   if (opts.metadata !== undefined) {
     const name = opts.metadata.name?.trim();
     const location = opts.metadata.location?.trim();
     const preferredFormats = opts.metadata.preferredFormats?.trim();
-    personalization = {};
     if (name) personalization.name = name;
     if (location) personalization.location = location;
     if (preferredFormats) personalization.preferredFormats = preferredFormats;
+    if (opts.metadata.includeCurrentDate !== undefined) {
+      personalization.includeCurrentDate = opts.metadata.includeCurrentDate;
+    }
   }
-  return serverPromptContext(
-    personalization !== undefined ? { personalization } : {},
-    opts.toolSessionDir,
-  );
+  return serverPromptContext({ personalization }, opts.toolSessionDir);
 }
 
 function createBuiltinTool(toolName: string): BaseTool {
