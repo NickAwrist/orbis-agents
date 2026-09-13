@@ -15,6 +15,16 @@ import { AgentTool, delegationToolName } from "../../src/tools/AgentTool";
 const RUNTIME_USER_ID = "33333333-3333-4333-8333-333333333333";
 
 describe("agent capability runtime", () => {
+  test("enables page fetching for newly seeded general agents", () => {
+    ensureUserData(RUNTIME_USER_ID);
+    const agent = agentManager.createAgent("general_agent", {
+      ownerUuid: RUNTIME_USER_ID,
+    });
+    expect(agent.TOOL_MAP.fetch_web_page?.toTool().function.name).toBe(
+      "fetch_web_page",
+    );
+  });
+
   test("uses only the active agent's skills, built-in tools, and delegation routes", async () => {
     ensureUserData(RUNTIME_USER_ID);
     const releaseSkill = createSkillRow(RUNTIME_USER_ID, {

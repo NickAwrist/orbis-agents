@@ -12,7 +12,7 @@ const DEFAULT_AGENTS: Array<{
     name: "general_agent",
     description:
       "Orchestrator agent that answers questions directly or delegates to specialized subagents.",
-    tools: ["web_search"],
+    tools: ["web_search", "fetch_web_page"],
     delegates: ["system_agent"],
     system_prompt: [
       "You are the orchestrator agent. You answer the user's request directly when you can, and delegate to your tools when the task requires capabilities you do not have.",

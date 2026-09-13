@@ -52,6 +52,7 @@ export const envConfig = {
   ollamaHost: getFirstEnv(["AGENTS_OLLAMA_HOST", "OLLAMA_HOST"]),
   comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
   searxngHost: getFirstEnv(["AGENTS_SEARXNG_HOST", "SEARXNG_HOST"]),
+  jinaApiKey: getFirstEnv(["JINA_API_KEY", "AGENTS_JINA_API_KEY"]),
   serveFrontend: getBoolean(["AGENTS_SERVE_FRONTEND"], true),
   openrouterApiKey: getFirstEnv([
     "OPENROUTER_API_KEY",

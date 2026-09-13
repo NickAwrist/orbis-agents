@@ -20,6 +20,7 @@ import { BashTool } from "../tools/bash";
 import { isBuiltinToolName } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
+import { FetchWebPageTool } from "../tools/fetch_web_page";
 import { GenerateImageTool } from "../tools/generate_image";
 import { GrepTool } from "../tools/grep";
 import { ListFilesTool } from "../tools/list_files";
@@ -96,6 +97,8 @@ function createBuiltinTool(toolName: string): BaseTool {
       return new RunTscTool();
     case "web_search":
       return new WebSearchTool();
+    case "fetch_web_page":
+      return new FetchWebPageTool();
     case "bash":
       return new BashTool();
     case "generate_image":

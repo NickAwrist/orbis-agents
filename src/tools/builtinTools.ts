@@ -7,6 +7,7 @@ export const BUILTIN_TOOLS = [
   "read_file",
   "run_tsc",
   "web_search",
+  "fetch_web_page",
   "bash",
   "generate_image",
 ] as const;
