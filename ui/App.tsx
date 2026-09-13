@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
@@ -41,6 +41,23 @@ function ChatView({
   onSettings,
 }: ChatViewProps) {
   const [runFooterInset, setRunFooterInset] = useState(104);
+  const { setEditingUserIndex, setTruncateConfirm } = app;
+  const cancelEditUser = useCallback(
+    () => setEditingUserIndex(null),
+    [setEditingUserIndex],
+  );
+  const requestEditConfirm = useCallback(
+    (userIndex: number, text: string) => {
+      setTruncateConfirm({ kind: "edit", userIndex, text });
+    },
+    [setTruncateConfirm],
+  );
+  const requestRetryConfirm = useCallback(
+    (userIndex: number) => {
+      setTruncateConfirm({ kind: "retry", userIndex });
+    },
+    [setTruncateConfirm],
+  );
 
   useAppKeybinds({
     blockShortcuts:
@@ -161,17 +178,9 @@ function ChatView({
                 onViewSteps={app.setStepsModalData}
                 editingUserIndex={app.editingUserIndex}
                 onStartEditUser={app.setEditingUserIndex}
-                onCancelEditUser={() => app.setEditingUserIndex(null)}
-                onRequestEditConfirm={(userIndex, text) =>
-                  app.setTruncateConfirm({
-                    kind: "edit",
-                    userIndex,
-                    text,
-                  })
-                }
-                onRequestRetryConfirm={(userIndex) =>
-                  app.setTruncateConfirm({ kind: "retry", userIndex })
-                }
+                onCancelEditUser={cancelEditUser}
+                onRequestEditConfirm={requestEditConfirm}
+                onRequestRetryConfirm={requestRetryConfirm}
               />
             </div>
           ) : (

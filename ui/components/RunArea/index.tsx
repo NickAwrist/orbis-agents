@@ -1,13 +1,12 @@
 import { Bot } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
-import { traceStepsForDisplay } from "../ExecutionTrace";
 import { MarkdownMessage } from "../MarkdownMessage";
-import { MessageItem } from "../MessageItem";
+import { MessageHistory } from "./MessageHistory";
 import { StreamingStatusRow } from "./StreamingStatusRow";
 import type { RunAreaProps } from "./types";
 
-export function RunArea({
+export const RunArea = memo(function RunArea({
   messages,
   sessionLoadState,
   sessionError,
@@ -101,25 +100,17 @@ export function RunArea({
             </div>
           )}
 
-          {messages.map((message, index) => (
-            <MessageItem
-              key={`${index}:${message.role}:${message.content.slice(0, 80)}`}
-              messageIndex={index}
-              message={message}
-              animateEntry={index >= initialCount}
-              onViewSteps={
-                message.steps && traceStepsForDisplay(message.steps).length > 0
-                  ? () => onViewSteps(message.steps!)
-                  : undefined
-              }
-              isBusy={isBusy}
-              editingUserIndex={editingUserIndex}
-              onStartEditUser={onStartEditUser}
-              onCancelEditUser={onCancelEditUser}
-              onRequestEditConfirm={onRequestEditConfirm}
-              onRequestRetryConfirm={onRequestRetryConfirm}
-            />
-          ))}
+          <MessageHistory
+            messages={messages}
+            initialCount={initialCount}
+            onViewSteps={onViewSteps}
+            isBusy={isBusy}
+            editingUserIndex={editingUserIndex}
+            onStartEditUser={onStartEditUser}
+            onCancelEditUser={onCancelEditUser}
+            onRequestEditConfirm={onRequestEditConfirm}
+            onRequestRetryConfirm={onRequestRetryConfirm}
+          />
 
           {(streamingStep || streamingSteps.length > 0) && (
             <StreamingStatusRow
@@ -144,4 +135,4 @@ export function RunArea({
       </div>
     </div>
   );
-}
+});

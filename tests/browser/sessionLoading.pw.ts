@@ -32,7 +32,7 @@ async function mockApp(page: Page) {
           : path.endsWith("/health")
             ? { connected: true }
             : path === "/api/agents"
-              ? []
+              ? { agents: [] }
               : path.startsWith("/api/runs/active/")
                 ? { active: false }
                 : {};

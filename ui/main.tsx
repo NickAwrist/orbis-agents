@@ -13,7 +13,10 @@ const Root =
         : import.meta.env.DEV &&
             window.location.pathname === "/dev/model-playground"
           ? lazy(() => import("./dev/ModelPlayground"))
-          : App;
+          : import.meta.env.DEV &&
+              window.location.pathname === "/dev/long-thread"
+            ? lazy(() => import("./dev/LongThreadDemo"))
+            : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -28,7 +28,7 @@ export default defineConfig({
     },
     {
       name: "desktop",
-      grep: /desktop hover|attachment image loading|session loading|composer selectors desktop|model preferences desktop/,
+      grep: /long thread|desktop hover|attachment image loading|session loading|composer selectors desktop|model preferences desktop/,
     },
   ],
   webServer: {
