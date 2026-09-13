@@ -1,4 +1,5 @@
 import { parse as parseHtml } from "node-html-parser";
+import { z } from "zod";
 import { getSearXNGHost } from "../db/index";
 import { DEFAULT_SEARXNG_HOST } from "../env";
 import { providerHostConfig } from "../providerHostConfig";
@@ -10,16 +11,10 @@ export type SearXNGResult = {
   engine?: string;
 };
 
-type RawSearXNGResult = {
-  title?: unknown;
-  url?: unknown;
-  content?: unknown;
-  engine?: unknown;
-};
-
-type RawSearXNGResponse = {
-  results?: unknown;
-};
+const SearchResponseSchema = z.object({
+  results: z.array(z.unknown()),
+  unresponsive_engines: z.array(z.tuple([z.string(), z.string()])).optional(),
+});
 
 const REQUEST_HEADERS = {
   Accept: "application/json, text/html;q=0.9",
@@ -48,8 +43,33 @@ export class SearXNGClient {
     });
 
     if (jsonResponse.ok) {
-      const data = (await jsonResponse.json()) as RawSearXNGResponse;
-      return parseSearXNGJsonResults(data, maxResults);
+      const contentType = jsonResponse.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `SearXNG returned ${contentType || "an unknown content type"} instead of JSON. Check the configured SearXNG address and enable search.formats: [html, json].`,
+        );
+      }
+      let data: unknown;
+      try {
+        data = await jsonResponse.json();
+      } catch {
+        throw new Error("SearXNG returned invalid JSON.");
+      }
+      const parsed = SearchResponseSchema.safeParse(data);
+      if (!parsed.success) {
+        throw new Error("SearXNG returned an invalid search response.");
+      }
+      const results = parseSearXNGJsonResults(parsed.data.results, maxResults);
+      if (results.length === 0 && parsed.data.unresponsive_engines?.length) {
+        throw new Error(
+          `SearXNG returned no results and reported engine failures: ${parsed.data.unresponsive_engines.map(([engine, reason]) => `${engine}: ${reason}`).join("; ")}`,
+        );
+      }
+      return results;
+    }
+
+    if (jsonResponse.status !== 403) {
+      throw new Error(`SearXNG returned HTTP ${jsonResponse.status}`);
     }
 
     const htmlUrl = this.searchUrl(query);
@@ -71,7 +91,13 @@ export class SearXNGClient {
     timeoutMs = 5000,
   ): Promise<{ ok: boolean; error?: string }> {
     try {
-      await this.search("searxng", 1, timeoutMs);
+      const results = await this.search("searxng", 1, timeoutMs);
+      if (results.length === 0) {
+        return {
+          ok: false,
+          error: "SearXNG returned no results for the test query.",
+        };
+      }
       return { ok: true };
     } catch (error) {
       return {
@@ -89,15 +115,15 @@ export class SearXNGClient {
 }
 
 function parseSearXNGJsonResults(
-  data: RawSearXNGResponse,
+  rows: unknown[],
   maxResults: number,
 ): SearXNGResult[] {
-  const rows = Array.isArray(data.results) ? data.results : [];
   const out: SearXNGResult[] = [];
 
   for (const row of rows) {
     if (out.length >= maxResults) break;
-    const result = row as RawSearXNGResult;
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const result = row as Record<string, unknown>;
     const title = typeof result.title === "string" ? result.title.trim() : "";
     const url = typeof result.url === "string" ? result.url.trim() : "";
     if (!title && !url) continue;
@@ -121,6 +147,11 @@ function parseSearXNGHtmlResults(
   maxResults: number,
 ): SearXNGResult[] {
   const root = parseHtml(html);
+  if (!root.querySelector('meta[name="endpoint"][content="results"]')) {
+    throw new Error(
+      "SearXNG returned an unexpected HTML page. Check the configured SearXNG address.",
+    );
+  }
   const nodes = root.querySelectorAll("article.result");
   const out: SearXNGResult[] = [];
 
@@ -141,6 +172,20 @@ function parseSearXNGHtmlResults(
     });
   }
 
+  if (out.length === 0) {
+    const failures = root
+      .querySelectorAll("#engines_msg tr")
+      .filter((row) => row.querySelector(".response-error"))
+      .map(
+        (row) =>
+          `${cleanText(row.querySelector(".engine-name")?.text ?? "")}: ${cleanText(row.querySelector(".response-error")?.text ?? "")}`,
+      );
+    if (failures.length) {
+      throw new Error(
+        `SearXNG returned no results and reported engine failures: ${failures.join("; ")}`,
+      );
+    }
+  }
   return out;
 }
 
