@@ -36,7 +36,14 @@ bun run dev:server
 bun run dev:ui
 ```
 
-Optional local overrides can be placed in `.env`. Start from `.env.example`.
+Create your own local settings file, then edit it before starting the app:
+
+```bash
+cp .env.example .env
+```
+
+Bun and Vite load `.env` automatically. Restart the dev processes after changing it.
+The file is ignored by Git. For example:
 
 ```bash
 AGENTS_BACKEND_PORT=3000
@@ -53,6 +60,39 @@ In development, the backend API and Vite UI are separate processes:
 
 - `AGENTS_BACKEND_PORT` controls the API server. Default: `3000`.
 - `AGENTS_FRONTEND_PORT` controls the Vite dev server. Default: `5174`.
+
+## Worktree development
+
+From a new worktree, run:
+
+```bash
+bun run init:worktree
+# Edit .env, including unused AGENTS_BACKEND_PORT and AGENTS_FRONTEND_PORT values.
+bun run dev
+```
+
+The initializer copies your primary checkout's `.env`, or `.env.example` if no
+local file exists. It sets `AGENTS_DB_PATH` and `ORBIS_DATA_ROOT` to the worktree's
+own `data/` directory and links the primary checkout's `node_modules` when available.
+Existing `.env` files and dependencies are preserved. Run `bun install` if the
+primary checkout has no dependencies installed.
+
+New worktrees copy the primary checkout's SQLite database and retained workspaces.
+The database snapshot includes committed WAL data. Existing destination data is
+preserved, and rerunning setup with an existing `.env` does not copy data again.
+Temporary workspaces and trash are not copied. Saved endpoint settings still take
+precedence over `.env`; clear them in Settings to use your environment values.
+Service endpoints, API keys, and
+`AGENTS_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
+port to use the full app with these settings.
+
+You can also run `bun run init:worktree /path/to/worktree` from the primary checkout.
+T3 Code can invoke the same command on worktree creation using its
+`T3CODE_PROJECT_ROOT` and `T3CODE_WORKTREE_PATH` variables. Running it in the primary
+checkout creates `.env` from the example if needed.
+
+The `/dev/...` routes are isolated UI examples for automated browser checks.
+Unit tests continue to use an in-memory database and mocked services.
 
 ## Docker
 
